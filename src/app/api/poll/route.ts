@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       id,
       title: title || 'What It Do?',
       suggestions,
-      creatorEmail: 'myth-gait8y@icloud.com',
+      creatorEmail: 'sailorbeefalo@gmail.com',
       createdAt: Date.now(),
       responses: []
     }
