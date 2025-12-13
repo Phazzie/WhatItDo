@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv'
+import { getRedis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
@@ -22,11 +22,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Poll ID and votes required' }, { status: 400 })
     }
 
-    const poll = await kv.get<Poll>(`poll:${pollId}`)
+    const redis = await getRedis()
+    const data = await redis.get(`poll:${pollId}`)
 
-    if (!poll) {
+    if (!data) {
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
+
+    const poll = JSON.parse(data) as Poll
 
     const response: PollResponse = {
       id: nanoid(8),
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     poll.responses.push(response)
-    await kv.set(`poll:${pollId}`, poll)
+    await redis.set(`poll:${pollId}`, JSON.stringify(poll))
 
     // Send email notification
     const emailClient = getResend()
