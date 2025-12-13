@@ -5,7 +5,6 @@ import { useState, useRef, useEffect } from 'react'
 export default function Home() {
   const [suggestions, setSuggestions] = useState(['', '', ''])
   const [title, setTitle] = useState('')
-  const [email, setEmail] = useState('')
   const [pollLink, setPollLink] = useState('')
   const [resultsLink, setResultsLink] = useState('')
   const [copied, setCopied] = useState(false)
@@ -30,10 +29,6 @@ export default function Home() {
       alert('Add at least one suggestion!')
       return
     }
-    if (!email.trim()) {
-      alert('Add your email to get notified when someone votes!')
-      return
-    }
 
     setCreating(true)
     try {
@@ -42,8 +37,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim() || 'What It Do?',
-          suggestions: filledSuggestions.map(s => s.trim()),
-          creatorEmail: email.trim()
+          suggestions: filledSuggestions.map(s => s.trim())
         })
       })
 
@@ -95,7 +89,6 @@ export default function Home() {
     setResultsLink('')
     setSuggestions(['', '', ''])
     setTitle('')
-    setEmail('')
   }
 
   if (pollLink) {
@@ -181,20 +174,6 @@ export default function Home() {
         </div>
 
         <div className="card-gradient rounded-2xl p-8 neon-border">
-          <div className="mb-6">
-            <label htmlFor="creator-email" className="block text-purple-300 text-sm mb-2 font-medium">
-              Your Email <span className="text-fuchsia-400">*</span>
-            </label>
-            <input
-              type="email"
-              id="creator-email"
-              placeholder="you@example.com (for vote notifications)"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
-            />
-          </div>
-
           <div className="mb-6">
             <label htmlFor="poll-title" className="block text-purple-300 text-sm mb-2 font-medium">Poll Title (optional)</label>
             <input

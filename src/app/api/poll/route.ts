@@ -6,14 +6,10 @@ import { Poll } from '@/lib/types'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, suggestions, creatorEmail } = body
+    const { title, suggestions } = body
 
     if (!suggestions || suggestions.length === 0) {
       return NextResponse.json({ error: 'At least one suggestion required' }, { status: 400 })
-    }
-
-    if (!creatorEmail) {
-      return NextResponse.json({ error: 'Email required for notifications' }, { status: 400 })
     }
 
     const id = nanoid(10)
@@ -21,7 +17,7 @@ export async function POST(request: NextRequest) {
       id,
       title: title || 'What It Do?',
       suggestions,
-      creatorEmail,
+      creatorEmail: 'myth-gait8y@icloud.com',
       createdAt: Date.now(),
       responses: []
     }
