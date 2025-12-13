@@ -2,24 +2,199 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --neon-pink: #ff00ff;
+  --neon-blue: #00ffff;
+  --neon-purple: #bf00ff;
+}
+
 body {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: linear-gradient(135deg, #0d0221 0%, #1a0533 30%, #2d1b4e 60%, #1a0533 100%);
   min-height: 100vh;
+  position: relative;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.3;
+  z-index: -2;
+  pointer-events: none;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at top, rgba(191, 0, 255, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(0, 255, 255, 0.1) 0%, transparent 50%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Neon glow effects */
+.neon-text {
+  text-shadow:
+    0 0 5px var(--neon-pink),
+    0 0 10px var(--neon-pink),
+    0 0 20px var(--neon-pink),
+    0 0 40px var(--neon-purple);
+}
+
+.neon-box {
+  box-shadow:
+    0 0 5px rgba(191, 0, 255, 0.5),
+    0 0 20px rgba(191, 0, 255, 0.3),
+    0 0 40px rgba(191, 0, 255, 0.1),
+    inset 0 0 20px rgba(191, 0, 255, 0.1);
+}
+
+.neon-border {
+  border: 1px solid rgba(191, 0, 255, 0.5);
+  box-shadow:
+    0 0 10px rgba(191, 0, 255, 0.3),
+    inset 0 0 10px rgba(191, 0, 255, 0.1);
+}
+
+/* Rainbow bar */
+.rainbow-bar {
+  height: 4px;
+  background: linear-gradient(90deg,
+    #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0080ff, #8000ff, #ff0080
+  );
+  border-radius: 2px;
+}
+
+/* Animated gradient background for cards */
+.card-gradient {
+  background: linear-gradient(
+    145deg,
+    rgba(45, 27, 78, 0.9) 0%,
+    rgba(26, 5, 51, 0.95) 50%,
+    rgba(13, 2, 33, 0.9) 100%
+  );
+  backdrop-filter: blur(10px);
+}
+
+/* Button styles */
+.btn-neon {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-neon::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transform: rotate(45deg);
+  transition: all 0.5s ease;
+}
+
+.btn-neon:hover::before {
+  left: 100%;
+}
+
+/* Vote buttons */
 .vote-btn {
-  @apply transform transition-all duration-200 hover:scale-110 active:scale-95;
+  @apply transform transition-all duration-200;
 }
 
-.card-glow {
-  box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+.vote-btn:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 10px 30px -10px currentColor;
 }
 
+.vote-btn:active {
+  transform: scale(0.98);
+}
+
+/* Floating animation */
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-15px) rotate(1deg); }
 }
 
 .floating {
-  animation: float 3s ease-in-out infinite;
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(191, 0, 255, 0.4); }
+  50% { box-shadow: 0 0 40px rgba(191, 0, 255, 0.8), 0 0 60px rgba(0, 255, 255, 0.3); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Sparkle effect */
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* Scanlines overlay */
+.scanlines::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1) 0px,
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.3;
+}
+
+/* Input focus glow */
+input:focus {
+  box-shadow: 0 0 0 2px rgba(191, 0, 255, 0.3), 0 0 20px rgba(191, 0, 255, 0.2);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(13, 2, 33, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--neon-pink), var(--neon-purple));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--neon-blue), var(--neon-pink));
 }

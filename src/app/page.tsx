@@ -9,9 +9,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false)
 
   const updateSuggestion = (index: number, value: string) => {
-    const updated = [...suggestions]
-    updated[index] = value
-    setSuggestions(updated)
+    setSuggestions(prev => prev.map((s, i) => i === index ? value : s))
   }
 
   const createPoll = () => {
@@ -29,10 +27,33 @@ export default function Home() {
     setPollLink(link)
   }
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(pollLink)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(pollLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = pollLink
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const shareViaText = () => {
+    const message = `Vote on my poll: ${title || 'What It Do?'}\n${pollLink}`
+    window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank')
+  }
+
+  const shareViaEmail = () => {
+    const subject = title || 'Vote on my poll!'
+    const body = `Hey! I need your input on some suggestions.\n\nClick here to vote: ${pollLink}\n\nThanks!`
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
   }
 
   const resetPoll = () => {
@@ -43,79 +64,101 @@ export default function Home() {
 
   if (pollLink) {
     return (
-      <main className="min-h-screen py-12 px-4">
+      <main className="min-h-screen py-12 px-4 scanlines">
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-10">
-            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400 mb-4">
+            <div className="rainbow-bar w-32 mx-auto mb-6" />
+            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-300 to-cyan-400 mb-4 floating neon-text">
               Poll Created!
             </h1>
-            <p className="text-xl text-gray-400">
+            <p className="text-xl text-purple-200/80">
               Share this link with your friend
             </p>
           </div>
 
-          <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-green-500/30">
-            <div className="bg-gray-800 rounded-xl p-4 mb-6 break-all">
-              <p className="text-indigo-300 text-sm font-mono">{pollLink}</p>
+          <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow">
+            <div className="bg-black/40 rounded-xl p-4 mb-6 break-all border border-purple-500/30">
+              <p className="text-cyan-300 text-sm font-mono">{pollLink}</p>
             </div>
 
             <div className="space-y-3">
               <button
                 onClick={copyLink}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all"
+                className="btn-neon w-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all"
               >
-                {copied ? 'Copied!' : 'Copy Link'}
+                {copied ? '✓ Copied!' : 'Copy Link'}
               </button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={shareViaText}
+                  className="btn-neon bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <span>📱</span> Text
+                </button>
+                <button
+                  onClick={shareViaEmail}
+                  className="btn-neon bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <span>📧</span> Email
+                </button>
+              </div>
 
               <a
                 href={pollLink}
-                className="block w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all text-center"
+                className="block w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all text-center border border-white/20"
               >
                 Preview Poll
               </a>
 
               <button
                 onClick={resetPoll}
-                className="w-full text-gray-400 hover:text-white py-2 transition-all"
+                className="w-full text-purple-300 hover:text-white py-2 transition-all"
               >
                 Create Another Poll
               </button>
             </div>
           </div>
+
+          <p className="text-center text-purple-400/60 text-sm mt-8">
+            Your friend&apos;s votes will be shown after they submit
+          </p>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen py-12 px-4">
+    <main className="min-h-screen py-12 px-4 scanlines">
       <div className="max-w-xl mx-auto">
         <div className="text-center mb-10">
-          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 mb-4">
+          <div className="rainbow-bar w-32 mx-auto mb-6" />
+          <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 mb-4 floating">
             What It Do?
           </h1>
-          <p className="text-xl text-gray-400">
+          <p className="text-xl text-purple-200/80">
             Create 3 dubious suggestions for your friend to vote on
           </p>
         </div>
 
-        <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-indigo-500/30">
+        <div className="card-gradient rounded-2xl p-8 neon-border">
           <div className="mb-6">
-            <label className="block text-gray-400 text-sm mb-2">Poll Title (optional)</label>
+            <label className="block text-purple-300 text-sm mb-2 font-medium">Poll Title (optional)</label>
             <input
               type="text"
               placeholder="e.g., Weekend Plans for Dave"
               value={title}
+              maxLength={100}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
             />
           </div>
 
           <div className="space-y-4 mb-8">
             {suggestions.map((suggestion, index) => (
               <div key={index}>
-                <label className="block text-gray-400 text-sm mb-2">
-                  Suggestion #{index + 1}
+                <label className="block text-purple-300 text-sm mb-2 font-medium">
+                  Suggestion #{index + 1} {index === 0 && <span className="text-fuchsia-400">*</span>}
                 </label>
                 <input
                   type="text"
@@ -125,8 +168,9 @@ export default function Home() {
                     "e.g., Call in sick and go to the beach"
                   }
                   value={suggestion}
+                  maxLength={200}
                   onChange={(e) => updateSuggestion(index, e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
                 />
               </div>
             ))}
@@ -134,13 +178,13 @@ export default function Home() {
 
           <button
             onClick={createPoll}
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
+            className="btn-neon w-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
           >
             Create Poll & Get Link
           </button>
         </div>
 
-        <p className="text-center text-gray-500 text-sm mt-8">
+        <p className="text-center text-purple-400/60 text-sm mt-8">
           Your friend will vote Yes, No, or Maybe on each suggestion
         </p>
       </div>
