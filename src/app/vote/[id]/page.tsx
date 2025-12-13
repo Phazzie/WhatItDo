@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
+import { Poll } from '@/lib/types'
 
 type Vote = 'yes' | 'no' | 'maybe' | null
 
@@ -11,30 +12,38 @@ interface SuggestionVote {
   comment: string
 }
 
-function VoteContent() {
-  const searchParams = useSearchParams()
-  const [title, setTitle] = useState('')
+export default function VotePage() {
+  const params = useParams()
+  const pollId = params.id as string
+
+  const [poll, setPoll] = useState<Poll | null>(null)
   const [suggestions, setSuggestions] = useState<SuggestionVote[]>([])
-  const [submitted, setSubmitted] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [voterName, setVoterName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const t = searchParams.get('t')
-    if (t) setTitle(t)
-
-    const suggs: SuggestionVote[] = []
-    let i = 0
-    while (true) {
-      const s = searchParams.get(`s${i}`)
-      if (!s) break
-      suggs.push({ text: s, vote: null, comment: '' })
-      i++
+    async function loadPoll() {
+      try {
+        const res = await fetch(`/api/poll?id=${pollId}`)
+        if (!res.ok) throw new Error('Poll not found')
+        const data = await res.json()
+        setPoll(data.poll)
+        setSuggestions(data.poll.suggestions.map((text: string) => ({
+          text,
+          vote: null,
+          comment: ''
+        })))
+      } catch {
+        setError('Poll not found')
+      } finally {
+        setLoading(false)
+      }
     }
-    setSuggestions(suggs)
-    setLoading(false)
-  }, [searchParams])
+    loadPoll()
+  }, [pollId])
 
   const handleVote = (index: number, vote: Vote) => {
     setSuggestions(prev => prev.map((s, i) =>
@@ -50,45 +59,35 @@ function VoteContent() {
 
   const allVoted = suggestions.length > 0 && suggestions.every(s => s.vote !== null)
 
-  const submitVotes = () => {
+  const submitVotes = async () => {
     if (!allVoted) {
       alert('Vote on all suggestions first!')
       return
     }
-    setSubmitted(true)
-  }
 
-  const getResultsText = () => {
-    const resultText = suggestions.map((s, i) =>
-      `${i + 1}. "${s.text}"\n   Vote: ${s.vote?.toUpperCase()}${s.comment ? `\n   Comment: ${s.comment}` : ''}`
-    ).join('\n\n')
-    return `${title ? `${title}\n\n` : ''}${voterName ? `From: ${voterName}\n\n` : ''}${resultText}`
-  }
-
-  const copyResults = async () => {
+    setSubmitting(true)
     try {
-      await navigator.clipboard.writeText(getResultsText())
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      const res = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pollId,
+          voterName: voterName.trim() || 'Anonymous',
+          votes: suggestions.map(s => ({
+            text: s.text,
+            vote: s.vote,
+            comment: s.comment.trim()
+          }))
+        })
+      })
+
+      if (!res.ok) throw new Error('Failed to submit')
+      setSubmitted(true)
     } catch {
-      const textArea = document.createElement('textarea')
-      textArea.value = getResultsText()
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      alert('Failed to submit votes. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
-  }
-
-  const shareViaText = () => {
-    window.open(`sms:?body=${encodeURIComponent(getResultsText())}`, '_blank')
-  }
-
-  const shareViaEmail = () => {
-    const subject = `Poll Results: ${title || 'What It Do?'}`
-    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(getResultsText())}`, '_blank')
   }
 
   const getVoteEmoji = (vote: Vote) => {
@@ -108,16 +107,16 @@ function VoteContent() {
   if (loading) {
     return (
       <main className="min-h-screen py-12 px-4 flex items-center justify-center">
-        <div className="text-purple-300 text-xl animate-pulse">Loading...</div>
+        <div className="text-purple-300 text-xl animate-pulse">Loading poll...</div>
       </main>
     )
   }
 
-  if (suggestions.length === 0) {
+  if (error || !poll) {
     return (
       <main className="min-h-screen py-12 px-4 flex items-center justify-center scanlines">
         <div className="text-center card-gradient p-8 rounded-2xl neon-border">
-          <h1 className="text-3xl font-bold text-white mb-4">No suggestions found</h1>
+          <h1 className="text-3xl font-bold text-white mb-4">Poll not found</h1>
           <a href="/" className="text-fuchsia-400 hover:text-fuchsia-300 font-medium">Create a new poll</a>
         </div>
       </main>
@@ -133,7 +132,7 @@ function VoteContent() {
             <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-300 to-cyan-400 mb-4 floating">
               Votes Submitted!
             </h1>
-            {title && <p className="text-xl text-purple-200/80">{title}</p>}
+            <p className="text-xl text-purple-200/80">{poll.title}</p>
           </div>
 
           <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow mb-6">
@@ -152,42 +151,11 @@ function VoteContent() {
             </div>
           </div>
 
-          <div className="card-gradient rounded-2xl p-6 neon-border">
-            <p className="text-purple-300 text-sm mb-3 font-medium">Send your results back:</p>
-            <label htmlFor="voter-name" className="sr-only">Your name (optional)</label>
-            <input
-              id="voter-name"
-              type="text"
-              placeholder="Your name (optional)"
-              value={voterName}
-              onChange={(e) => setVoterName(e.target.value)}
-              className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all mb-4"
-            />
-
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <button
-                onClick={copyResults}
-                className="btn-neon bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-bold py-3 px-4 rounded-xl transition-all text-sm"
-              >
-                {copied ? '✓' : 'Copy'}
-              </button>
-              <button
-                onClick={shareViaText}
-                className="btn-neon bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-1 text-sm"
-              >
-                <span>📱</span> Text
-              </button>
-              <button
-                onClick={shareViaEmail}
-                className="btn-neon bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-1 text-sm"
-              >
-                <span>📧</span> Email
-              </button>
-            </div>
-
+          <div className="card-gradient rounded-2xl p-6 neon-border text-center">
+            <p className="text-green-400 mb-4">The poll creator has been notified of your votes!</p>
             <a
               href="/"
-              className="block text-center text-purple-300 hover:text-white text-sm transition-all"
+              className="text-purple-300 hover:text-white text-sm transition-all"
             >
               Create your own poll
             </a>
@@ -203,11 +171,25 @@ function VoteContent() {
         <div className="text-center mb-10">
           <div className="rainbow-bar w-32 mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 mb-4 floating">
-            {title || 'What It Do?'}
+            {poll.title}
           </h1>
           <p className="text-xl text-purple-200/80">
             Vote on these suggestions!
           </p>
+        </div>
+
+        <div className="card-gradient rounded-2xl p-6 neon-border mb-6">
+          <label htmlFor="voter-name" className="block text-purple-300 text-sm mb-2 font-medium">
+            Your Name (optional)
+          </label>
+          <input
+            id="voter-name"
+            type="text"
+            placeholder="Enter your name"
+            value={voterName}
+            onChange={(e) => setVoterName(e.target.value)}
+            className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
+          />
         </div>
 
         <div className="space-y-6 mb-8">
@@ -277,28 +259,16 @@ function VoteContent() {
 
         <button
           onClick={submitVotes}
-          disabled={!allVoted}
+          disabled={!allVoted || submitting}
           className={`w-full font-bold py-4 px-6 rounded-xl text-lg transition-all ${
-            allVoted
+            allVoted && !submitting
               ? 'btn-neon bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white transform hover:scale-[1.02]'
               : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
           }`}
         >
-          {allVoted ? 'Submit Votes' : `Vote on all ${suggestions.length} suggestions`}
+          {submitting ? 'Submitting...' : allVoted ? 'Submit Votes' : `Vote on all ${suggestions.length} suggestions`}
         </button>
       </div>
     </main>
-  )
-}
-
-export default function VotePage() {
-  return (
-    <Suspense fallback={
-      <main className="min-h-screen py-12 px-4 flex items-center justify-center">
-        <div className="text-purple-300 text-xl animate-pulse">Loading...</div>
-      </main>
-    }>
-      <VoteContent />
-    </Suspense>
   )
 }

@@ -5,8 +5,11 @@ import { useState, useRef, useEffect } from 'react'
 export default function Home() {
   const [suggestions, setSuggestions] = useState(['', '', ''])
   const [title, setTitle] = useState('')
+  const [email, setEmail] = useState('')
   const [pollLink, setPollLink] = useState('')
+  const [resultsLink, setResultsLink] = useState('')
   const [copied, setCopied] = useState(false)
+  const [creating, setCreating] = useState(false)
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -21,19 +24,40 @@ export default function Home() {
     setSuggestions(prev => prev.map((s, i) => i === index ? value : s))
   }
 
-  const createPoll = () => {
+  const createPoll = async () => {
     const filledSuggestions = suggestions.filter(s => s.trim())
     if (filledSuggestions.length === 0) {
       alert('Add at least one suggestion!')
       return
     }
+    if (!email.trim()) {
+      alert('Add your email to get notified when someone votes!')
+      return
+    }
 
-    const params = new URLSearchParams()
-    if (title.trim()) params.set('t', title.trim())
-    filledSuggestions.forEach((s, i) => params.set(`s${i}`, s.trim()))
+    setCreating(true)
+    try {
+      const res = await fetch('/api/poll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim() || 'What It Do?',
+          suggestions: filledSuggestions.map(s => s.trim()),
+          creatorEmail: email.trim()
+        })
+      })
 
-    const link = `${window.location.origin}/vote?${params.toString()}`
-    setPollLink(link)
+      if (!res.ok) throw new Error('Failed to create poll')
+
+      const data = await res.json()
+      setPollLink(`${window.location.origin}/vote/${data.id}`)
+      setResultsLink(`${window.location.origin}/results/${data.id}`)
+    } catch (error) {
+      console.error(error)
+      alert('Failed to create poll. Please try again.')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const copyLink = async () => {
@@ -43,7 +67,6 @@ export default function Home() {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback for older browsers
       const textArea = document.createElement('textarea')
       textArea.value = pollLink
       document.body.appendChild(textArea)
@@ -69,8 +92,10 @@ export default function Home() {
 
   const resetPoll = () => {
     setPollLink('')
+    setResultsLink('')
     setSuggestions(['', '', ''])
     setTitle('')
+    setEmail('')
   }
 
   if (pollLink) {
@@ -87,7 +112,8 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow">
+          <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow mb-6">
+            <p className="text-purple-300 text-sm mb-2 font-medium">Send this to your friend:</p>
             <div className="bg-black/40 rounded-xl p-4 mb-6 break-all border border-purple-500/30">
               <p className="text-cyan-300 text-sm font-mono">{pollLink}</p>
             </div>
@@ -114,26 +140,28 @@ export default function Home() {
                   <span>📧</span> Email
                 </button>
               </div>
-
-              <a
-                href={pollLink}
-                className="block w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all text-center border border-white/20"
-              >
-                Preview Poll
-              </a>
-
-              <button
-                onClick={resetPoll}
-                className="w-full text-purple-300 hover:text-white py-2 transition-all"
-              >
-                Create Another Poll
-              </button>
             </div>
           </div>
 
-          <p className="text-center text-purple-400/60 text-sm mt-8">
-            Your friend&apos;s votes will be shown after they submit
-          </p>
+          <div className="card-gradient rounded-2xl p-6 neon-border">
+            <p className="text-purple-300 text-sm mb-2 font-medium">View results anytime:</p>
+            <a
+              href={resultsLink}
+              className="block w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all text-center border border-white/20"
+            >
+              View Results Page
+            </a>
+            <p className="text-purple-400/60 text-xs mt-3 text-center">
+              You&apos;ll also get an email when someone votes!
+            </p>
+          </div>
+
+          <button
+            onClick={resetPoll}
+            className="w-full text-purple-300 hover:text-white py-4 transition-all"
+          >
+            Create Another Poll
+          </button>
         </div>
       </main>
     )
@@ -153,6 +181,20 @@ export default function Home() {
         </div>
 
         <div className="card-gradient rounded-2xl p-8 neon-border">
+          <div className="mb-6">
+            <label htmlFor="creator-email" className="block text-purple-300 text-sm mb-2 font-medium">
+              Your Email <span className="text-fuchsia-400">*</span>
+            </label>
+            <input
+              type="email"
+              id="creator-email"
+              placeholder="you@example.com (for vote notifications)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
+            />
+          </div>
+
           <div className="mb-6">
             <label htmlFor="poll-title" className="block text-purple-300 text-sm mb-2 font-medium">Poll Title (optional)</label>
             <input
@@ -191,9 +233,10 @@ export default function Home() {
 
           <button
             onClick={createPoll}
-            className="btn-neon w-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
+            disabled={creating}
+            className="btn-neon w-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
-            Create Poll & Get Link
+            {creating ? 'Creating...' : 'Create Poll & Get Link'}
           </button>
         </div>
 
