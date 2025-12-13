@@ -1,4 +1,4 @@
-import { getRedis } from '@/lib/redis'
+import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
@@ -22,14 +22,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Poll ID and votes required' }, { status: 400 })
     }
 
-    const redis = await getRedis()
     const data = await redis.get(`poll:${pollId}`)
 
     if (!data) {
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
-    const poll = JSON.parse(data) as Poll
+    const poll: Poll = typeof data === 'string' ? JSON.parse(data) : data
 
     const response: PollResponse = {
       id: nanoid(8),
@@ -78,7 +77,6 @@ export async function POST(request: NextRequest) {
         })
       } catch (emailError) {
         console.error('Failed to send email:', emailError)
-        // Don't fail the request if email fails
       }
     }
 

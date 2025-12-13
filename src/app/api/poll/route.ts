@@ -1,4 +1,4 @@
-import { getRedis } from '@/lib/redis'
+import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Poll } from '@/lib/types'
@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email required for notifications' }, { status: 400 })
     }
 
-    const redis = await getRedis()
     const id = nanoid(10)
     const poll: Poll = {
       id,
@@ -45,14 +44,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Poll ID required' }, { status: 400 })
     }
 
-    const redis = await getRedis()
     const data = await redis.get(`poll:${id}`)
 
     if (!data) {
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
-    const poll = JSON.parse(data) as Poll
+    const poll = typeof data === 'string' ? JSON.parse(data) : data
 
     return NextResponse.json({ poll })
   } catch (error) {
