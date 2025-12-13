@@ -25,9 +25,12 @@ function VoteContent() {
     if (t) setTitle(t)
 
     const suggs: SuggestionVote[] = []
-    for (let i = 0; i < 3; i++) {
+    let i = 0
+    while (true) {
       const s = searchParams.get(`s${i}`)
-      if (s) suggs.push({ text: s, vote: null, comment: '' })
+      if (!s) break
+      suggs.push({ text: s, vote: null, comment: '' })
+      i++
     }
     setSuggestions(suggs)
     setLoading(false)
@@ -151,7 +154,9 @@ function VoteContent() {
 
           <div className="card-gradient rounded-2xl p-6 neon-border">
             <p className="text-purple-300 text-sm mb-3 font-medium">Send your results back:</p>
+            <label htmlFor="voter-name" className="sr-only">Your name (optional)</label>
             <input
+              id="voter-name"
               type="text"
               placeholder="Your name (optional)"
               value={voterName}
@@ -218,6 +223,8 @@ function VoteContent() {
               <div className="flex gap-3 mb-4">
                 <button
                   onClick={() => handleVote(index, 'yes')}
+                  aria-pressed={suggestion.vote === 'yes'}
+                  aria-label={`Vote yes for "${suggestion.text}"`}
                   className={`vote-btn flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                     suggestion.vote === 'yes'
                       ? 'bg-green-500 text-white shadow-lg shadow-green-500/50'
@@ -228,6 +235,8 @@ function VoteContent() {
                 </button>
                 <button
                   onClick={() => handleVote(index, 'maybe')}
+                  aria-pressed={suggestion.vote === 'maybe'}
+                  aria-label={`Vote maybe for "${suggestion.text}"`}
                   className={`vote-btn flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                     suggestion.vote === 'maybe'
                       ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/50'
@@ -238,6 +247,8 @@ function VoteContent() {
                 </button>
                 <button
                   onClick={() => handleVote(index, 'no')}
+                  aria-pressed={suggestion.vote === 'no'}
+                  aria-label={`Vote no for "${suggestion.text}"`}
                   className={`vote-btn flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                     suggestion.vote === 'no'
                       ? 'bg-red-500 text-white shadow-lg shadow-red-500/50'
@@ -248,7 +259,11 @@ function VoteContent() {
                 </button>
               </div>
 
+              <label htmlFor={`comment-${index}`} className="sr-only">
+                Add a comment for &quot;{suggestion.text}&quot; (optional)
+              </label>
               <input
+                id={`comment-${index}`}
                 type="text"
                 placeholder="Add a comment (optional)"
                 value={suggestion.comment}

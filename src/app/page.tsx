@@ -1,12 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function Home() {
   const [suggestions, setSuggestions] = useState(['', '', ''])
   const [title, setTitle] = useState('')
   const [pollLink, setPollLink] = useState('')
   const [copied, setCopied] = useState(false)
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const updateSuggestion = (index: number, value: string) => {
     setSuggestions(prev => prev.map((s, i) => i === index ? value : s))
@@ -31,7 +40,8 @@ export default function Home() {
     try {
       await navigator.clipboard.writeText(pollLink)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
       // Fallback for older browsers
       const textArea = document.createElement('textarea')
@@ -41,7 +51,8 @@ export default function Home() {
       document.execCommand('copy')
       document.body.removeChild(textArea)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     }
   }
 
@@ -143,9 +154,10 @@ export default function Home() {
 
         <div className="card-gradient rounded-2xl p-8 neon-border">
           <div className="mb-6">
-            <label className="block text-purple-300 text-sm mb-2 font-medium">Poll Title (optional)</label>
+            <label htmlFor="poll-title" className="block text-purple-300 text-sm mb-2 font-medium">Poll Title (optional)</label>
             <input
               type="text"
+              id="poll-title"
               placeholder="e.g., Weekend Plans for Dave"
               value={title}
               maxLength={100}
@@ -157,11 +169,12 @@ export default function Home() {
           <div className="space-y-4 mb-8">
             {suggestions.map((suggestion, index) => (
               <div key={index}>
-                <label className="block text-purple-300 text-sm mb-2 font-medium">
+                <label htmlFor={`suggestion-${index}`} className="block text-purple-300 text-sm mb-2 font-medium">
                   Suggestion #{index + 1} {index === 0 && <span className="text-fuchsia-400">*</span>}
                 </label>
                 <input
                   type="text"
+                  id={`suggestion-${index}`}
                   placeholder={
                     index === 0 ? "e.g., Eat an entire pizza alone" :
                     index === 1 ? "e.g., Text your ex 'I miss you'" :

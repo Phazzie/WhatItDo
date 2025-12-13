@@ -85,6 +85,7 @@ body::after {
     rgba(26, 5, 51, 0.95) 50%,
     rgba(13, 2, 33, 0.9) 100%
   );
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -138,6 +139,7 @@ body::after {
 
 .floating {
   animation: float 4s ease-in-out infinite;
+  will-change: transform;
 }
 
 /* Pulse glow */
@@ -148,12 +150,6 @@ body::after {
 
 .pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Sparkle effect */
-@keyframes sparkle {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.2); }
 }
 
 /* Scanlines overlay */
@@ -172,12 +168,16 @@ body::after {
     transparent 2px
   );
   pointer-events: none;
-  z-index: 1000;
+  z-index: 99;
   opacity: 0.3;
 }
 
 /* Input focus glow */
-input:focus {
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+textarea:focus {
+  outline: none;
   box-shadow: 0 0 0 2px rgba(191, 0, 255, 0.3), 0 0 20px rgba(191, 0, 255, 0.2);
 }
 
