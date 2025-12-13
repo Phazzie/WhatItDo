@@ -16,7 +16,7 @@ function getResend() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { pollId, voterName, votes } = body
+    const { pollId, voterName, votes, counterProposal } = body
 
     if (!pollId || !votes) {
       return NextResponse.json({ error: 'Poll ID and votes required' }, { status: 400 })
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       id: nanoid(8),
       voterName: voterName || 'Anonymous',
       votes,
+      counterProposal: counterProposal || undefined,
       submittedAt: Date.now()
     }
 
@@ -47,13 +48,20 @@ export async function POST(request: NextRequest) {
         `${i + 1}. "${v.text}"\n   Vote: ${v.vote.toUpperCase()}${v.comment ? `\n   Comment: "${v.comment}"` : ''}`
       ).join('\n\n')
 
+      const counterProposalHtml = counterProposal
+        ? `<div style="background: #2d1f3d; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #f0abfc;">
+             <p style="color: #f0abfc; font-weight: bold; margin: 0 0 8px 0;">💡 Counter Proposal:</p>
+             <p style="color: #e2e8f0; margin: 0; font-style: italic;">"${counterProposal}"</p>
+           </div>`
+        : ''
+
       const resultsUrl = `${process.env.NEXT_PUBLIC_BASE_URL || request.headers.get('origin')}/results/${pollId}`
 
       try {
         await emailClient.emails.send({
           from: 'What It Do <notifications@resend.dev>',
           to: poll.creatorEmail,
-          subject: `${response.voterName} voted on your poll: ${poll.title}`,
+          subject: `${response.voterName} voted on your poll: ${poll.title}${counterProposal ? ' (+ counter proposal!)' : ''}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <h1 style="color: #a855f7;">New Vote Received!</h1>
@@ -62,6 +70,8 @@ export async function POST(request: NextRequest) {
               <div style="background: #1a1a2e; padding: 20px; border-radius: 12px; margin: 20px 0;">
                 <pre style="color: #e2e8f0; white-space: pre-wrap; font-size: 14px;">${voteSummary}</pre>
               </div>
+
+              ${counterProposalHtml}
 
               <p>
                 <a href="${resultsUrl}" style="display: inline-block; background: linear-gradient(to right, #a855f7, #6366f1); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">

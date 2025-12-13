@@ -19,6 +19,7 @@ export default function VotePage() {
   const [poll, setPoll] = useState<Poll | null>(null)
   const [suggestions, setSuggestions] = useState<SuggestionVote[]>([])
   const [voterName, setVoterName] = useState('')
+  const [counterProposal, setCounterProposal] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -77,7 +78,8 @@ export default function VotePage() {
             text: s.text,
             vote: s.vote,
             comment: s.comment.trim()
-          }))
+          })),
+          counterProposal: counterProposal.trim() || undefined
         })
       })
 
@@ -149,6 +151,13 @@ export default function VotePage() {
                 </div>
               ))}
             </div>
+
+            {counterProposal.trim() && (
+              <div className="mt-6 pt-6 border-t border-purple-500/30">
+                <p className="text-fuchsia-400 text-sm font-medium mb-2">Your Counter Proposal:</p>
+                <p className="text-white italic">&ldquo;{counterProposal.trim()}&rdquo;</p>
+              </div>
+            )}
           </div>
 
           <div className="card-gradient rounded-2xl p-6 neon-border text-center">
@@ -255,6 +264,24 @@ export default function VotePage() {
               />
             </div>
           ))}
+        </div>
+
+        <div className="card-gradient rounded-2xl p-6 neon-border mb-6">
+          <label htmlFor="counter-proposal" className="block text-purple-300 text-sm mb-2 font-medium">
+            Counter Proposal (optional)
+          </label>
+          <p className="text-purple-400/60 text-xs mb-3">
+            Have a better idea? Suggest an alternative!
+          </p>
+          <textarea
+            id="counter-proposal"
+            placeholder="e.g., Instead of those ideas, how about we..."
+            value={counterProposal}
+            maxLength={500}
+            onChange={(e) => setCounterProposal(e.target.value)}
+            rows={3}
+            className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all resize-none"
+          />
         </div>
 
         <button

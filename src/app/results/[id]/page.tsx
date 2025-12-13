@@ -134,6 +134,15 @@ export default function ResultsPage() {
                     </div>
                   ))}
                 </div>
+
+                {response.counterProposal && (
+                  <div className="mt-4 pt-4 border-t border-purple-500/30">
+                    <p className="text-fuchsia-400 text-sm font-bold mb-2">Counter Proposal:</p>
+                    <p className="text-white italic bg-fuchsia-500/10 rounded-lg p-3 border border-fuchsia-500/30">
+                      &ldquo;{response.counterProposal}&rdquo;
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

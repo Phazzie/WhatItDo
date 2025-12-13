@@ -15,5 +15,6 @@ export interface PollResponse {
     vote: 'yes' | 'no' | 'maybe'
     comment: string
   }[]
+  counterProposal?: string
   submittedAt: number
 }
