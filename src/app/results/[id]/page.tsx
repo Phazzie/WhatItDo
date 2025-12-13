@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { Poll } from '@/lib/types'
+import { Poll, VoteOption } from '@/lib/types'
 
 export default function ResultsPage() {
   const params = useParams()
@@ -27,15 +27,17 @@ export default function ResultsPage() {
 
   useEffect(() => {
     loadPoll()
-    // Refresh every 30 seconds
     const interval = setInterval(loadPoll, 30000)
     return () => clearInterval(interval)
   }, [loadPoll])
+
+  const isDubious = poll?.mode === 'dubious'
 
   const getVoteEmoji = (vote: string) => {
     if (vote === 'yes') return '✅'
     if (vote === 'no') return '❌'
     if (vote === 'maybe') return '🤔'
+    if (vote === 'yolo') return '🎲'
     return ''
   }
 
@@ -43,16 +45,32 @@ export default function ResultsPage() {
     if (vote === 'yes') return 'text-green-400'
     if (vote === 'no') return 'text-red-400'
     if (vote === 'maybe') return 'text-yellow-400'
+    if (vote === 'yolo') return 'text-fuchsia-400'
     return ''
   }
 
+  const getVoteBgColor = (vote: string) => {
+    if (vote === 'yes') return 'bg-green-500'
+    if (vote === 'no') return 'bg-red-500'
+    if (vote === 'maybe') return 'bg-yellow-500'
+    if (vote === 'yolo') return 'bg-gradient-to-r from-fuchsia-500 to-pink-500'
+    return 'bg-gray-500'
+  }
+
   const getVoteCounts = (suggestionIndex: number) => {
-    const counts = { yes: 0, no: 0, maybe: 0 }
+    const counts: Record<VoteOption, number> = { yes: 0, no: 0, maybe: 0, yolo: 0 }
     poll?.responses.forEach(r => {
-      const vote = r.votes[suggestionIndex]?.vote
-      if (vote) counts[vote]++
+      const vote = r.votes[suggestionIndex]?.vote as VoteOption
+      if (vote && counts[vote] !== undefined) counts[vote]++
     })
     return counts
+  }
+
+  const getWinningVote = (counts: Record<VoteOption, number>) => {
+    const entries = Object.entries(counts) as [VoteOption, number][]
+    const sorted = entries.sort((a, b) => b[1] - a[1])
+    if (sorted[0][1] === 0) return null
+    return sorted[0][0]
   }
 
   if (loading) {
@@ -75,61 +93,165 @@ export default function ResultsPage() {
   }
 
   return (
-    <main className="min-h-screen py-12 px-4 scanlines">
+    <main className={`min-h-screen py-12 px-4 scanlines ${isDubious ? 'dubious-mode' : ''}`}>
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-10">
           <div className="rainbow-bar w-32 mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 mb-4">
+          <h1 className={`text-4xl md:text-5xl font-black text-transparent bg-clip-text mb-4 ${
+            isDubious
+              ? 'bg-gradient-to-r from-orange-400 via-red-400 to-pink-400'
+              : 'bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400'
+          }`}>
             {poll.title}
           </h1>
-          <p className="text-xl text-purple-200/80">
-            {poll.responses.length} {poll.responses.length === 1 ? 'response' : 'responses'}
-          </p>
+          <div className="flex items-center justify-center gap-4">
+            <p className="text-xl text-purple-200/80">
+              {poll.responses.length} {poll.responses.length === 1 ? 'response' : 'responses'}
+            </p>
+            {isDubious && (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                DUBIOUS MODE
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Vote Summary */}
+        {/* Vote Summary - Card Style */}
         <div className="card-gradient rounded-2xl p-6 neon-border mb-8">
-          <h2 className="text-lg font-bold text-white mb-4">Vote Summary</h2>
-          <div className="space-y-4">
+          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <span className="text-2xl">📊</span> Vote Summary
+          </h2>
+          <div className="space-y-6">
             {poll.suggestions.map((suggestion, index) => {
               const counts = getVoteCounts(index)
-              const total = counts.yes + counts.no + counts.maybe
+              const total = counts.yes + counts.no + counts.maybe + counts.yolo
+              const winner = getWinningVote(counts)
+
               return (
-                <div key={index} className="border-b border-purple-500/30 pb-4 last:border-0 last:pb-0">
-                  <p className="text-white mb-2">&ldquo;{suggestion}&rdquo;</p>
-                  <div className="flex gap-4 text-sm">
-                    <span className="text-green-400">✅ {counts.yes}</span>
-                    <span className="text-yellow-400">🤔 {counts.maybe}</span>
-                    <span className="text-red-400">❌ {counts.no}</span>
-                    <span className="text-purple-400/60 ml-auto">{total} votes</span>
+                <div key={index} className="bg-black/30 rounded-xl p-4 border border-purple-500/20">
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-white font-medium flex-1">
+                      <span className={`mr-2 ${isDubious ? 'text-orange-400' : 'text-fuchsia-400'}`}>
+                        #{index + 1}
+                      </span>
+                      &ldquo;{suggestion}&rdquo;
+                    </p>
+                    {winner && (
+                      <span className={`text-2xl ml-2 ${winner === 'yolo' ? 'animate-bounce' : ''}`}>
+                        {getVoteEmoji(winner)}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Vote bars */}
+                  {total > 0 ? (
+                    <div className="space-y-2">
+                      {(['yes', 'maybe', 'no', ...(isDubious ? ['yolo'] : [])] as VoteOption[]).map(voteType => {
+                        const count = counts[voteType]
+                        const percentage = total > 0 ? (count / total) * 100 : 0
+                        if (count === 0) return null
+
+                        return (
+                          <div key={voteType} className="flex items-center gap-2">
+                            <span className="w-12 text-xs font-bold uppercase" style={{ color: voteType === 'yes' ? '#4ade80' : voteType === 'no' ? '#f87171' : voteType === 'maybe' ? '#facc15' : '#e879f9' }}>
+                              {voteType}
+                            </span>
+                            <div className="flex-1 h-6 bg-black/40 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${getVoteBgColor(voteType)} transition-all duration-500 flex items-center justify-end pr-2`}
+                                style={{ width: `${Math.max(percentage, 15)}%` }}
+                              >
+                                <span className="text-xs font-bold text-white drop-shadow">{count}</span>
+                              </div>
+                            </div>
+                            <span className="text-purple-400/60 text-xs w-10 text-right">{percentage.toFixed(0)}%</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-purple-400/50 text-sm italic">No votes yet</p>
+                  )}
                 </div>
               )
             })}
           </div>
         </div>
 
+        {/* Counter Proposals Section */}
+        {poll.responses.some(r => r.counterProposal) && (
+          <div className="card-gradient rounded-2xl p-6 neon-border mb-8 border-2 border-fuchsia-500/30">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <span className="text-2xl">💡</span>
+              {isDubious ? 'Counter Dares' : 'Counter Proposals'}
+            </h2>
+            <div className="space-y-4">
+              {poll.responses.filter(r => r.counterProposal).map((response) => (
+                <div key={response.id} className="bg-gradient-to-r from-fuchsia-500/10 to-purple-500/10 rounded-xl p-4 border border-fuchsia-500/30">
+                  <p className="text-fuchsia-400 text-sm font-medium mb-2">
+                    {response.voterName} {isDubious ? 'raises:' : 'suggests:'}
+                  </p>
+                  <p className="text-white italic text-lg">
+                    &ldquo;{response.counterProposal}&rdquo;
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Individual Responses */}
         {poll.responses.length > 0 ? (
           <div className="space-y-6">
-            <h2 className="text-lg font-bold text-white">All Responses</h2>
-            {poll.responses.map((response) => (
-              <div key={response.id} className="card-gradient rounded-2xl p-6 neon-border">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-2xl">👥</span> All Responses
+            </h2>
+            {poll.responses.map((response, respIndex) => (
+              <div
+                key={response.id}
+                className={`card-gradient rounded-2xl p-6 neon-border overflow-hidden relative ${
+                  response.votes.some(v => v.vote === 'yolo') ? 'ring-2 ring-fuchsia-500/50' : ''
+                }`}
+              >
+                {/* Decorative corner */}
+                <div className={`absolute top-0 right-0 w-16 h-16 ${
+                  isDubious
+                    ? 'bg-gradient-to-bl from-orange-500/20 to-transparent'
+                    : 'bg-gradient-to-bl from-purple-500/20 to-transparent'
+                }`} />
+
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-fuchsia-400">{response.voterName}</h3>
+                  <h3 className={`text-lg font-bold ${isDubious ? 'text-orange-400' : 'text-fuchsia-400'}`}>
+                    <span className="text-2xl mr-2">
+                      {respIndex === 0 ? '🥇' : respIndex === 1 ? '🥈' : respIndex === 2 ? '🥉' : '👤'}
+                    </span>
+                    {response.voterName}
+                  </h3>
                   <span className="text-purple-400/60 text-sm">
                     {new Date(response.submittedAt).toLocaleDateString()}
                   </span>
                 </div>
-                <div className="space-y-3">
+
+                <div className="grid gap-3">
                   {response.votes.map((vote, i) => (
-                    <div key={i} className="bg-black/20 rounded-lg p-3">
-                      <p className="text-white text-sm mb-1">&ldquo;{vote.text}&rdquo;</p>
-                      <p className={`font-bold ${getVoteColor(vote.vote)}`}>
-                        {getVoteEmoji(vote.vote)} {vote.vote.toUpperCase()}
-                      </p>
+                    <div
+                      key={i}
+                      className={`rounded-xl p-3 transition-all ${
+                        vote.vote === 'yolo'
+                          ? 'bg-gradient-to-r from-fuchsia-500/20 to-pink-500/20 border border-fuchsia-500/30'
+                          : 'bg-black/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-white/80 text-sm flex-1">&ldquo;{vote.text}&rdquo;</p>
+                        <span className={`font-bold text-lg ml-3 ${getVoteColor(vote.vote)} ${vote.vote === 'yolo' ? 'animate-pulse' : ''}`}>
+                          {getVoteEmoji(vote.vote)} {vote.vote.toUpperCase()}
+                        </span>
+                      </div>
                       {vote.comment && (
-                        <p className="text-purple-300/70 text-sm mt-1 italic">&ldquo;{vote.comment}&rdquo;</p>
+                        <p className="text-purple-300/70 text-sm mt-2 italic border-l-2 border-purple-500/30 pl-3">
+                          &ldquo;{vote.comment}&rdquo;
+                        </p>
                       )}
                     </div>
                   ))}
@@ -137,7 +259,9 @@ export default function ResultsPage() {
 
                 {response.counterProposal && (
                   <div className="mt-4 pt-4 border-t border-purple-500/30">
-                    <p className="text-fuchsia-400 text-sm font-bold mb-2">Counter Proposal:</p>
+                    <p className="text-fuchsia-400 text-sm font-bold mb-2">
+                      {isDubious ? '🔥 Counter Dare:' : '💡 Counter Proposal:'}
+                    </p>
                     <p className="text-white italic bg-fuchsia-500/10 rounded-lg p-3 border border-fuchsia-500/30">
                       &ldquo;{response.counterProposal}&rdquo;
                     </p>
@@ -148,16 +272,19 @@ export default function ResultsPage() {
           </div>
         ) : (
           <div className="card-gradient rounded-2xl p-8 neon-border text-center">
+            <p className="text-6xl mb-4">🦗</p>
             <p className="text-purple-300 text-lg">No responses yet!</p>
             <p className="text-purple-400/60 text-sm mt-2">Share your poll link to get votes</p>
           </div>
         )}
 
         <div className="mt-8 text-center">
-          <p className="text-purple-400/60 text-sm mb-4">Auto-refreshes every 30 seconds</p>
+          <p className="text-purple-400/60 text-sm mb-4 flex items-center justify-center gap-2">
+            <span className="animate-pulse">🔄</span> Auto-refreshes every 30 seconds
+          </p>
           <a
             href="/"
-            className="text-fuchsia-400 hover:text-fuchsia-300 font-medium"
+            className={`font-medium ${isDubious ? 'text-orange-400 hover:text-orange-300' : 'text-fuchsia-400 hover:text-fuchsia-300'}`}
           >
             Create a new poll
           </a>

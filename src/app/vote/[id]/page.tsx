@@ -2,15 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Poll } from '@/lib/types'
+import { Poll, VoteOption } from '@/lib/types'
 
-type Vote = 'yes' | 'no' | 'maybe' | null
+type Vote = VoteOption | null
 
 interface SuggestionVote {
   text: string
   vote: Vote
   comment: string
 }
+
+const MYSTERIOUS_NAMES = [
+  'A Shadowy Figure',
+  'Someone From Your Past',
+  'A Mysterious Stranger',
+  'Your Secret Admirer',
+  'A Chaotic Neutral Entity',
+  'The Phantom Voter',
+  'An Anonymous Troublemaker',
+  'A Mischievous Spirit'
+]
 
 export default function VotePage() {
   const params = useParams()
@@ -73,7 +84,7 @@ export default function VotePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pollId,
-          voterName: voterName.trim() || 'Anonymous',
+          voterName: getDisplayName(),
           votes: suggestions.map(s => ({
             text: s.text,
             vote: s.vote,
@@ -96,6 +107,7 @@ export default function VotePage() {
     if (vote === 'yes') return '✅'
     if (vote === 'no') return '❌'
     if (vote === 'maybe') return '🤔'
+    if (vote === 'yolo') return '🎲'
     return ''
   }
 
@@ -103,7 +115,20 @@ export default function VotePage() {
     if (vote === 'yes') return 'text-green-400'
     if (vote === 'no') return 'text-red-400'
     if (vote === 'maybe') return 'text-yellow-400'
+    if (vote === 'yolo') return 'text-fuchsia-400'
     return ''
+  }
+
+  const isDubious = poll?.mode === 'dubious'
+
+  const getDisplayName = () => {
+    if (!voterName.trim()) {
+      if (isDubious) {
+        return MYSTERIOUS_NAMES[Math.floor(Math.random() * MYSTERIOUS_NAMES.length)]
+      }
+      return 'Anonymous'
+    }
+    return voterName.trim()
   }
 
   if (loading) {
@@ -175,48 +200,65 @@ export default function VotePage() {
   }
 
   return (
-    <main className="min-h-screen py-12 px-4 scanlines">
+    <main className={`min-h-screen py-12 px-4 scanlines ${isDubious ? 'dubious-mode' : ''}`}>
       <div className="max-w-xl mx-auto">
         <div className="text-center mb-10">
           <div className="rainbow-bar w-32 mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 mb-4 floating">
+          <h1 className={`text-4xl md:text-5xl font-black text-transparent bg-clip-text mb-4 floating ${
+            isDubious
+              ? 'bg-gradient-to-r from-orange-400 via-red-400 to-pink-400'
+              : 'bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400'
+          }`}>
             {poll.title}
           </h1>
           <p className="text-xl text-purple-200/80">
-            Vote on these suggestions!
+            {isDubious ? 'Do you dare?' : 'Vote on these suggestions!'}
           </p>
+          {isDubious && (
+            <p className="text-sm text-orange-400/70 mt-2">
+              Dubious Mode - YOLO voting available!
+            </p>
+          )}
         </div>
 
         <div className="card-gradient rounded-2xl p-6 neon-border mb-6">
           <label htmlFor="voter-name" className="block text-purple-300 text-sm mb-2 font-medium">
-            Your Name (optional)
+            {isDubious ? 'Your Alias (optional)' : 'Your Name (optional)'}
           </label>
           <input
             id="voter-name"
             type="text"
-            placeholder="Enter your name"
+            placeholder={isDubious ? "Leave blank for mysterious identity..." : "Enter your name"}
             value={voterName}
             onChange={(e) => setVoterName(e.target.value)}
             className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
           />
+          {isDubious && !voterName.trim() && (
+            <p className="text-orange-400/60 text-xs mt-2">
+              You&apos;ll appear as a mysterious figure...
+            </p>
+          )}
         </div>
 
         <div className="space-y-6 mb-8">
           {suggestions.map((suggestion, index) => (
             <div
               key={index}
-              className="card-gradient rounded-2xl p-6 neon-border"
+              className={`card-gradient rounded-2xl p-6 neon-border ${
+                suggestion.vote === 'yolo' ? 'ring-2 ring-fuchsia-500 ring-opacity-50' : ''
+              }`}
             >
               <p className="text-white text-xl font-medium mb-4">
+                {isDubious && <span className="text-orange-400 mr-2">#{index + 1}</span>}
                 &ldquo;{suggestion.text}&rdquo;
               </p>
 
-              <div className="flex gap-3 mb-4">
+              <div className={`grid gap-3 mb-4 ${isDubious ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 <button
                   onClick={() => handleVote(index, 'yes')}
                   aria-pressed={suggestion.vote === 'yes'}
                   aria-label={`Vote yes for "${suggestion.text}"`}
-                  className={`vote-btn flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-all ${
+                  className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                     suggestion.vote === 'yes'
                       ? 'bg-green-500 text-white shadow-lg shadow-green-500/50'
                       : 'bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-white border border-green-500/30'
@@ -228,7 +270,7 @@ export default function VotePage() {
                   onClick={() => handleVote(index, 'maybe')}
                   aria-pressed={suggestion.vote === 'maybe'}
                   aria-label={`Vote maybe for "${suggestion.text}"`}
-                  className={`vote-btn flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-all ${
+                  className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                     suggestion.vote === 'maybe'
                       ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/50'
                       : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-white border border-yellow-500/30'
@@ -240,7 +282,7 @@ export default function VotePage() {
                   onClick={() => handleVote(index, 'no')}
                   aria-pressed={suggestion.vote === 'no'}
                   aria-label={`Vote no for "${suggestion.text}"`}
-                  className={`vote-btn flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-all ${
+                  className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                     suggestion.vote === 'no'
                       ? 'bg-red-500 text-white shadow-lg shadow-red-500/50'
                       : 'bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30'
@@ -248,6 +290,20 @@ export default function VotePage() {
                 >
                   NO
                 </button>
+                {isDubious && (
+                  <button
+                    onClick={() => handleVote(index, 'yolo')}
+                    aria-pressed={suggestion.vote === 'yolo'}
+                    aria-label={`Vote YOLO for "${suggestion.text}"`}
+                    className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
+                      suggestion.vote === 'yolo'
+                        ? 'bg-gradient-to-r from-fuchsia-500 via-purple-500 to-pink-500 text-white shadow-lg shadow-fuchsia-500/50 animate-pulse'
+                        : 'bg-fuchsia-500/20 text-fuchsia-400 hover:bg-gradient-to-r hover:from-fuchsia-500 hover:via-purple-500 hover:to-pink-500 hover:text-white border border-fuchsia-500/30'
+                    }`}
+                  >
+                    YOLO
+                  </button>
+                )}
               </div>
 
               <label htmlFor={`comment-${index}`} className="sr-only">
@@ -256,7 +312,7 @@ export default function VotePage() {
               <input
                 id={`comment-${index}`}
                 type="text"
-                placeholder="Add a comment (optional)"
+                placeholder={isDubious ? "Add a spicy comment..." : "Add a comment (optional)"}
                 value={suggestion.comment}
                 maxLength={200}
                 onChange={(e) => handleComment(index, e.target.value)}
@@ -268,14 +324,18 @@ export default function VotePage() {
 
         <div className="card-gradient rounded-2xl p-6 neon-border mb-6">
           <label htmlFor="counter-proposal" className="block text-purple-300 text-sm mb-2 font-medium">
-            Counter Proposal (optional)
+            {isDubious ? "I'll Raise You... (optional)" : 'Counter Proposal (optional)'}
           </label>
           <p className="text-purple-400/60 text-xs mb-3">
-            Have a better idea? Suggest an alternative!
+            {isDubious
+              ? 'Think you can do better? Up the ante!'
+              : 'Have a better idea? Suggest an alternative!'}
           </p>
           <textarea
             id="counter-proposal"
-            placeholder="e.g., Instead of those ideas, how about we..."
+            placeholder={isDubious
+              ? "e.g., Forget those weak suggestions, I dare YOU to..."
+              : "e.g., Instead of those ideas, how about we..."}
             value={counterProposal}
             maxLength={500}
             onChange={(e) => setCounterProposal(e.target.value)}
@@ -289,11 +349,13 @@ export default function VotePage() {
           disabled={!allVoted || submitting}
           className={`w-full font-bold py-4 px-6 rounded-xl text-lg transition-all ${
             allVoted && !submitting
-              ? 'btn-neon bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white transform hover:scale-[1.02]'
+              ? isDubious
+                ? 'btn-neon bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 hover:from-orange-500 hover:via-red-500 hover:to-pink-500 text-white transform hover:scale-[1.02]'
+                : 'btn-neon bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white transform hover:scale-[1.02]'
               : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
           }`}
         >
-          {submitting ? 'Submitting...' : allVoted ? 'Submit Votes' : `Vote on all ${suggestions.length} suggestions`}
+          {submitting ? 'Submitting...' : allVoted ? (isDubious ? 'Accept the Dare!' : 'Submit Votes') : `Vote on all ${suggestions.length} ${isDubious ? 'dares' : 'suggestions'}`}
         </button>
       </div>
     </main>

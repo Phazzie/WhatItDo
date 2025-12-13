@@ -1,3 +1,6 @@
+export type PollMode = 'normal' | 'dubious'
+export type VoteOption = 'yes' | 'no' | 'maybe' | 'yolo'
+
 export interface Poll {
   id: string
   title: string
@@ -5,6 +8,7 @@ export interface Poll {
   creatorEmail: string
   createdAt: number
   responses: PollResponse[]
+  mode: PollMode
 }
 
 export interface PollResponse {
@@ -12,7 +16,7 @@ export interface PollResponse {
   voterName: string
   votes: {
     text: string
-    vote: 'yes' | 'no' | 'maybe'
+    vote: VoteOption
     comment: string
   }[]
   counterProposal?: string

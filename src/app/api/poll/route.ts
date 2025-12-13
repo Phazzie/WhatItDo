@@ -1,25 +1,27 @@
 import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
-import { Poll } from '@/lib/types'
+import { Poll, PollMode } from '@/lib/types'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, suggestions } = body
+    const { title, suggestions, mode } = body
 
     if (!suggestions || suggestions.length === 0) {
       return NextResponse.json({ error: 'At least one suggestion required' }, { status: 400 })
     }
 
     const id = nanoid(10)
+    const pollMode: PollMode = mode === 'dubious' ? 'dubious' : 'normal'
     const poll: Poll = {
       id,
-      title: title || 'What It Do?',
+      title: title || (pollMode === 'dubious' ? 'I Dare You...' : 'What It Do?'),
       suggestions,
       creatorEmail: 'sailorbeefalo@gmail.com',
       createdAt: Date.now(),
-      responses: []
+      responses: [],
+      mode: pollMode
     }
 
     await redis.set(`poll:${id}`, JSON.stringify(poll))

@@ -44,28 +44,43 @@ export async function POST(request: NextRequest) {
     // Send email notification
     const emailClient = getResend()
     if (emailClient && poll.creatorEmail) {
+      const isDubious = poll.mode === 'dubious'
+      const hasYolo = votes.some((v: { vote: string }) => v.vote === 'yolo')
+
+      const getVoteEmoji = (vote: string) => {
+        if (vote === 'yes') return '✅'
+        if (vote === 'no') return '❌'
+        if (vote === 'maybe') return '🤔'
+        if (vote === 'yolo') return '🎲'
+        return ''
+      }
+
       const voteSummary = votes.map((v: { text: string; vote: string; comment: string }, i: number) =>
-        `${i + 1}. "${v.text}"\n   Vote: ${v.vote.toUpperCase()}${v.comment ? `\n   Comment: "${v.comment}"` : ''}`
+        `${getVoteEmoji(v.vote)} ${i + 1}. "${v.text}"\n   Vote: ${v.vote.toUpperCase()}${v.comment ? `\n   Comment: "${v.comment}"` : ''}`
       ).join('\n\n')
 
       const counterProposalHtml = counterProposal
-        ? `<div style="background: #2d1f3d; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #f0abfc;">
-             <p style="color: #f0abfc; font-weight: bold; margin: 0 0 8px 0;">💡 Counter Proposal:</p>
+        ? `<div style="background: ${isDubious ? '#3d1f1f' : '#2d1f3d'}; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid ${isDubious ? '#f97316' : '#f0abfc'};">
+             <p style="color: ${isDubious ? '#f97316' : '#f0abfc'}; font-weight: bold; margin: 0 0 8px 0;">${isDubious ? '🔥 Counter Dare:' : '💡 Counter Proposal:'}</p>
              <p style="color: #e2e8f0; margin: 0; font-style: italic;">"${counterProposal}"</p>
            </div>`
         : ''
 
       const resultsUrl = `${process.env.NEXT_PUBLIC_BASE_URL || request.headers.get('origin')}/results/${pollId}`
 
+      const subjectPrefix = isDubious ? '🌶️' : '📊'
+      const yoloNote = hasYolo ? ' 🎲 YOLO DETECTED!' : ''
+
       try {
         await emailClient.emails.send({
           from: 'What It Do <notifications@resend.dev>',
           to: poll.creatorEmail,
-          subject: `${response.voterName} voted on your poll: ${poll.title}${counterProposal ? ' (+ counter proposal!)' : ''}`,
+          subject: `${subjectPrefix} ${response.voterName} voted on: ${poll.title}${counterProposal ? ' (+counter!)' : ''}${yoloNote}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #a855f7;">New Vote Received!</h1>
-              <p><strong>${response.voterName}</strong> just voted on your poll "<strong>${poll.title}</strong>"</p>
+              <h1 style="color: ${isDubious ? '#f97316' : '#a855f7'};">${isDubious ? '🌶️ New Dare Response!' : '📊 New Vote Received!'}</h1>
+              <p><strong>${response.voterName}</strong> just ${isDubious ? 'responded to your dare' : 'voted on your poll'} "<strong>${poll.title}</strong>"</p>
+              ${hasYolo ? '<p style="background: linear-gradient(to right, #d946ef, #ec4899); color: white; padding: 8px 16px; border-radius: 8px; display: inline-block; font-weight: bold;">🎲 They went YOLO on at least one!</p>' : ''}
 
               <div style="background: #1a1a2e; padding: 20px; border-radius: 12px; margin: 20px 0;">
                 <pre style="color: #e2e8f0; white-space: pre-wrap; font-size: 14px;">${voteSummary}</pre>
@@ -74,13 +89,13 @@ export async function POST(request: NextRequest) {
               ${counterProposalHtml}
 
               <p>
-                <a href="${resultsUrl}" style="display: inline-block; background: linear-gradient(to right, #a855f7, #6366f1); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                <a href="${resultsUrl}" style="display: inline-block; background: linear-gradient(to right, ${isDubious ? '#f97316, #ef4444' : '#a855f7, #6366f1'}); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
                   View All Results
                 </a>
               </p>
 
               <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
-                Total responses: ${poll.responses.length}
+                Total responses: ${poll.responses.length} ${isDubious ? '| Dubious Mode 🌶️' : ''}
               </p>
             </div>
           `
