@@ -10,9 +10,9 @@ const PLACEHOLDERS = {
     "e.g., Host a game night"
   ],
   dubious: [
-    "e.g., Text your ex 'thinking of you...'",
-    "e.g., Eat an entire pizza alone at 2am",
-    "e.g., Call in sick and go to the beach"
+    "e.g., Send a mysterious message to someone intriguing...",
+    "e.g., Take an impromptu midnight drive somewhere scenic",
+    "e.g., Book that spontaneous weekend getaway"
   ]
 }
 
@@ -47,7 +47,7 @@ export default function Home() {
 
     setCreating(true)
     try {
-      const defaultTitle = mode === 'dubious' ? 'I Dare You...' : 'What It Do?'
+      const defaultTitle = mode === 'dubious' ? 'Intriguing Possibilities...' : 'What It Do?'
       const res = await fetch('/api/poll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,7 +115,7 @@ export default function Home() {
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-10">
             <div className="rainbow-bar w-32 mx-auto mb-6" />
-            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-300 to-cyan-400 mb-4 floating neon-text">
+            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-violet-400 to-purple-400 mb-4 floating neon-text">
               Poll Created!
             </h1>
             <p className="text-xl text-purple-200/80">
@@ -132,7 +132,7 @@ export default function Home() {
             <div className="space-y-3">
               <button
                 onClick={copyLink}
-                className="btn-neon w-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all"
+                className="btn-neon w-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all"
               >
                 {copied ? '✓ Copied!' : 'Copy Link'}
               </button>
@@ -140,13 +140,13 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={shareViaText}
-                  className="btn-neon bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                  className="btn-neon bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
                 >
                   <span>📱</span> Text
                 </button>
                 <button
                   onClick={shareViaEmail}
-                  className="btn-neon bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                  className="btn-neon bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
                 >
                   <span>📧</span> Email
                 </button>
@@ -185,14 +185,14 @@ export default function Home() {
           <div className="rainbow-bar w-32 mx-auto mb-6" />
           <h1 className={`text-5xl md:text-6xl font-black text-transparent bg-clip-text mb-4 floating ${
             mode === 'dubious'
-              ? 'bg-gradient-to-r from-orange-400 via-red-400 to-pink-400'
-              : 'bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400'
+              ? 'bg-gradient-to-r from-rose-400 via-purple-400 to-violet-400'
+              : 'bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400'
           }`}>
-            {mode === 'dubious' ? 'I Dare You...' : 'What It Do?'}
+            {mode === 'dubious' ? 'Intriguing Possibilities...' : 'What It Do?'}
           </h1>
           <p className="text-xl text-purple-200/80">
             {mode === 'dubious'
-              ? 'Create spicy suggestions for your friend to vote on'
+              ? 'Craft enticing propositions for someone special'
               : 'Create suggestions for your friend to vote on'}
           </p>
         </div>
@@ -204,28 +204,28 @@ export default function Home() {
               onClick={() => setMode('normal')}
               className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                 mode === 'normal'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30'
+                  ? 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/30'
                   : 'bg-white/5 text-purple-300 hover:bg-white/10 border border-purple-500/20'
               }`}
             >
-              <span className="text-lg">🎯</span>
-              <span className="block text-sm mt-1">Normal Mode</span>
+              <span className="text-lg">✨</span>
+              <span className="block text-sm mt-1">Classic Mode</span>
             </button>
             <button
               onClick={() => setMode('dubious')}
               className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                 mode === 'dubious'
-                  ? 'bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white shadow-lg shadow-red-500/30'
+                  ? 'bg-gradient-to-r from-rose-500 via-purple-500 to-violet-500 text-white shadow-lg shadow-rose-500/30'
                   : 'bg-white/5 text-purple-300 hover:bg-white/10 border border-purple-500/20'
               }`}
             >
-              <span className="text-lg">🌶️</span>
+              <span className="text-lg">🌙</span>
               <span className="block text-sm mt-1">Dubious Mode</span>
             </button>
           </div>
           <p className="text-center text-purple-400/60 text-xs mt-3">
             {mode === 'dubious'
-              ? 'YOLO voting enabled! Anonymous names shown as mysterious'
+              ? 'YOLO voting enabled · Mystery names for intrigue'
               : 'Standard voting with Yes, No, or Maybe'}
           </p>
         </div>
@@ -236,7 +236,7 @@ export default function Home() {
             <input
               type="text"
               id="poll-title"
-              placeholder={mode === 'dubious' ? "e.g., Dares for Dave" : "e.g., Weekend Plans for Dave"}
+              placeholder={mode === 'dubious' ? "e.g., Tempting Suggestions..." : "e.g., Weekend Plans for Dave"}
               value={title}
               maxLength={100}
               onChange={(e) => setTitle(e.target.value)}
@@ -248,7 +248,7 @@ export default function Home() {
             {suggestions.map((suggestion, index) => (
               <div key={index}>
                 <label htmlFor={`suggestion-${index}`} className="block text-purple-300 text-sm mb-2 font-medium">
-                  {mode === 'dubious' ? `Dare #${index + 1}` : `Suggestion #${index + 1}`} {index === 0 && <span className="text-fuchsia-400">*</span>}
+                  {mode === 'dubious' ? `Option ${index + 1}` : `Suggestion #${index + 1}`} {index === 0 && <span className="text-rose-400">*</span>}
                 </label>
                 <input
                   type="text"
@@ -268,17 +268,17 @@ export default function Home() {
             disabled={creating}
             className={`btn-neon w-full text-white font-bold py-4 px-6 rounded-xl text-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
               mode === 'dubious'
-                ? 'bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 hover:from-orange-500 hover:via-red-500 hover:to-pink-500'
-                : 'bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:from-fuchsia-500 hover:via-purple-500 hover:to-indigo-500'
+                ? 'bg-gradient-to-r from-rose-600 via-purple-600 to-violet-600 hover:from-rose-500 hover:via-purple-500 hover:to-violet-500'
+                : 'bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500'
             }`}
           >
-            {creating ? 'Creating...' : mode === 'dubious' ? 'Send the Dare!' : 'Create Poll & Get Link'}
+            {creating ? 'Creating...' : mode === 'dubious' ? 'Send the Invitation' : 'Create Poll & Get Link'}
           </button>
         </div>
 
         <p className="text-center text-purple-400/60 text-sm mt-8">
           {mode === 'dubious'
-            ? 'Your friend can vote Yes, No, Maybe, or YOLO!'
+            ? 'They can choose: Yes, No, Maybe, or YOLO'
             : 'Your friend will vote Yes, No, or Maybe on each suggestion'}
         </p>
       </div>

@@ -45,7 +45,7 @@ export default function ResultsPage() {
     if (vote === 'yes') return 'text-green-400'
     if (vote === 'no') return 'text-red-400'
     if (vote === 'maybe') return 'text-yellow-400'
-    if (vote === 'yolo') return 'text-fuchsia-400'
+    if (vote === 'yolo') return 'text-violet-400'
     return ''
   }
 
@@ -53,7 +53,7 @@ export default function ResultsPage() {
     if (vote === 'yes') return 'bg-green-500'
     if (vote === 'no') return 'bg-red-500'
     if (vote === 'maybe') return 'bg-yellow-500'
-    if (vote === 'yolo') return 'bg-gradient-to-r from-fuchsia-500 to-pink-500'
+    if (vote === 'yolo') return 'bg-gradient-to-r from-violet-500 to-rose-500'
     return 'bg-gray-500'
   }
 
@@ -99,8 +99,8 @@ export default function ResultsPage() {
           <div className="rainbow-bar w-32 mx-auto mb-6" />
           <h1 className={`text-4xl md:text-5xl font-black text-transparent bg-clip-text mb-4 ${
             isDubious
-              ? 'bg-gradient-to-r from-orange-400 via-red-400 to-pink-400'
-              : 'bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400'
+              ? 'bg-gradient-to-r from-rose-400 via-purple-400 to-violet-400'
+              : 'bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400'
           }`}>
             {poll.title}
           </h1>
@@ -109,7 +109,7 @@ export default function ResultsPage() {
               {poll.responses.length} {poll.responses.length === 1 ? 'response' : 'responses'}
             </p>
             {isDubious && (
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-rose-500 to-violet-500 text-white">
                 DUBIOUS MODE
               </span>
             )}
@@ -131,7 +131,7 @@ export default function ResultsPage() {
                 <div key={index} className="bg-black/30 rounded-xl p-4 border border-purple-500/20">
                   <div className="flex items-start justify-between mb-3">
                     <p className="text-white font-medium flex-1">
-                      <span className={`mr-2 ${isDubious ? 'text-orange-400' : 'text-fuchsia-400'}`}>
+                      <span className={`mr-2 ${isDubious ? 'text-rose-400' : 'text-violet-400'}`}>
                         #{index + 1}
                       </span>
                       &ldquo;{suggestion}&rdquo;
@@ -153,7 +153,7 @@ export default function ResultsPage() {
 
                         return (
                           <div key={voteType} className="flex items-center gap-2">
-                            <span className="w-12 text-xs font-bold uppercase" style={{ color: voteType === 'yes' ? '#4ade80' : voteType === 'no' ? '#f87171' : voteType === 'maybe' ? '#facc15' : '#e879f9' }}>
+                            <span className="w-12 text-xs font-bold uppercase" style={{ color: voteType === 'yes' ? '#4ade80' : voteType === 'no' ? '#f87171' : voteType === 'maybe' ? '#facc15' : '#a78bfa' }}>
                               {voteType}
                             </span>
                             <div className="flex-1 h-6 bg-black/40 rounded-full overflow-hidden">
@@ -180,16 +180,16 @@ export default function ResultsPage() {
 
         {/* Counter Proposals Section */}
         {poll.responses.some(r => r.counterProposal) && (
-          <div className="card-gradient rounded-2xl p-6 neon-border mb-8 border-2 border-fuchsia-500/30">
+          <div className="card-gradient rounded-2xl p-6 neon-border mb-8 border-2 border-violet-500/30">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <span className="text-2xl">💡</span>
-              {isDubious ? 'Counter Dares' : 'Counter Proposals'}
+              {isDubious ? 'Alternative Suggestions' : 'Counter Proposals'}
             </h2>
             <div className="space-y-4">
               {poll.responses.filter(r => r.counterProposal).map((response) => (
-                <div key={response.id} className="bg-gradient-to-r from-fuchsia-500/10 to-purple-500/10 rounded-xl p-4 border border-fuchsia-500/30">
-                  <p className="text-fuchsia-400 text-sm font-medium mb-2">
-                    {response.voterName} {isDubious ? 'raises:' : 'suggests:'}
+                <div key={response.id} className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 rounded-xl p-4 border border-violet-500/30">
+                  <p className="text-violet-400 text-sm font-medium mb-2">
+                    {response.voterName} suggests:
                   </p>
                   <p className="text-white italic text-lg">
                     &ldquo;{response.counterProposal}&rdquo;
@@ -210,18 +210,18 @@ export default function ResultsPage() {
               <div
                 key={response.id}
                 className={`card-gradient rounded-2xl p-6 neon-border overflow-hidden relative ${
-                  response.votes.some(v => v.vote === 'yolo') ? 'ring-2 ring-fuchsia-500/50' : ''
+                  response.votes.some(v => v.vote === 'yolo') ? 'ring-2 ring-violet-500/50' : ''
                 }`}
               >
                 {/* Decorative corner */}
                 <div className={`absolute top-0 right-0 w-16 h-16 ${
                   isDubious
-                    ? 'bg-gradient-to-bl from-orange-500/20 to-transparent'
-                    : 'bg-gradient-to-bl from-purple-500/20 to-transparent'
+                    ? 'bg-gradient-to-bl from-rose-500/20 to-transparent'
+                    : 'bg-gradient-to-bl from-violet-500/20 to-transparent'
                 }`} />
 
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className={`text-lg font-bold ${isDubious ? 'text-orange-400' : 'text-fuchsia-400'}`}>
+                  <h3 className={`text-lg font-bold ${isDubious ? 'text-rose-400' : 'text-violet-400'}`}>
                     <span className="text-2xl mr-2">
                       {respIndex === 0 ? '🥇' : respIndex === 1 ? '🥈' : respIndex === 2 ? '🥉' : '👤'}
                     </span>
@@ -238,7 +238,7 @@ export default function ResultsPage() {
                       key={i}
                       className={`rounded-xl p-3 transition-all ${
                         vote.vote === 'yolo'
-                          ? 'bg-gradient-to-r from-fuchsia-500/20 to-pink-500/20 border border-fuchsia-500/30'
+                          ? 'bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/30'
                           : 'bg-black/20'
                       }`}
                     >
@@ -259,10 +259,10 @@ export default function ResultsPage() {
 
                 {response.counterProposal && (
                   <div className="mt-4 pt-4 border-t border-purple-500/30">
-                    <p className="text-fuchsia-400 text-sm font-bold mb-2">
-                      {isDubious ? '🔥 Counter Dare:' : '💡 Counter Proposal:'}
+                    <p className="text-violet-400 text-sm font-bold mb-2">
+                      {isDubious ? '💡 Alternative Suggestion:' : '💡 Counter Proposal:'}
                     </p>
-                    <p className="text-white italic bg-fuchsia-500/10 rounded-lg p-3 border border-fuchsia-500/30">
+                    <p className="text-white italic bg-violet-500/10 rounded-lg p-3 border border-violet-500/30">
                       &ldquo;{response.counterProposal}&rdquo;
                     </p>
                   </div>
@@ -284,7 +284,7 @@ export default function ResultsPage() {
           </p>
           <a
             href="/"
-            className={`font-medium ${isDubious ? 'text-orange-400 hover:text-orange-300' : 'text-fuchsia-400 hover:text-fuchsia-300'}`}
+            className={`font-medium ${isDubious ? 'text-rose-400 hover:text-rose-300' : 'text-violet-400 hover:text-violet-300'}`}
           >
             Create a new poll
           </a>
