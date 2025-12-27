@@ -231,7 +231,7 @@ export default function VotePage() {
             placeholder={isDubious ? "Remain anonymous for intrigue..." : "Enter your name"}
             value={voterName}
             onChange={(e) => setVoterName(e.target.value)}
-            className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-purple-500 transition-all"
+            className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-violet-500 transition-all"
           />
           {isDubious && !voterName.trim() && (
             <p className="text-rose-400/60 text-xs mt-2">
