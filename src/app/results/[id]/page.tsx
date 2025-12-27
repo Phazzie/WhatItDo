@@ -110,7 +110,7 @@ export default function ResultsPage() {
             </p>
             {isDubious && (
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-rose-500 to-violet-500 text-white">
-                ADVENTUROUS
+                DUBIOUS MODE
               </span>
             )}
           </div>

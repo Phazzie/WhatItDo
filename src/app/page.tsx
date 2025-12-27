@@ -220,12 +220,12 @@ export default function Home() {
               }`}
             >
               <span className="text-lg">🌙</span>
-              <span className="block text-sm mt-1">Adventurous</span>
+              <span className="block text-sm mt-1">Dubious Mode</span>
             </button>
           </div>
           <p className="text-center text-purple-400/60 text-xs mt-3">
             {mode === 'dubious'
-              ? 'Bold choices available · Mystery names for the daring'
+              ? 'YOLO voting enabled · Mystery names for intrigue'
               : 'Standard voting with Yes, No, or Maybe'}
           </p>
         </div>
@@ -278,7 +278,7 @@ export default function Home() {
 
         <p className="text-center text-purple-400/60 text-sm mt-8">
           {mode === 'dubious'
-            ? 'They can choose: Yes, No, Maybe, or make it Bold'
+            ? 'They can choose: Yes, No, Maybe, or YOLO'
             : 'Your friend will vote Yes, No, or Maybe on each suggestion'}
         </p>
       </div>

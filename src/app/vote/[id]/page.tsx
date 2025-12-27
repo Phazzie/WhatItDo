@@ -216,7 +216,7 @@ export default function VotePage() {
           </p>
           {isDubious && (
             <p className="text-sm text-rose-400/70 mt-2">
-              Adventurous Mode · Bold choices available
+              Dubious Mode · YOLO voting available
             </p>
           )}
         </div>
@@ -294,14 +294,14 @@ export default function VotePage() {
                   <button
                     onClick={() => handleVote(index, 'yolo')}
                     aria-pressed={suggestion.vote === 'yolo'}
-                    aria-label={`Vote BOLD for "${suggestion.text}"`}
+                    aria-label={`Vote YOLO for "${suggestion.text}"`}
                     className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
                       suggestion.vote === 'yolo'
                         ? 'bg-gradient-to-r from-violet-500 via-purple-500 to-rose-500 text-white shadow-lg shadow-violet-500/50 animate-pulse'
                         : 'bg-violet-500/20 text-violet-400 hover:bg-gradient-to-r hover:from-violet-500 hover:via-purple-500 hover:to-rose-500 hover:text-white border border-violet-500/30'
                     }`}
                   >
-                    BOLD
+                    YOLO
                   </button>
                 )}
               </div>
@@ -355,7 +355,7 @@ export default function VotePage() {
               : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
           }`}
         >
-          {submitting ? 'Submitting...' : allVoted ? (isDubious ? 'Make Your Choice' : 'Submit Votes') : `Vote on all ${suggestions.length} ${isDubious ? 'options' : 'suggestions'}`}
+          {submitting ? 'Submitting...' : allVoted ? (isDubious ? 'Submit Votes' : 'Submit Votes') : `Vote on all ${suggestions.length} ${isDubious ? 'options' : 'suggestions'}`}
         </button>
       </div>
     </main>
