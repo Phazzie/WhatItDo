@@ -189,7 +189,7 @@ export default function ResultsPage() {
               {poll.responses.filter(r => r.counterProposal).map((response) => (
                 <div key={response.id} className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 rounded-xl p-4 border border-violet-500/30">
                   <p className="text-violet-400 text-sm font-medium mb-2">
-                    {response.voterName} {isDubious ? 'suggests:' : 'suggests:'}
+                    {response.voterName} suggests:
                   </p>
                   <p className="text-white italic text-lg">
                     &ldquo;{response.counterProposal}&rdquo;
