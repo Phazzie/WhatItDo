@@ -13,7 +13,7 @@ const CreatePollSchema = z.object({
     .min(1, 'At least one suggestion required')
     .max(3, 'Maximum 3 suggestions allowed'),
   mode: z.enum(['normal', 'dubious']).optional().default('normal'),
-  creatorEmail: z.string().email().optional(),
+  creatorEmail: z.string().email().optional().or(z.literal('')),
 })
 
 export async function POST(request: NextRequest) {
