@@ -2,29 +2,47 @@ import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Poll, PollMode } from '@/lib/types'
+import { z } from 'zod'
+
+const POLL_TTL_SECONDS = 30 * 24 * 60 * 60 // 30 days
+
+const CreatePollSchema = z.object({
+  title: z.string().max(100).optional(),
+  suggestions: z
+    .array(z.string().min(1).max(200))
+    .min(1, 'At least one suggestion required')
+    .max(3, 'Maximum 3 suggestions allowed'),
+  mode: z.enum(['normal', 'dubious']).optional().default('normal'),
+  creatorEmail: z.string().email().optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, suggestions, mode } = body
+    const parsed = CreatePollSchema.safeParse(body)
 
-    if (!suggestions || suggestions.length === 0) {
-      return NextResponse.json({ error: 'At least one suggestion required' }, { status: 400 })
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
+        { status: 400 }
+      )
     }
 
-    const id = nanoid(10)
+    const { title, suggestions, mode, creatorEmail } = parsed.data
     const pollMode: PollMode = mode === 'dubious' ? 'dubious' : 'normal'
+
+    const id = nanoid(10)
     const poll: Poll = {
       id,
       title: title || (pollMode === 'dubious' ? 'I Dare You...' : 'What It Do?'),
       suggestions,
-      creatorEmail: 'sailorbeefalo@gmail.com',
+      creatorEmail: creatorEmail || process.env.POLL_CREATOR_EMAIL || '',
       createdAt: Date.now(),
       responses: [],
-      mode: pollMode
+      mode: pollMode,
     }
 
-    await redis.set(`poll:${id}`, JSON.stringify(poll))
+    await redis.set(`poll:${id}`, JSON.stringify(poll), { ex: POLL_TTL_SECONDS })
 
     return NextResponse.json({ id, poll })
   } catch (error) {

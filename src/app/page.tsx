@@ -19,6 +19,7 @@ const PLACEHOLDERS = {
 export default function Home() {
   const [suggestions, setSuggestions] = useState(['', '', ''])
   const [title, setTitle] = useState('')
+  const [creatorEmail, setCreatorEmail] = useState('')
   const [pollLink, setPollLink] = useState('')
   const [resultsLink, setResultsLink] = useState('')
   const [copied, setCopied] = useState(false)
@@ -54,7 +55,8 @@ export default function Home() {
         body: JSON.stringify({
           title: title.trim() || defaultTitle,
           suggestions: filledSuggestions.map(s => s.trim()),
-          mode
+          mode,
+          creatorEmail: creatorEmail.trim() || undefined
         })
       })
 
@@ -78,12 +80,19 @@ export default function Home() {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
+      // Modern fallback: create a temporary input and select it
       const textArea = document.createElement('textarea')
       textArea.value = pollLink
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
       document.body.appendChild(textArea)
+      textArea.focus()
       textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
+      try {
+        document.execCommand('copy')
+      } finally {
+        document.body.removeChild(textArea)
+      }
       setCopied(true)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
@@ -106,6 +115,7 @@ export default function Home() {
     setResultsLink('')
     setSuggestions(['', '', ''])
     setTitle('')
+    setCreatorEmail('')
     setMode('dubious')
   }
 
@@ -240,6 +250,21 @@ export default function Home() {
               value={title}
               maxLength={100}
               onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
+            />
+          </div>
+
+          <div className="mb-6">
+            <label htmlFor="creator-email" className="block text-purple-300 text-sm mb-2 font-medium">
+              Your Email <span className="text-purple-400/50 font-normal">(optional — to receive vote notifications)</span>
+            </label>
+            <input
+              type="email"
+              id="creator-email"
+              placeholder="you@example.com"
+              value={creatorEmail}
+              maxLength={254}
+              onChange={(e) => setCreatorEmail(e.target.value)}
               className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
             />
           </div>

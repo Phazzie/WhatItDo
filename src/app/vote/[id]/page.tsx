@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Poll, VoteOption } from '@/lib/types'
+import { getVoteEmoji, getVoteColor } from '@/lib/utils'
 
 type Vote = VoteOption | null
 
@@ -101,22 +102,6 @@ export default function VotePage() {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const getVoteEmoji = (vote: Vote) => {
-    if (vote === 'yes') return '✅'
-    if (vote === 'no') return '❌'
-    if (vote === 'maybe') return '🤔'
-    if (vote === 'yolo') return '🎲'
-    return ''
-  }
-
-  const getVoteColor = (vote: Vote) => {
-    if (vote === 'yes') return 'text-green-400'
-    if (vote === 'no') return 'text-red-400'
-    if (vote === 'maybe') return 'text-yellow-400'
-    if (vote === 'yolo') return 'text-violet-400'
-    return ''
   }
 
   const isDubious = poll?.mode === 'dubious'
