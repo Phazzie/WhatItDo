@@ -84,7 +84,7 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 
 ## Wave 3 — Verification
 
-- [ ] **3.1 E2E smoke**
+- [x] **3.1 E2E smoke** — done: 2 Playwright specs (both modes, YOLO + counter proposal), CI e2e job; webServer uses `next build && next start` because dev-mode on-demand compilation resets the in-process mock-Redis singleton mid-run
   **Files**: `e2e/` (new), `playwright.config.ts` (new), `package.json` + `package-lock.json` (add `@playwright/test`, `e2e` script), `.github/workflows/ci.yml` (e2e job)
   **Special info**: run `next dev` with `USE_MOCK_REDIS=1`; one happy-path spec per mode: create → vote (incl. YOLO in dubious) → results show counts + counter proposal; CI installs via `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` — do not re-download.
 - [ ] **3.2 Orchestrator self-review** (not a sub-agent task)
