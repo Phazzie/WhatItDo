@@ -29,10 +29,10 @@ Every sub-agent receives this block verbatim, plus its task-specific info:
 - [x] **1.3 Dependency triage (H5)** — done: 14 vulns (7 high) → 5; all remaining require a Next 15/16 major upgrade (see Follow-ups)
   **Files**: `package.json`, `package-lock.json` (runtime dependency versions only — no scripts, no new packages)
   **Special info**: `npm audit` before/after; `npm audit fix` without `--force`; bump `next`/`eslint-config-next` to latest 14.2.x; NO breaking majors (report Next 15-only fixes as follow-ups); verify tsc + lint + build.
-- [ ] **1.4 Test harness** — *blocked on 1.3 (shared manifests; 1.3 lands first, then rebase + fresh `npm install`)*
+- [x] **1.4 Test harness** — done: Vitest 4, mockRedis with TTL inspection, 3-test smoke incl. route-handler pattern
   **Files**: `package.json` + `package-lock.json` (devDependencies + scripts only), `vitest.config.ts` (new), `src/test/mockRedis.ts` (new), `src/test/smoke.test.ts` (new)
   **Special info**: add `vitest`, `@testing-library/react`, `jsdom`; scripts `test`, `test:watch`, `typecheck`; mock must support `get/set/rpush/lrange/expire` and be importable by later waves; smoke test = one trivial assertion + one route-handler call to `GET /api/poll` with the mock proving route handlers are testable.
-- [ ] **1.5 CI workflow**
+- [x] **1.5 CI workflow** — done: lint → typecheck → test → build on push/PR, Node 20
   **Files**: `.github/workflows/ci.yml` (new)
   **Special info**: install → lint → typecheck → test → build on push + PR; Node 20; can run in parallel with 1.4 but merges after it (CI needs the `test` script to exist to pass).
 
