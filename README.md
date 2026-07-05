@@ -86,8 +86,12 @@ UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
 # Resend Email API
 RESEND_API_KEY=your_resend_api_key
 
-# Email address for poll notifications
-POLL_CREATOR_EMAIL=your_email@example.com
+# Email settings
+POLL_CREATOR_EMAIL=your_email@example.com  # Email address that receives vote notifications
+EMAIL_FROM=What It Do <notifications@your-domain.com>  # From address for notification emails (used by Resend)
+
+# Your app URL
+NEXT_PUBLIC_BASE_URL=https://your-app.vercel.app
 ```
 
 4. Run the development server:
@@ -118,6 +122,8 @@ pnpm dev
 4. **Add Comments** (optional): Share your thoughts on each suggestion
 5. **Counter Proposal** (optional): Suggest your own alternative
 6. **Submit**: Send your votes to the poll creator
+
+**Note**: Duplicate voting is permitted by design—the same person can vote multiple times from different devices or sessions.
 
 ### Viewing Results
 
@@ -195,6 +201,14 @@ Request: {
 
 Response: {
   id: string
+  poll: {
+    id: string
+    title: string
+    suggestions: string[]
+    mode: 'normal' | 'dubious'
+    responses: PollResponse[]
+    createdAt: number
+  }
 }
 ```
 
@@ -242,12 +256,12 @@ interface Poll {
   title: string
   suggestions: string[]
   mode: PollMode
-  responses: Response[]
-  createdAt: string
+  responses: PollResponse[]
+  createdAt: number
 }
 ```
 
-### Response Type
+### PollResponse Type
 ```typescript
 type VoteOption = 'yes' | 'no' | 'maybe' | 'yolo'
 
@@ -257,14 +271,22 @@ interface Vote {
   comment: string
 }
 
-interface Response {
+interface PollResponse {
   id: string
   voterName: string
   votes: Vote[]
   counterProposal?: string
-  submittedAt: string
+  submittedAt: number
 }
 ```
+
+## Data Storage
+
+Polls are stored in Upstash Redis using the following key structure:
+
+- `poll:{id}` — The poll object (title, suggestions, mode, metadata); responses are currently stored inside it
+
+Planned hardening moves responses to a separate `poll:{id}:responses` list and adds a 30-day TTL to both keys (refreshed on each vote).
 
 ## Email Notifications
 
