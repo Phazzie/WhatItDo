@@ -1,0 +1,102 @@
+# WhatItDo — Completion Plan (parallel sub-agent execution)
+
+Companion to `docs/AUDIT.md` (finding IDs C1–C5, H1–H4, M1–M6 referenced below).
+
+## Orchestration model
+
+- **Orchestrator**: Opus (or the coordinating session). Spawns agents, merges waves, resolves conflicts, runs the final self-review and verification gate.
+- **Sonnet 5**: anything touching API logic, the Redis data model, or test design.
+- **Haiku**: docs, env files, mechanical frontend cleanups.
+- Agents within a wave own **disjoint files** so they can run in parallel with no merge conflicts. A wave merges only when every agent in it is green.
+
+## Exploration still needed (none blocking)
+
+The codebase (13 source files) has been fully read and the build verified — no further code exploration is required. Two small look-ups happen inside the waves that own them:
+
+1. Agent A confirms current Vitest + `next` route-handler testing setup (mocking `@upstash/redis`).
+2. Agent D confirms `@upstash/ratelimit` API before wiring rate limiting.
+
+## Red-green discipline (applies to every code agent)
+
+1. **Red**: write the failing test that reproduces the finding first; run it; confirm it fails for the expected reason.
+2. **Green**: implement the minimal fix; confirm the test passes.
+3. **Regression**: run the full suite + `tsc --noEmit` + `next lint` before reporting done.
+4. Each agent's report must include the red output and the green output.
+
+---
+
+## Wave 1 — Foundation (2 agents, parallel)
+
+### Agent A (Sonnet) — Test harness + CI
+**Files owned**: `vitest.config.ts`, `package.json`, `src/test/**`, `.github/workflows/ci.yml`
+- Add Vitest (+ `@testing-library/react` + `jsdom` for component tests later).
+- Create a reusable in-memory mock of `@upstash/redis` (`src/test/mockRedis.ts`) supporting `get/set/rpush/lrange/expire`.
+- Add scripts: `test`, `test:watch`, `typecheck`.
+- GitHub Actions workflow: install → lint → typecheck → test → build.
+- Smoke test proving the harness runs (one trivial passing test + one route-handler test invoking `GET /api/poll` with the mock).
+
+### Agent B (Haiku) — Env, docs, hygiene
+**Files owned**: `.env.example`, `README.md`
+- Add `POLL_CREATOR_EMAIL`, `EMAIL_FROM` to `.env.example` (fixes M6).
+- Fix README drift: response shapes, timestamp types, type names, duplicate-voting note (M5). Document the new env vars and the Redis key layout that Wave 2 introduces (coordinate wording with orchestrator).
+
+**Gate**: CI runs green on the branch.
+
+---
+
+## Wave 2 — Fixes (2 agents, parallel, disjoint files)
+
+### Agent D (Sonnet) — Backend hardening
+**Files owned**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, `src/lib/validation.ts` (new), `src/lib/escapeHtml.ts` (new), their test files
+Red-green per finding:
+- **C1**: move responses to `RPUSH poll:{id}:responses`; `GET /api/poll` merges list into the poll object. Red test: two concurrent POSTs to `/api/vote`, assert both responses survive.
+- **C2**: `escapeHtml()` applied to every user string interpolated into the email. Red test: voterName `<img src=x onerror=…>` must appear escaped in the sent payload (mock Resend).
+- **C3**: `src/lib/validation.ts` — validate poll creation (suggestions: array of 1–3 non-empty strings ≤200 chars; title ≤100) and vote submission (votes match the poll's suggestions exactly; vote ∈ allowed options for the poll's mode — fixes H3; voterName ≤50; comment ≤200; counterProposal ≤500). Malformed JSON → 400.
+- **C4**: `creatorEmail` from `process.env.POLL_CREATOR_EMAIL`; skip email (with a server log) when unset. Remove the hardcoded address.
+- **C5**: `@upstash/ratelimit` sliding window on both POST routes (e.g. 10 polls/hr, 20 votes/hr per IP), env-gated so dev/test skip it.
+- **H1**: build `resultsUrl` only when a base URL is known; omit the button otherwise.
+- **H2**: `EX` 30 days on poll keys, refreshed on each vote.
+- **M1**: `from:` address from `EMAIL_FROM` env with the current value as fallback.
+
+### Agent E (Haiku) — Frontend cleanup
+**Files owned**: `src/app/page.tsx`, `src/app/vote/[id]/page.tsx`, `src/app/results/[id]/page.tsx`, `src/lib/voteDisplay.ts` (new), their test files
+- **M2**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` to `src/lib/voteDisplay.ts`; unit-test the pure functions (red-green); update all three pages to import them.
+- **M3**: `maxLength={50}` on the voter-name input (must match Agent D's server cap — orchestrator pins the value at 50 for both).
+- **M4**: pause the 30s results refresh when `document.visibilityState === 'hidden'`, refresh immediately on return.
+- Low items: replace `alert()` with inline error banners on create/vote pages; drop the deprecated `execCommand` fallback path or leave with a comment (agent's judgment, prefer `navigator.clipboard` only + visible error).
+
+**Cross-wave contract** (orchestrator enforces): voterName cap = 50; vote options per mode = `yes|no|maybe` (normal) / `+yolo` (dubious); Redis keys = `poll:{id}` (poll sans responses) + `poll:{id}:responses` (list).
+
+**Gate**: full suite green, `next build` clean, CI green.
+
+---
+
+## Wave 3 — Verification & self-review (orchestrator + 1 agent)
+
+### Agent F (Sonnet) — End-to-end smoke
+**Files owned**: `e2e/**` (new), `playwright.config.ts`
+- Playwright (Chromium is pre-installed in this environment) against `next dev` with the Redis mock injected via a test-only env switch: create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
+- Kept minimal (one happy-path spec per mode) so it stays fast in CI.
+
+### Orchestrator self-review
+1. Run `/code-review` (high effort) on the full branch diff; fix or explicitly waive every finding.
+2. Run `/security-review` on the branch (email escaping, validation, rate limiting are security-sensitive).
+3. Final gate: `lint` + `typecheck` + `test` + `e2e` + `build` all green.
+4. Re-read `docs/AUDIT.md` and tick every finding as fixed/waived in the PR description.
+
+---
+
+## Wave 4 — Ship
+
+- Squash-tidy commits if needed, push branch, open PR referencing the audit table with per-finding status.
+- Post-merge manual checklist (needs the human — cannot be done by agents): set `POLL_CREATOR_EMAIL`, `EMAIL_FROM`, `NEXT_PUBLIC_BASE_URL` in Vercel; verify a real email delivers via Resend; note that existing polls stored under the old single-JSON layout will show zero responses after the C1 data-model change (acceptable — polls are ephemeral — or run a one-off migration if any live poll matters).
+
+## Decisions needed from the owner (defaults chosen; override any)
+
+| Decision | Default in this plan |
+|---|---|
+| Poll TTL | 30 days |
+| Rate limits | 10 polls/hr, 20 votes/hr per IP |
+| Rate-limit dependency | `@upstash/ratelimit` (same vendor, no new account) |
+| Test framework | Vitest |
+| Old-format polls | not migrated |
