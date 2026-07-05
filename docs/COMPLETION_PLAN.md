@@ -36,9 +36,9 @@ Every sub-agent receives this block verbatim, plus its task-specific info:
   **Files**: `.github/workflows/ci.yml` (new)
   **Special info**: install → lint → typecheck → test → build on push + PR; Node 20; can run in parallel with 1.4 but merges after it (CI needs the `test` script to exist to pass).
 
-**Wave gate**: CI green on the branch.
+**Wave gate**: MET — CI run green on branch + PR #4 (2026-07-05).
 
-## Wave 2 — Fixes (after Wave 1 merges)
+## Wave 2 — Fixes *(IN PROGRESS: backend agent running 2.1–2.6, frontend agent running 2.7–2.10, launched 2026-07-05 ~16:10 UTC)*
 
 Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one backend agent
 (or as separate agents in the listed order). Frontend items 2.7–2.10 are parallel to the backend track.
