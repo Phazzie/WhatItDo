@@ -38,32 +38,32 @@ Every sub-agent receives this block verbatim, plus its task-specific info:
 
 **Wave gate**: MET — CI run green on branch + PR #4 (2026-07-05).
 
-## Wave 2 — Fixes *(IN PROGRESS: backend agent running 2.1–2.6; frontend track 2.7–2.10 complete, launched 2026-07-05 ~16:10 UTC)*
+## Wave 2 — Fixes *(COMPLETE)*
 
 Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one backend agent
 (or as separate agents in the listed order). Frontend items 2.7–2.10 are parallel to the backend track.
 
-- [ ] **2.1 Input validation (C3 + H3)**
+- [x] **2.1 Input validation (C3 + H3)** — done
   **Files**: `src/lib/validation.ts` (new), `src/lib/validation.test.ts` (new), `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`
   **Special info**: poll: suggestions = 1–3 non-empty strings ≤200 chars, title ≤100; vote: votes must match the poll's suggestions exactly, vote value ∈ mode's allowed set (`yolo` only in `dubious`), voterName ≤50, comment ≤200, counterProposal ≤500; malformed JSON → 400 not 500.
   **Red**: POST a vote with a non-string `vote` value → currently 500 via `toUpperCase()`; POST 50 suggestions → currently accepted.
-- [ ] **2.2 Concurrency-safe responses (C1)**
+- [x] **2.2 Concurrency-safe responses (C1)** — done
   **Files**: `src/app/api/vote/route.ts`, `src/app/api/poll/route.ts`, their test files
   **Special info**: `RPUSH poll:{id}:responses`, `GET /api/poll` merges the list into the returned poll object; poll object no longer stores responses.
   **Red**: two interleaved vote submissions against the mock → one response lost under current read-modify-write.
-- [ ] **2.3 Email HTML escaping (C2)**
+- [x] **2.3 Email HTML escaping (C2)** — done
   **Files**: `src/lib/escapeHtml.ts` (new), `src/lib/escapeHtml.test.ts` (new), `src/app/api/vote/route.ts`
   **Special info**: escape voterName, poll.title, vote text, comments, counterProposal; mock Resend and assert on the html payload.
   **Red**: voterName `<img src=x onerror=alert(1)>` appears unescaped in the email html.
-- [ ] **2.4 Env-driven emails + URL fallback (C4, M1, H1)**
+- [x] **2.4 Env-driven emails + URL fallback (C4, M1, H1)** — done
   **Files**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, their test files
   **Special info**: `creatorEmail` from `POLL_CREATOR_EMAIL` (skip email + server log when unset; remove hardcoded address); `from:` from `EMAIL_FROM` with current value as fallback; `resultsUrl` = `NEXT_PUBLIC_BASE_URL` else `request.nextUrl.origin`.
   **Red**: with `NEXT_PUBLIC_BASE_URL` unset and no origin header, email contains `undefined/results/…`.
-- [ ] **2.5 TTL + rate limiting (H2, C5)**
+- [x] **2.5 TTL + rate limiting (H2, C5)** — done (hand-rolled sliding-window limiter; see decision table)
   **Files**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `package.json` + `package-lock.json` (add `@upstash/ratelimit`), their test files
   **Special info**: `EX` 30 days on BOTH `poll:{id}` and `poll:{id}:responses`, refreshed on vote; sliding window 10 polls/hr + 20 votes/hr per IP, env-gated off in dev/test.
   **Red**: keys created with no TTL (assert via mock `expire` tracking); 25 rapid votes all succeed.
-- [ ] **2.6 Test-only Redis switch + backend voteDisplay import (enables Wave 3; M2 backend half)**
+- [x] **2.6 Test-only Redis switch + backend voteDisplay import (enables Wave 3; M2 backend half)** — done
   **Files**: `src/lib/redis.ts`, `src/app/api/vote/route.ts`
   **Special info**: `USE_MOCK_REDIS=1` → in-memory implementation reusing `src/test/mockRedis.ts`; also swap the route's local `getVoteEmoji` for the `src/lib/voteDisplay` import once 2.7 has landed (coordinate: 2.7 merges first, else keep local copy and flag).
 - [x] **2.7 Shared vote-display lib (M2)** — done, commit `5b46957`
@@ -79,7 +79,7 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
   **Files**: `src/app/page.tsx`, `src/app/vote/[id]/page.tsx`
   **Special info**: replace `alert()` with inline error banners; drop deprecated `execCommand` fallback in favor of `navigator.clipboard` + visible error on failure.
 
-**Wave gate**: full suite + `next build` + CI green.
+**Wave gate**: MET — 44 tests, tsc, lint, build all green (2026-07-05).
 **Cross-wave contract**: voterName cap = 50; allowed votes = `yes`/`no`/`maybe` (+`yolo` in dubious); keys = `poll:{id}` + `poll:{id}:responses`.
 
 ## Wave 3 — Verification
@@ -107,6 +107,6 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 |---|---|
 | Poll TTL | 30 days |
 | Rate limits | 10 polls/hr, 20 votes/hr per IP |
-| Rate-limit dependency | `@upstash/ratelimit` |
+| Rate-limit dependency | hand-rolled sliding-window log in `src/lib/redis.ts` — `@upstash/ratelimit` is Lua-script (`eval`) based, untestable against the shared mock; swap in the package later if the mock grows `eval` support |
 | Test framework | Vitest |
 | Old-format polls | not migrated |

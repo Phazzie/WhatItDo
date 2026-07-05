@@ -1,16 +1,35 @@
-import { redis } from '@/lib/redis'
+import { redis, POLL_TTL_SECONDS, checkRateLimit, getClientIp } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
-import { Poll, PollMode } from '@/lib/types'
+import { Poll, PollMode, PollResponse } from '@/lib/types'
+import { validatePollInput } from '@/lib/validation'
+
+const POLL_RATE_LIMIT = 10
+const POLL_RATE_WINDOW_SECONDS = 60 * 60
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { title, suggestions, mode } = body
-
-    if (!suggestions || suggestions.length === 0) {
-      return NextResponse.json({ error: 'At least one suggestion required' }, { status: 400 })
+    if (process.env.RATE_LIMIT_ENABLED === '1') {
+      const ip = getClientIp(request)
+      const allowed = await checkRateLimit(`ratelimit:poll:${ip}`, POLL_RATE_LIMIT, POLL_RATE_WINDOW_SECONDS)
+      if (!allowed) {
+        return NextResponse.json({ error: 'Too many polls created. Please try again later.' }, { status: 429 })
+      }
     }
+
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    const validation = validatePollInput(body)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
+    const { title, suggestions, mode } = body as { title?: string; suggestions: string[]; mode?: string }
 
     const id = nanoid(10)
     const pollMode: PollMode = mode === 'dubious' ? 'dubious' : 'normal'
@@ -18,13 +37,13 @@ export async function POST(request: NextRequest) {
       id,
       title: title || (pollMode === 'dubious' ? 'I Dare You...' : 'What It Do?'),
       suggestions,
-      creatorEmail: 'sailorbeefalo@gmail.com',
+      creatorEmail: process.env.POLL_CREATOR_EMAIL || '',
       createdAt: Date.now(),
       responses: [],
       mode: pollMode
     }
 
-    await redis.set(`poll:${id}`, JSON.stringify(poll))
+    await redis.set(`poll:${id}`, JSON.stringify(poll), { ex: POLL_TTL_SECONDS })
 
     return NextResponse.json({ id, poll })
   } catch (error) {
@@ -48,7 +67,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
-    const poll = typeof data === 'string' ? JSON.parse(data) : data
+    const poll: Poll = typeof data === 'string' ? JSON.parse(data) : data
+
+    const rawResponses = await redis.lrange(`poll:${id}:responses`, 0, -1)
+    const responses: PollResponse[] = rawResponses.map((r) => (typeof r === 'string' ? JSON.parse(r) : r))
+    poll.responses = responses
 
     return NextResponse.json({ poll })
   } catch (error) {

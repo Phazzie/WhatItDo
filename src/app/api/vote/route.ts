@@ -1,8 +1,14 @@
-import { redis } from '@/lib/redis'
+import { redis, POLL_TTL_SECONDS, checkRateLimit, getClientIp } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { Poll, PollResponse } from '@/lib/types'
+import { validateVoteInput } from '@/lib/validation'
+import { escapeHtml } from '@/lib/escapeHtml'
+import { getVoteEmoji } from '@/lib/voteDisplay'
+
+const VOTE_RATE_LIMIT = 20
+const VOTE_RATE_WINDOW_SECONDS = 60 * 60
 
 // Lazy initialization to avoid build-time errors
 let resend: Resend | null = null
@@ -15,7 +21,20 @@ function getResend() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    if (process.env.RATE_LIMIT_ENABLED === '1') {
+      const ip = getClientIp(request)
+      const allowed = await checkRateLimit(`ratelimit:vote:${ip}`, VOTE_RATE_LIMIT, VOTE_RATE_WINDOW_SECONDS)
+      if (!allowed) {
+        return NextResponse.json({ error: 'Too many votes submitted. Please try again later.' }, { status: 429 })
+      }
+    }
+
+    let body: { pollId?: string; voterName?: string; votes?: unknown; counterProposal?: string }
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
     const { pollId, voterName, votes, counterProposal } = body
 
     if (!pollId || !votes) {
@@ -30,56 +49,61 @@ export async function POST(request: NextRequest) {
 
     const poll: Poll = typeof data === 'string' ? JSON.parse(data) : data
 
+    const validation = validateVoteInput(body, poll)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
+    const typedVotes = votes as PollResponse['votes']
+
     const response: PollResponse = {
       id: nanoid(8),
       voterName: voterName || 'Anonymous',
-      votes,
+      votes: typedVotes,
       counterProposal: counterProposal || undefined,
       submittedAt: Date.now()
     }
 
-    poll.responses.push(response)
-    await redis.set(`poll:${pollId}`, JSON.stringify(poll))
+    const responseCount = await redis.rpush(`poll:${pollId}:responses`, JSON.stringify(response))
+
+    // Refresh the 30-day TTL on both keys on every vote so active polls
+    // don't expire out from under their responses (H2).
+    await redis.expire(`poll:${pollId}`, POLL_TTL_SECONDS)
+    await redis.expire(`poll:${pollId}:responses`, POLL_TTL_SECONDS)
 
     // Send email notification
     const emailClient = getResend()
     if (emailClient && poll.creatorEmail) {
       const isDubious = poll.mode === 'dubious'
-      const hasYolo = votes.some((v: { vote: string }) => v.vote === 'yolo')
+      const hasYolo = typedVotes.some((v) => v.vote === 'yolo')
 
-      const getVoteEmoji = (vote: string) => {
-        if (vote === 'yes') return '✅'
-        if (vote === 'no') return '❌'
-        if (vote === 'maybe') return '🤔'
-        if (vote === 'yolo') return '🎲'
-        return ''
-      }
-
-      const voteSummary = votes.map((v: { text: string; vote: string; comment: string }, i: number) =>
-        `${getVoteEmoji(v.vote)} ${i + 1}. "${v.text}"\n   Vote: ${v.vote.toUpperCase()}${v.comment ? `\n   Comment: "${v.comment}"` : ''}`
+      const voteSummary = typedVotes.map((v, i) =>
+        `${getVoteEmoji(v.vote)} ${i + 1}. "${escapeHtml(v.text)}"\n   Vote: ${v.vote.toUpperCase()}${v.comment ? `\n   Comment: "${escapeHtml(v.comment)}"` : ''}`
       ).join('\n\n')
 
       const counterProposalHtml = counterProposal
         ? `<div style="background: ${isDubious ? '#3d1f1f' : '#2d1f3d'}; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid ${isDubious ? '#f97316' : '#f0abfc'};">
              <p style="color: ${isDubious ? '#f97316' : '#f0abfc'}; font-weight: bold; margin: 0 0 8px 0;">${isDubious ? '🔥 Counter Dare:' : '💡 Counter Proposal:'}</p>
-             <p style="color: #e2e8f0; margin: 0; font-style: italic;">"${counterProposal}"</p>
+             <p style="color: #e2e8f0; margin: 0; font-style: italic;">"${escapeHtml(counterProposal)}"</p>
            </div>`
         : ''
 
-      const resultsUrl = `${process.env.NEXT_PUBLIC_BASE_URL || request.headers.get('origin')}/results/${pollId}`
+      const resultsUrl = `${process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin}/results/${pollId}`
 
       const subjectPrefix = isDubious ? '🌶️' : '📊'
       const yoloNote = hasYolo ? ' 🎲 YOLO DETECTED!' : ''
+      const escapedVoterName = escapeHtml(response.voterName)
+      const escapedTitle = escapeHtml(poll.title)
 
       try {
         await emailClient.emails.send({
-          from: 'What It Do <notifications@resend.dev>',
+          from: process.env.EMAIL_FROM || 'What It Do <notifications@resend.dev>',
           to: poll.creatorEmail,
           subject: `${subjectPrefix} ${response.voterName} voted on: ${poll.title}${counterProposal ? ' (+counter!)' : ''}${yoloNote}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <h1 style="color: ${isDubious ? '#f97316' : '#a855f7'};">${isDubious ? '🌶️ New Dare Response!' : '📊 New Vote Received!'}</h1>
-              <p><strong>${response.voterName}</strong> just ${isDubious ? 'responded to your dare' : 'voted on your poll'} "<strong>${poll.title}</strong>"</p>
+              <p><strong>${escapedVoterName}</strong> just ${isDubious ? 'responded to your dare' : 'voted on your poll'} "<strong>${escapedTitle}</strong>"</p>
               ${hasYolo ? '<p style="background: linear-gradient(to right, #d946ef, #ec4899); color: white; padding: 8px 16px; border-radius: 8px; display: inline-block; font-weight: bold;">🎲 They went YOLO on at least one!</p>' : ''}
 
               <div style="background: #1a1a2e; padding: 20px; border-radius: 12px; margin: 20px 0;">
@@ -95,7 +119,7 @@ export async function POST(request: NextRequest) {
               </p>
 
               <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
-                Total responses: ${poll.responses.length} ${isDubious ? '| Dubious Mode 🌶️' : ''}
+                Total responses: ${responseCount} ${isDubious ? '| Dubious Mode 🌶️' : ''}
               </p>
             </div>
           `
@@ -103,6 +127,8 @@ export async function POST(request: NextRequest) {
       } catch (emailError) {
         console.error('Failed to send email:', emailError)
       }
+    } else if (emailClient && !poll.creatorEmail) {
+      console.log(`No creator email configured for poll ${pollId}; skipping notification email`)
     }
 
     return NextResponse.json({ success: true, responseId: response.id })
