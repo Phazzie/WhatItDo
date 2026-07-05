@@ -17,7 +17,7 @@ All findings below are runtime/logic/security issues, not compile errors.
 
 | # | Issue | Location | Detail |
 |---|-------|----------|--------|
-| H1 | **`resultsUrl` can be `"undefined/results/…"`** | `vote/route.ts:69` | `NEXT_PUBLIC_BASE_URL || request.headers.get('origin')` — if the env is unset and the `origin` header is absent (server-to-server / some clients), the link in the email is broken. Fix: fall back to `request.nextUrl.origin`, which is always available on a `NextRequest`. |
+| H1 | **`resultsUrl` can be `"undefined/results/…"`** | `vote/route.ts:69` | `NEXT_PUBLIC_BASE_URL \|\| request.headers.get('origin')` — if the env is unset and the `origin` header is absent (server-to-server / some clients), the link in the email is broken. Fix: fall back to `request.nextUrl.origin`, which is always available on a `NextRequest`. |
 | H2 | **No TTL on Redis keys** | `poll/route.ts:27` | Polls persist forever; a free Upstash instance eventually fills. Add an expiry (e.g. 30 days, refreshed on vote) — applied to both the poll key and the responses key introduced by the C1 fix, so neither leaks. |
 | H3 | **Votes not cross-checked against the poll** | `vote/route.ts` | The submitted `votes[].text` is trusted; a forged payload can record votes for suggestions that don't exist in the poll, and `yolo` votes are accepted for `normal`-mode polls. |
 | H4 | **Zero tests / zero CI** | repo-wide | No test framework, no test files, no GitHub Actions. Nothing guards regressions. |
@@ -27,12 +27,12 @@ All findings below are runtime/logic/security issues, not compile errors.
 
 | # | Issue | Location |
 |---|-------|----------|
-| M1 | `from: 'What It Do <notifications@resend.dev>'` hardcoded — resend.dev only delivers to the account owner's address; should be `EMAIL_FROM` env. (`vote/route.ts:76`) |
-| M2 | `getVoteEmoji` / `getVoteColor` duplicated in 3 files (`vote/[id]/page.tsx`, `results/[id]/page.tsx`, `api/vote/route.ts`) — extract to `src/lib/voteDisplay.ts`. |
-| M3 | Voter-name input has no `maxLength` (`vote/[id]/page.tsx:228`) while every other input is capped. |
-| M4 | Results auto-refresh keeps polling every 30s while the tab is hidden (`results/[id]/page.tsx:28-32`) — gate on `document.visibilityState`. |
-| M5 | README drift: API response shapes (`POST /api/poll` returns `{id, poll}` not `{id}`), `submittedAt`/`createdAt` documented as `string` but are `number`, `POLL_CREATOR_EMAIL` documented but unused, `Response` vs actual `PollResponse` type name. |
-| M6 | `.env.example` missing `POLL_CREATOR_EMAIL` and `EMAIL_FROM`. |
+| M1 | `from: 'What It Do <notifications@resend.dev>'` hardcoded — resend.dev only delivers to the account owner's address; should be `EMAIL_FROM` env. | `vote/route.ts:76` |
+| M2 | `getVoteEmoji` / `getVoteColor` duplicated in 3 files — extract to `src/lib/voteDisplay.ts`. | `vote/[id]/page.tsx`, `results/[id]/page.tsx`, `api/vote/route.ts` |
+| M3 | Voter-name input has no `maxLength` while every other input is capped. | `vote/[id]/page.tsx:228` |
+| M4 | Results auto-refresh keeps polling every 30s while the tab is hidden — gate on `document.visibilityState`. | `results/[id]/page.tsx:28-32` |
+| M5 | README drift: API response shapes (`POST /api/poll` returns `{id, poll}` not `{id}`), `submittedAt`/`createdAt` documented as `string` but are `number`, `POLL_CREATOR_EMAIL` documented but unused, `Response` vs actual `PollResponse` type name. | `README.md` |
+| M6 | Missing `POLL_CREATOR_EMAIL` and `EMAIL_FROM`. | `.env.example` |
 
 ## Low
 

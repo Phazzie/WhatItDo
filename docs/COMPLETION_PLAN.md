@@ -1,6 +1,6 @@
 # WhatItDo — Completion Plan (parallel sub-agent execution)
 
-Companion to `docs/AUDIT.md` (finding IDs C1–C5, H1–H4, M1–M6 referenced below).
+Companion to `docs/AUDIT.md` (finding IDs C1–C5, H1–H5, M1–M6 referenced below).
 
 ## Orchestration model
 
@@ -28,6 +28,7 @@ The codebase (13 source files) has been fully read and the build verified — no
 ## Wave 1 — Foundation (3 agents, parallel)
 
 ### Agent A (Sonnet) — Test harness + CI
+
 **Files owned**: `vitest.config.ts`, `package.json`, `src/test/**`, `.github/workflows/ci.yml`
 - Add Vitest (+ `@testing-library/react` + `jsdom` for component tests later).
 - Create a reusable in-memory mock of `@upstash/redis` (`src/test/mockRedis.ts`) supporting `get/set/rpush/lrange/expire`.
@@ -36,11 +37,13 @@ The codebase (13 source files) has been fully read and the build verified — no
 - Smoke test proving the harness runs (one trivial passing test + one route-handler test invoking `GET /api/poll` with the mock).
 
 ### Agent B (Haiku) — Env, docs, hygiene
+
 **Files owned**: `.env.example`, `README.md`
 - Add `POLL_CREATOR_EMAIL`, `EMAIL_FROM` to `.env.example` (fixes M6).
 - Fix README drift: response shapes, timestamp types, type names, duplicate-voting note (M5). Document the new env vars and the Redis key layout that Wave 2 introduces (coordinate wording with orchestrator).
 
 ### Agent C (Sonnet) — Dependency vulnerability triage (H5)
+
 **Files owned**: `package.json` (dependency versions only — Agent A owns scripts; orchestrator merges the two edits), `package-lock.json`
 - Run `npm audit`, review the Dependabot list (14 high / 19 moderate / 4 low).
 - Bump within-semver first (`npm audit fix`, Next 14.2.x latest patch); take any remaining high-severity majors case by case.
@@ -53,6 +56,7 @@ The codebase (13 source files) has been fully read and the build verified — no
 ## Wave 2 — Fixes (2 agents, parallel, disjoint files)
 
 ### Agent D (Sonnet) — Backend hardening
+
 **Files owned**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, `src/lib/validation.ts` (new), `src/lib/escapeHtml.ts` (new), their test files
 Red-green per finding:
 - **C1**: move responses to `RPUSH poll:{id}:responses`; `GET /api/poll` merges list into the poll object. Red test: two concurrent POSTs to `/api/vote`, assert both responses survive.
@@ -63,15 +67,17 @@ Red-green per finding:
 - **H1**: build `resultsUrl` from `NEXT_PUBLIC_BASE_URL` with `request.nextUrl.origin` as fallback (always available on a `NextRequest`, unlike the `origin` header).
 - **H2**: `EX` 30 days on **both** `poll:{id}` and `poll:{id}:responses` keys (expiring only the poll would leak orphaned response lists), refreshed on each vote.
 - **M1**: `from:` address from `EMAIL_FROM` env with the current value as fallback.
+- **M2 (backend half)**: replace the local `getVoteEmoji` copy in `api/vote/route.ts` with an import from `src/lib/voteDisplay.ts` (created by Agent E — see cross-wave contract for merge order).
 
 ### Agent E (Haiku) — Frontend cleanup
+
 **Files owned**: `src/app/page.tsx`, `src/app/vote/[id]/page.tsx`, `src/app/results/[id]/page.tsx`, `src/lib/voteDisplay.ts` (new), their test files
-- **M2**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` to `src/lib/voteDisplay.ts`; unit-test the pure functions (red-green); update all three pages to import them.
+- **M2**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` to `src/lib/voteDisplay.ts`; unit-test the pure functions (red-green); update all three pages to import them. (The fourth copy, in `api/vote/route.ts`, is swapped to the shared import by Agent D, who owns that file.)
 - **M3**: `maxLength={50}` on the voter-name input (must match Agent D's server cap — orchestrator pins the value at 50 for both).
 - **M4**: pause the 30s results refresh when `document.visibilityState === 'hidden'`, refresh immediately on return.
 - Low items: replace `alert()` with inline error banners on create/vote pages; drop the deprecated `execCommand` fallback path or leave with a comment (agent's judgment, prefer `navigator.clipboard` only + visible error).
 
-**Cross-wave contract** (orchestrator enforces): voterName cap = 50; vote options per mode = `yes|no|maybe` (normal) / `+yolo` (dubious); Redis keys = `poll:{id}` (poll sans responses) + `poll:{id}:responses` (list).
+**Cross-wave contract** (orchestrator enforces): voterName cap = 50; vote options per mode = `yes|no|maybe` (normal) / `+yolo` (dubious); Redis keys = `poll:{id}` (poll sans responses) + `poll:{id}:responses` (list); `src/lib/voteDisplay.ts` exports `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` — Agent E's branch merges before Agent D's `api/vote/route.ts` import lands (or D keeps the local copy and the orchestrator dedupes at wave merge).
 
 **Gate**: full suite green, `next build` clean, CI green.
 
@@ -80,12 +86,14 @@ Red-green per finding:
 ## Wave 3 — Verification & self-review (orchestrator + 1 agent)
 
 ### Agent F (Sonnet) — End-to-end smoke
+
 **Files owned**: `e2e/**` (new), `playwright.config.ts`
 - Playwright against `next dev` with the Redis mock injected via a test-only env switch: create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
 - Reproducible browser setup: CI and contributor machines run `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` and must not re-download it.
 - Kept minimal (one happy-path spec per mode) so it stays fast in CI.
 
 ### Orchestrator self-review
+
 1. Run `/code-review` (high effort) on the full branch diff; fix or explicitly waive every finding. (`/code-review` and `/security-review` are Claude Code slash commands; a human reviewer without that tooling substitutes a manual pass over the diff against the audit table plus a security-focused read of the email/validation/rate-limit changes.)
 2. Run `/security-review` on the branch (email escaping, validation, rate limiting are security-sensitive).
 3. Final gate: `lint` + `typecheck` + `test` + `e2e` + `build` all green.
