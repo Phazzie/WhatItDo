@@ -8,7 +8,7 @@ Each unchecked box is one dispatchable sub-agent task. Items in the same wave wi
 
 Every sub-agent receives this block verbatim, plus its task-specific info:
 
-- **Repo**: Next.js 14 (App Router) + TypeScript polling app at `/home/user/WhatItDo`, already on the correct branch.
+- **Repo**: Next.js 14 (App Router) + TypeScript polling app; work from the repository root, already on the correct branch. (The orchestrator substitutes the absolute path for the current environment when dispatching.)
 - **Context**: read `docs/AUDIT.md` and this file before editing anything.
 - **File ownership**: touch ONLY the files listed in your task. If the fix seems to require another file, stop and report instead of editing it.
 - **No git**: never run `git commit`/`push`/`checkout`. The orchestrator reviews your diff and commits.
@@ -38,7 +38,7 @@ Every sub-agent receives this block verbatim, plus its task-specific info:
 
 **Wave gate**: MET — CI run green on branch + PR #4 (2026-07-05).
 
-## Wave 2 — Fixes *(IN PROGRESS: backend agent running 2.1–2.6, frontend agent running 2.7–2.10, launched 2026-07-05 ~16:10 UTC)*
+## Wave 2 — Fixes *(IN PROGRESS: backend agent running 2.1–2.6; frontend track 2.7–2.10 complete, launched 2026-07-05 ~16:10 UTC)*
 
 Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one backend agent
 (or as separate agents in the listed order). Frontend items 2.7–2.10 are parallel to the backend track.
@@ -66,16 +66,16 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 - [ ] **2.6 Test-only Redis switch + backend voteDisplay import (enables Wave 3; M2 backend half)**
   **Files**: `src/lib/redis.ts`, `src/app/api/vote/route.ts`
   **Special info**: `USE_MOCK_REDIS=1` → in-memory implementation reusing `src/test/mockRedis.ts`; also swap the route's local `getVoteEmoji` for the `src/lib/voteDisplay` import once 2.7 has landed (coordinate: 2.7 merges first, else keep local copy and flag).
-- [ ] **2.7 Shared vote-display lib (M2)**
+- [x] **2.7 Shared vote-display lib (M2)** — done, commit `5b46957`
   **Files**: `src/lib/voteDisplay.ts` (new), `src/lib/voteDisplay.test.ts` (new), `src/app/vote/[id]/page.tsx`, `src/app/results/[id]/page.tsx`
   **Special info**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` exactly as-is; unit-test the pure functions (red first: tests import the not-yet-existing module).
-- [ ] **2.8 Voter-name cap (M3)**
+- [x] **2.8 Voter-name cap (M3)** — done, commit `5b46957`
   **Files**: `src/app/vote/[id]/page.tsx`
   **Special info**: `maxLength={50}` — MUST equal the server cap in 2.1 (contract: 50).
-- [ ] **2.9 Visibility-aware refresh (M4)**
+- [x] **2.9 Visibility-aware refresh (M4)** — done, commit `5b46957`
   **Files**: `src/app/results/[id]/page.tsx`
   **Special info**: pause the 30s interval when `document.visibilityState === 'hidden'`; refetch immediately on visible.
-- [ ] **2.10 Inline errors + clipboard cleanup (Low findings)**
+- [x] **2.10 Inline errors + clipboard cleanup (Low findings)** — done, commit `5b46957`
   **Files**: `src/app/page.tsx`, `src/app/vote/[id]/page.tsx`
   **Special info**: replace `alert()` with inline error banners; drop deprecated `execCommand` fallback in favor of `navigator.clipboard` + visible error on failure.
 
