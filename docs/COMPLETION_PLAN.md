@@ -9,7 +9,7 @@ Companion to `docs/AUDIT.md` (finding IDs C1–C5, H1–H4, M1–M6 referenced b
 - **Haiku**: docs, env files, mechanical frontend cleanups.
 - Agents within a wave own **disjoint files** so they can run in parallel with no merge conflicts. A wave merges only when every agent in it is green.
 
-## Exploration still needed (none blocking)
+## Exploration still needed (non-blocking)
 
 The codebase (13 source files) has been fully read and the build verified — no further code exploration is required. Two small look-ups happen inside the waves that own them:
 
@@ -60,8 +60,8 @@ Red-green per finding:
 - **C3**: `src/lib/validation.ts` — validate poll creation (suggestions: array of 1–3 non-empty strings ≤200 chars; title ≤100) and vote submission (votes match the poll's suggestions exactly; vote ∈ allowed options for the poll's mode — fixes H3; voterName ≤50; comment ≤200; counterProposal ≤500). Malformed JSON → 400.
 - **C4**: `creatorEmail` from `process.env.POLL_CREATOR_EMAIL`; skip email (with a server log) when unset. Remove the hardcoded address.
 - **C5**: `@upstash/ratelimit` sliding window on both POST routes (e.g. 10 polls/hr, 20 votes/hr per IP), env-gated so dev/test skip it.
-- **H1**: build `resultsUrl` only when a base URL is known; omit the button otherwise.
-- **H2**: `EX` 30 days on poll keys, refreshed on each vote.
+- **H1**: build `resultsUrl` from `NEXT_PUBLIC_BASE_URL` with `request.nextUrl.origin` as fallback (always available on a `NextRequest`, unlike the `origin` header).
+- **H2**: `EX` 30 days on **both** `poll:{id}` and `poll:{id}:responses` keys (expiring only the poll would leak orphaned response lists), refreshed on each vote.
 - **M1**: `from:` address from `EMAIL_FROM` env with the current value as fallback.
 
 ### Agent E (Haiku) — Frontend cleanup

@@ -17,8 +17,8 @@ All findings below are runtime/logic/security issues, not compile errors.
 
 | # | Issue | Location | Detail |
 |---|-------|----------|--------|
-| H1 | **`resultsUrl` can be `"undefined/results/…"`** | `vote/route.ts:69` | `NEXT_PUBLIC_BASE_URL || request.headers.get('origin')` — if the env is unset and the `origin` header is absent (server-to-server / some clients), the link in the email is broken. |
-| H2 | **No TTL on Redis keys** | `poll/route.ts:27` | Polls persist forever; a free Upstash instance eventually fills. Add an expiry (e.g. 30 days, refreshed on vote). |
+| H1 | **`resultsUrl` can be `"undefined/results/…"`** | `vote/route.ts:69` | `NEXT_PUBLIC_BASE_URL || request.headers.get('origin')` — if the env is unset and the `origin` header is absent (server-to-server / some clients), the link in the email is broken. Fix: fall back to `request.nextUrl.origin`, which is always available on a `NextRequest`. |
+| H2 | **No TTL on Redis keys** | `poll/route.ts:27` | Polls persist forever; a free Upstash instance eventually fills. Add an expiry (e.g. 30 days, refreshed on vote) — applied to both the poll key and the responses key introduced by the C1 fix, so neither leaks. |
 | H3 | **Votes not cross-checked against the poll** | `vote/route.ts` | The submitted `votes[].text` is trusted; a forged payload can record votes for suggestions that don't exist in the poll, and `yolo` votes are accepted for `normal`-mode polls. |
 | H4 | **Zero tests / zero CI** | repo-wide | No test framework, no test files, no GitHub Actions. Nothing guards regressions. |
 | H5 | **37 known dependency vulnerabilities** | `package-lock.json` | GitHub Dependabot reports 14 high, 19 moderate, 4 low on the default branch. Needs `npm audit` triage and dependency bumps (Next.js 14.2.x patch releases likely cover most of the high ones). |
