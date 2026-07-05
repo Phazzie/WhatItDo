@@ -24,6 +24,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false)
   const [creating, setCreating] = useState(false)
   const [mode, setMode] = useState<PollMode>('dubious')
+  const [error, setError] = useState('')
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -36,15 +37,17 @@ export default function Home() {
 
   const updateSuggestion = (index: number, value: string) => {
     setSuggestions(prev => prev.map((s, i) => i === index ? value : s))
+    setError('')
   }
 
   const createPoll = async () => {
     const filledSuggestions = suggestions.filter(s => s.trim())
     if (filledSuggestions.length === 0) {
-      alert('Add at least one suggestion!')
+      setError('Add at least one suggestion!')
       return
     }
 
+    setError('')
     setCreating(true)
     try {
       const defaultTitle = mode === 'dubious' ? 'Intriguing Possibilities...' : 'What It Do?'
@@ -63,9 +66,9 @@ export default function Home() {
       const data = await res.json()
       setPollLink(`${window.location.origin}/vote/${data.id}`)
       setResultsLink(`${window.location.origin}/results/${data.id}`)
-    } catch (error) {
-      console.error(error)
-      alert('Failed to create poll. Please try again.')
+    } catch (err) {
+      console.error(err)
+      setError('Failed to create poll. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -74,19 +77,13 @@ export default function Home() {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(pollLink)
+      setError('')
       setCopied(true)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
-    } catch {
-      const textArea = document.createElement('textarea')
-      textArea.value = pollLink
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setCopied(true)
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
-      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error(err)
+      setError('Could not copy link. Please copy it manually.')
     }
   }
 
@@ -107,6 +104,7 @@ export default function Home() {
     setSuggestions(['', '', ''])
     setTitle('')
     setMode('dubious')
+    setError('')
   }
 
   if (pollLink) {
@@ -122,6 +120,12 @@ export default function Home() {
               Share this link with your friend
             </p>
           </div>
+
+          {error && (
+            <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
+              {error}
+            </div>
+          )}
 
           <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow mb-6">
             <p className="text-purple-300 text-sm mb-2 font-medium">Send this to your friend:</p>
@@ -229,6 +233,12 @@ export default function Home() {
               : 'Standard voting with Yes, No, or Maybe'}
           </p>
         </div>
+
+        {error && (
+          <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
+            {error}
+          </div>
+        )}
 
         <div className="card-gradient rounded-2xl p-8 neon-border">
           <div className="mb-6">

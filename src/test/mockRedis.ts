@@ -31,6 +31,9 @@ class MockRedis {
     this.store.set(key, value)
     if (options?.ex !== undefined) {
       this.ttls.set(key, options.ex)
+    } else {
+      // Real Redis SET without expiration clears any existing TTL.
+      this.ttls.delete(key)
     }
     return 'OK'
   }

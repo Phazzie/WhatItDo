@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Poll, VoteOption } from '@/lib/types'
+import { getVoteEmoji, getVoteColor, getVoteBgColor } from '@/lib/voteDisplay'
 
 export default function ResultsPage() {
   const params = useParams()
@@ -27,35 +28,43 @@ export default function ResultsPage() {
 
   useEffect(() => {
     loadPoll()
-    const interval = setInterval(loadPoll, 30000)
-    return () => clearInterval(interval)
+
+    let interval: ReturnType<typeof setInterval> | null = null
+
+    const startInterval = () => {
+      if (interval) return
+      interval = setInterval(loadPoll, 30000)
+    }
+
+    const stopInterval = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopInterval()
+      } else {
+        loadPoll()
+        startInterval()
+      }
+    }
+
+    if (document.visibilityState !== 'hidden') {
+      startInterval()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      stopInterval()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [loadPoll])
 
   const isDubious = poll?.mode === 'dubious'
-
-  const getVoteEmoji = (vote: string) => {
-    if (vote === 'yes') return '✅'
-    if (vote === 'no') return '❌'
-    if (vote === 'maybe') return '🤔'
-    if (vote === 'yolo') return '🎲'
-    return ''
-  }
-
-  const getVoteColor = (vote: string) => {
-    if (vote === 'yes') return 'text-green-400'
-    if (vote === 'no') return 'text-red-400'
-    if (vote === 'maybe') return 'text-yellow-400'
-    if (vote === 'yolo') return 'text-violet-400'
-    return ''
-  }
-
-  const getVoteBgColor = (vote: string) => {
-    if (vote === 'yes') return 'bg-green-500'
-    if (vote === 'no') return 'bg-red-500'
-    if (vote === 'maybe') return 'bg-yellow-500'
-    if (vote === 'yolo') return 'bg-gradient-to-r from-violet-500 to-rose-500'
-    return 'bg-gray-500'
-  }
 
   const getVoteCounts = (suggestionIndex: number) => {
     const counts: Record<VoteOption, number> = { yes: 0, no: 0, maybe: 0, yolo: 0 }

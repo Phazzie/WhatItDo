@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Poll, VoteOption } from '@/lib/types'
+import { getVoteEmoji, getVoteColor } from '@/lib/voteDisplay'
 
 type Vote = VoteOption | null
 
@@ -35,6 +36,7 @@ export default function VotePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     async function loadPoll() {
@@ -61,6 +63,7 @@ export default function VotePage() {
     setSuggestions(prev => prev.map((s, i) =>
       i === index ? { ...s, vote } : s
     ))
+    setSubmitError('')
   }
 
   const handleComment = (index: number, comment: string) => {
@@ -73,10 +76,11 @@ export default function VotePage() {
 
   const submitVotes = async () => {
     if (!allVoted) {
-      alert('Vote on all suggestions first!')
+      setSubmitError('Vote on all suggestions first!')
       return
     }
 
+    setSubmitError('')
     setSubmitting(true)
     try {
       const res = await fetch('/api/vote', {
@@ -97,26 +101,10 @@ export default function VotePage() {
       if (!res.ok) throw new Error('Failed to submit')
       setSubmitted(true)
     } catch {
-      alert('Failed to submit votes. Please try again.')
+      setSubmitError('Failed to submit votes. Please try again.')
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const getVoteEmoji = (vote: Vote) => {
-    if (vote === 'yes') return '✅'
-    if (vote === 'no') return '❌'
-    if (vote === 'maybe') return '🤔'
-    if (vote === 'yolo') return '🎲'
-    return ''
-  }
-
-  const getVoteColor = (vote: Vote) => {
-    if (vote === 'yes') return 'text-green-400'
-    if (vote === 'no') return 'text-red-400'
-    if (vote === 'maybe') return 'text-yellow-400'
-    if (vote === 'yolo') return 'text-violet-400'
-    return ''
   }
 
   const isDubious = poll?.mode === 'dubious'
@@ -230,6 +218,7 @@ export default function VotePage() {
             type="text"
             placeholder={isDubious ? "Remain anonymous for intrigue..." : "Enter your name"}
             value={voterName}
+            maxLength={50}
             onChange={(e) => setVoterName(e.target.value)}
             className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-violet-500 transition-all"
           />
@@ -343,6 +332,12 @@ export default function VotePage() {
             className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-purple-500 transition-all resize-none"
           />
         </div>
+
+        {submitError && (
+          <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
+            {submitError}
+          </div>
+        )}
 
         <button
           onClick={submitVotes}
