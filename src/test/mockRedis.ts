@@ -45,11 +45,18 @@ class MockRedis {
   async lrange(key: string, start: number, stop: number): Promise<string[]> {
     const list = this.lists.get(key) ?? []
     const len = list.length
-    const normalize = (i: number) => (i < 0 ? Math.max(len + i, 0) : i)
-    const from = normalize(start)
+    // Redis semantics: negative indices count from the end BEFORE clamping,
+    // and start > stop (after resolution) yields an empty list — clamping a
+    // negative-resolved stop up to 0 would wrongly return the first element.
+    let from = start < 0 ? len + start : start
+    let to = stop < 0 ? len + stop : stop
+    from = Math.max(from, 0)
+    to = Math.min(to, len - 1)
+    if (from > to || from >= len) {
+      return []
+    }
     // lrange's `stop` is inclusive; Array.slice's end is exclusive.
-    const to = stop === -1 ? len : normalize(stop) + 1
-    return list.slice(from, to)
+    return list.slice(from, to + 1)
   }
 
   async expire(key: string, seconds: number): Promise<number> {
