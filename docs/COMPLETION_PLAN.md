@@ -25,7 +25,7 @@ The codebase (13 source files) has been fully read and the build verified — no
 
 ---
 
-## Wave 1 — Foundation (2 agents, parallel)
+## Wave 1 — Foundation (3 agents, parallel)
 
 ### Agent A (Sonnet) — Test harness + CI
 **Files owned**: `vitest.config.ts`, `package.json`, `src/test/**`, `.github/workflows/ci.yml`
@@ -39,6 +39,12 @@ The codebase (13 source files) has been fully read and the build verified — no
 **Files owned**: `.env.example`, `README.md`
 - Add `POLL_CREATOR_EMAIL`, `EMAIL_FROM` to `.env.example` (fixes M6).
 - Fix README drift: response shapes, timestamp types, type names, duplicate-voting note (M5). Document the new env vars and the Redis key layout that Wave 2 introduces (coordinate wording with orchestrator).
+
+### Agent C (Sonnet) — Dependency vulnerability triage (H5)
+**Files owned**: `package.json` (dependency versions only — Agent A owns scripts; orchestrator merges the two edits), `package-lock.json`
+- Run `npm audit`, review the Dependabot list (14 high / 19 moderate / 4 low).
+- Bump within-semver first (`npm audit fix`, Next 14.2.x latest patch); take any remaining high-severity majors case by case.
+- Verify `next build` + the app's three pages still work after bumps; report anything that would need a breaking upgrade (e.g. Next 15) as a follow-up rather than doing it here.
 
 **Gate**: CI runs green on the branch.
 
