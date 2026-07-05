@@ -61,14 +61,17 @@ export default function Home() {
         })
       })
 
-      if (!res.ok) throw new Error('Failed to create poll')
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to create poll')
+      }
 
       const data = await res.json()
       setPollLink(`${window.location.origin}/vote/${data.id}`)
       setResultsLink(`${window.location.origin}/results/${data.id}`)
     } catch (err) {
       console.error(err)
-      setError('Failed to create poll. Please try again.')
+      setError(err instanceof Error ? err.message : 'Failed to create poll. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -122,7 +125,7 @@ export default function Home() {
           </div>
 
           {error && (
-            <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
+            <div role="alert" aria-live="assertive" className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
               {error}
             </div>
           )}

@@ -98,10 +98,13 @@ export default function VotePage() {
         })
       })
 
-      if (!res.ok) throw new Error('Failed to submit')
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to submit')
+      }
       setSubmitted(true)
-    } catch {
-      setSubmitError('Failed to submit votes. Please try again.')
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit votes. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -334,7 +337,7 @@ export default function VotePage() {
         </div>
 
         {submitError && (
-          <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
+          <div role="alert" aria-live="assertive" className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
             {submitError}
           </div>
         )}

@@ -88,7 +88,7 @@ RESEND_API_KEY=your_resend_api_key
 
 # Email settings
 POLL_CREATOR_EMAIL=your_email@example.com  # Email address that receives vote notifications
-EMAIL_FROM=What It Do <notifications@your-domain.com>  # From address for notification emails (used by Resend)
+EMAIL_FROM=What It Do <notifications@your-domain.com>  # From address for notification emails (wired up in the backend-hardening wave; not read by the code until that lands)
 
 # Your app URL
 NEXT_PUBLIC_BASE_URL=https://your-app.vercel.app
@@ -221,7 +221,7 @@ Response: {
     title: string
     suggestions: string[]
     mode: 'normal' | 'dubious'
-    responses: Response[]
+    responses: PollResponse[]
   }
 }
 ```
