@@ -54,7 +54,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
     }
 
-    const typedVotes = votes as PollResponse['votes']
+    // Rebuild the votes from scratch rather than persisting the raw request
+    // objects — a direct API caller could otherwise attach arbitrary extra
+    // fields that get stored and served back from GET /api/poll.
+    const typedVotes: PollResponse['votes'] = (votes as PollResponse['votes']).map((v) => ({
+      text: v.text,
+      vote: v.vote,
+      comment: typeof v.comment === 'string' ? v.comment : ''
+    }))
 
     const response: PollResponse = {
       id: nanoid(8),

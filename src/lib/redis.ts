@@ -48,20 +48,25 @@ export async function checkRateLimit(
   windowSeconds: number
 ): Promise<boolean> {
   const now = Date.now()
-  // The real Upstash client auto-deserializes stored JSON (returning an
-  // array), while the test mock returns the raw string — handle both.
-  const raw = await redis.get<string | number[]>(key)
-  const timestamps: number[] = Array.isArray(raw) ? raw : raw ? JSON.parse(raw) : []
-  const windowStart = now - windowSeconds * 1000
-  const recent = timestamps.filter((t) => t > windowStart)
+  // RPUSH is atomic, so each request claims a unique slot even under
+  // concurrency — a get/set read-modify-write here would let a burst of
+  // simultaneous requests all read the same stale state and sail past the
+  // limit. Entries are timestamps; the key expires a window after the last
+  // request, and denied requests also record a timestamp (extending the
+  // lockout), which fails closed against sustained abuse.
+  const count = await redis.rpush(key, String(now))
+  await redis.expire(key, windowSeconds)
 
-  if (recent.length >= limit) {
-    return false
+  if (count <= limit) {
+    return true
   }
 
-  recent.push(now)
-  await redis.set(key, JSON.stringify(recent), { ex: windowSeconds })
-  return true
+  // Over the raw cap: recount only entries inside the sliding window (old
+  // timestamps linger until the key TTL clears them).
+  const entries = await redis.lrange(key, 0, -1)
+  const windowStart = now - windowSeconds * 1000
+  const recent = entries.filter((t) => Number(t) > windowStart)
+  return recent.length <= limit
 }
 
 /** Extracts the client IP from the first value of `x-forwarded-for`. */

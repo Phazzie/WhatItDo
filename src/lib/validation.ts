@@ -78,9 +78,12 @@ export function validateVoteInput(body: unknown, poll: Poll): ValidationResult {
     return fail('votes must match the poll suggestions exactly')
   }
 
-  const seenTexts = new Set<string>()
-
-  for (const vote of votes) {
+  // Positional matching: votes[i] must target poll.suggestions[i]. The
+  // results page aggregates by index, so membership checks alone would let
+  // reordered payloads miscount votes, and duplicate suggestion texts would
+  // wrongly reject legitimate submissions.
+  for (let i = 0; i < votes.length; i++) {
+    const vote = votes[i]
     if (!vote || typeof vote !== 'object') {
       return fail('Each vote must be an object')
     }
@@ -91,8 +94,8 @@ export function validateVoteInput(body: unknown, poll: Poll): ValidationResult {
       comment?: unknown
     }
 
-    if (typeof text !== 'string' || !poll.suggestions.includes(text)) {
-      return fail('Vote text must match one of the poll suggestions')
+    if (typeof text !== 'string' || text !== poll.suggestions[i]) {
+      return fail('Votes must match the poll suggestions in order')
     }
 
     if (typeof voteValue !== 'string' || !allowedVotes.includes(voteValue)) {
@@ -104,12 +107,6 @@ export function validateVoteInput(body: unknown, poll: Poll): ValidationResult {
         return fail(`Comment must be at most ${COMMENT_MAX} characters`)
       }
     }
-
-    seenTexts.add(text)
-  }
-
-  if (seenTexts.size !== poll.suggestions.length) {
-    return fail('votes must cover every poll suggestion exactly once')
   }
 
   if (voterName !== undefined && voterName !== null) {

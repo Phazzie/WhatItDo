@@ -132,3 +132,33 @@ describe('validateVoteInput', () => {
     expect(result.valid).toBe(false)
   })
 })
+
+describe('vote validation is positional (Codex review)', () => {
+  const basePoll = {
+    id: 'p1', title: 't', creatorEmail: '', createdAt: 0, responses: [], mode: 'normal' as const,
+  }
+
+  it('rejects votes submitted in a different order than the suggestions', () => {
+    const poll = { ...basePoll, suggestions: ['Pizza', 'Tacos'] }
+    const result = validateVoteInput({
+      pollId: 'p1',
+      votes: [
+        { text: 'Tacos', vote: 'yes', comment: '' },
+        { text: 'Pizza', vote: 'no', comment: '' },
+      ],
+    }, poll)
+    expect(result.valid).toBe(false)
+  })
+
+  it('accepts votes on a poll with duplicate suggestion texts', () => {
+    const poll = { ...basePoll, suggestions: ['A', 'A'] }
+    const result = validateVoteInput({
+      pollId: 'p1',
+      votes: [
+        { text: 'A', vote: 'yes', comment: '' },
+        { text: 'A', vote: 'no', comment: '' },
+      ],
+    }, poll)
+    expect(result.valid).toBe(true)
+  })
+})

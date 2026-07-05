@@ -279,3 +279,30 @@ describe('POST /api/vote rate limiting (2.5, C5)', () => {
     expect(statuses.filter((s) => s === 429).length).toBe(5)
   })
 })
+
+describe('POST /api/vote sanitizes stored votes (Codex review)', () => {
+  beforeEach(() => {
+    mockRedis.reset()
+    vi.unstubAllEnvs()
+  })
+
+  it('strips extra fields from vote objects before persisting', async () => {
+    const { POST } = await import('./route')
+    await mockRedis.set('poll:poll1', JSON.stringify(normalPoll))
+
+    const res = await POST(postRequest({
+      pollId: 'poll1',
+      voterName: 'Mallory',
+      votes: [
+        { text: 'Pizza', vote: 'yes', comment: 'ok', payload: { junk: 'x'.repeat(50) } },
+        { text: 'Tacos', vote: 'no', comment: '' },
+      ],
+    }))
+    expect(res.status).toBe(200)
+
+    const stored = await mockRedis.lrange('poll:poll1:responses', 0, -1)
+    const persisted = JSON.parse(stored[0])
+    expect(persisted.votes[0]).not.toHaveProperty('payload')
+    expect(Object.keys(persisted.votes[0]).sort()).toEqual(['comment', 'text', 'vote'])
+  })
+})
