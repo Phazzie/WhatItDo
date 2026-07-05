@@ -29,7 +29,7 @@ The codebase (13 source files) has been fully read and the build verified — no
 
 ### Agent A (Sonnet) — Test harness + CI
 
-**Files owned**: `vitest.config.ts`, `package.json`, `src/test/**`, `.github/workflows/ci.yml`
+**Files owned**: `vitest.config.ts`, `package.json` + `package-lock.json` (devDependencies/scripts), `src/test/**`, `.github/workflows/ci.yml`
 - Add Vitest (+ `@testing-library/react` + `jsdom` for component tests later).
 - Create a reusable in-memory mock of `@upstash/redis` (`src/test/mockRedis.ts`) supporting `get/set/rpush/lrange/expire`.
 - Add scripts: `test`, `test:watch`, `typecheck`.
@@ -44,7 +44,9 @@ The codebase (13 source files) has been fully read and the build verified — no
 
 ### Agent C (Sonnet) — Dependency vulnerability triage (H5)
 
-**Files owned**: `package.json` (dependency versions only — Agent A owns scripts; orchestrator merges the two edits), `package-lock.json`
+**Files owned**: `package.json` + `package-lock.json` (runtime dependency versions only)
+
+> Manifest contention: Agents A and C both edit `package.json`/`package-lock.json`. The orchestrator serializes the merge — C lands first, then A rebases and re-runs `npm install` so the lockfile is regenerated once, consistently.
 - Run `npm audit`, review the Dependabot list (14 high / 19 moderate / 4 low).
 - Bump within-semver first (`npm audit fix`, Next 14.2.x latest patch); take any remaining high-severity majors case by case.
 - Verify `next build` + the app's three pages still work after bumps; report anything that would need a breaking upgrade (e.g. Next 15) as a follow-up rather than doing it here.
@@ -57,7 +59,7 @@ The codebase (13 source files) has been fully read and the build verified — no
 
 ### Agent D (Sonnet) — Backend hardening
 
-**Files owned**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, `src/lib/validation.ts` (new), `src/lib/escapeHtml.ts` (new), their test files
+**Files owned**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, `src/lib/validation.ts` (new), `src/lib/escapeHtml.ts` (new), their test files, plus `package.json`/`package-lock.json` for the `@upstash/ratelimit` dependency (no contention — Agent E does not touch the manifests, and Wave 1 has already merged)
 Red-green per finding:
 - **C1**: move responses to `RPUSH poll:{id}:responses`; `GET /api/poll` merges list into the poll object. Red test: two concurrent POSTs to `/api/vote`, assert both responses survive.
 - **C2**: `escapeHtml()` applied to every user string interpolated into the email. Red test: voterName `<img src=x onerror=…>` must appear escaped in the sent payload (mock Resend).
@@ -67,6 +69,7 @@ Red-green per finding:
 - **H1**: build `resultsUrl` from `NEXT_PUBLIC_BASE_URL` with `request.nextUrl.origin` as fallback (always available on a `NextRequest`, unlike the `origin` header).
 - **H2**: `EX` 30 days on **both** `poll:{id}` and `poll:{id}:responses` keys (expiring only the poll would leak orphaned response lists), refreshed on each vote.
 - **M1**: `from:` address from `EMAIL_FROM` env with the current value as fallback.
+- **Test-only Redis switch**: extend `src/lib/redis.ts` with an env-gated in-memory implementation (e.g. `USE_MOCK_REDIS=1`) reusing Agent A's `src/test/mockRedis.ts`, so the Wave 3 e2e run and credential-less dev/CI never hit real Upstash.
 - **M2 (backend half)**: replace the local `getVoteEmoji` copy in `api/vote/route.ts` with an import from `src/lib/voteDisplay.ts` (created by Agent E — see cross-wave contract for merge order).
 
 ### Agent E (Haiku) — Frontend cleanup
@@ -87,8 +90,8 @@ Red-green per finding:
 
 ### Agent F (Sonnet) — End-to-end smoke
 
-**Files owned**: `e2e/**` (new), `playwright.config.ts`
-- Playwright against `next dev` with the Redis mock injected via a test-only env switch: create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
+**Files owned**: `e2e/**` (new), `playwright.config.ts`, plus `package.json`/`package-lock.json` (add `@playwright/test` and an `e2e` script) and the e2e job in `.github/workflows/ci.yml` (no contention — Agent F runs alone in Wave 3)
+- Playwright against `next dev` with `USE_MOCK_REDIS=1` (the switch Agent D added to `src/lib/redis.ts` in Wave 2): create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
 - Reproducible browser setup: CI and contributor machines run `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` and must not re-download it.
 - Kept minimal (one happy-path spec per mode) so it stays fast in CI.
 
