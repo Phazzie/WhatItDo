@@ -81,11 +81,12 @@ Red-green per finding:
 
 ### Agent F (Sonnet) — End-to-end smoke
 **Files owned**: `e2e/**` (new), `playwright.config.ts`
-- Playwright (Chromium is pre-installed in this environment) against `next dev` with the Redis mock injected via a test-only env switch: create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
+- Playwright against `next dev` with the Redis mock injected via a test-only env switch: create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
+- Reproducible browser setup: CI and contributor machines run `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` and must not re-download it.
 - Kept minimal (one happy-path spec per mode) so it stays fast in CI.
 
 ### Orchestrator self-review
-1. Run `/code-review` (high effort) on the full branch diff; fix or explicitly waive every finding.
+1. Run `/code-review` (high effort) on the full branch diff; fix or explicitly waive every finding. (`/code-review` and `/security-review` are Claude Code slash commands; a human reviewer without that tooling substitutes a manual pass over the diff against the audit table plus a security-focused read of the email/validation/rate-limit changes.)
 2. Run `/security-review` on the branch (email escaping, validation, rate limiting are security-sensitive).
 3. Final gate: `lint` + `typecheck` + `test` + `e2e` + `build` all green.
 4. Re-read `docs/AUDIT.md` and tick every finding as fixed/waived in the PR description.
