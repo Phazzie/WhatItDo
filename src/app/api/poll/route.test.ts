@@ -180,3 +180,31 @@ describe('GET /api/poll merges the responses list (2.2, C1)', () => {
     expect(response.status).toBe(404)
   })
 })
+
+describe('creatorEmail is never exposed to clients (Codex review)', () => {
+  beforeEach(() => {
+    mockRedis.reset()
+    vi.unstubAllEnvs()
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'secret-owner@example.com')
+  })
+
+  it('POST /api/poll response omits creatorEmail', async () => {
+    const { POST } = await import('./route')
+    const res = await POST(postRequest({ suggestions: ['A'], mode: 'normal' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(JSON.stringify(data)).not.toContain('secret-owner@example.com')
+    expect(data.poll).not.toHaveProperty('creatorEmail')
+  })
+
+  it('GET /api/poll response omits creatorEmail', async () => {
+    const { POST, GET } = await import('./route')
+    const createRes = await POST(postRequest({ suggestions: ['A'], mode: 'normal' }))
+    const { id } = await createRes.json()
+    const res = await GET(new NextRequest(`http://localhost/api/poll?id=${id}`))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(JSON.stringify(data)).not.toContain('secret-owner@example.com')
+    expect(data.poll).not.toHaveProperty('creatorEmail')
+  })
+})

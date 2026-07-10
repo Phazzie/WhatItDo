@@ -7,6 +7,14 @@ import { validatePollInput, isValidPollId } from '@/lib/validation'
 const POLL_RATE_LIMIT = 10
 const POLL_RATE_WINDOW_SECONDS = 60 * 60
 
+// creatorEmail is the deployer's private notification address — it lives in
+// Redis for the vote route's email sending but must never reach clients, who
+// only need the poll content (anyone with the share link can read this JSON).
+function toPublicPoll(poll: Poll): Omit<Poll, 'creatorEmail'> {
+  const { creatorEmail: _creatorEmail, ...publicPoll } = poll
+  return publicPoll
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (process.env.RATE_LIMIT_ENABLED === '1') {
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     await redis.set(`poll:${id}`, JSON.stringify(poll), { ex: POLL_TTL_SECONDS })
 
-    return NextResponse.json({ id, poll })
+    return NextResponse.json({ id, poll: toPublicPoll(poll) })
   } catch (error) {
     console.error('Error creating poll:', error)
     return NextResponse.json({ error: 'Failed to create poll' }, { status: 500 })
@@ -79,7 +87,7 @@ export async function GET(request: NextRequest) {
     const responses: PollResponse[] = rawResponses.map((r) => (typeof r === 'string' ? JSON.parse(r) : r))
     poll.responses = responses
 
-    return NextResponse.json({ poll })
+    return NextResponse.json({ poll: toPublicPoll(poll) })
   } catch (error) {
     console.error('Error fetching poll:', error)
     return NextResponse.json({ error: 'Failed to fetch poll' }, { status: 500 })
