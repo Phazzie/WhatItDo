@@ -105,7 +105,7 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 
 ## Wave 4 — Ship (orchestrator)
 
-- [ ] **4.1** Push branch, open PR with a per-finding fixed/waived table mapped to `docs/AUDIT.md`.
+- [x] **4.1** Push branch, open PR with a per-finding fixed/waived table mapped to `docs/AUDIT.md` — done: PR #4 body updated (2026-07-10).
 - [ ] **4.2** Owner manual checklist (humans only): set `POLL_CREATOR_EMAIL`, `EMAIL_FROM`, `NEXT_PUBLIC_BASE_URL` in Vercel; send a test vote to verify Resend delivery; note old-format polls will show zero responses after 2.2 (acceptable — or request a migration).
 
 ## Follow-ups (out of scope for this pass)
