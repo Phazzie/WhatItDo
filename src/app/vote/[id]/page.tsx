@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Poll, VoteOption } from '@/lib/types'
 import { getVoteEmoji, getVoteColor } from '@/lib/voteDisplay'
+import { VOTER_NAME_MAX, COMMENT_MAX, COUNTER_PROPOSAL_MAX } from '@/lib/validation'
 
 type Vote = VoteOption | null
 
@@ -221,7 +222,7 @@ export default function VotePage() {
             type="text"
             placeholder={isDubious ? "Remain anonymous for intrigue..." : "Enter your name"}
             value={voterName}
-            maxLength={50}
+            maxLength={VOTER_NAME_MAX}
             onChange={(e) => setVoterName(e.target.value)}
             className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-violet-500 transition-all"
           />
@@ -306,7 +307,7 @@ export default function VotePage() {
                 type="text"
                 placeholder={isDubious ? "Add your thoughts..." : "Add a comment (optional)"}
                 value={suggestion.comment}
-                maxLength={200}
+                maxLength={COMMENT_MAX}
                 onChange={(e) => handleComment(index, e.target.value)}
                 className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-4 py-2 text-white placeholder-purple-300/40 focus:outline-none focus:border-purple-500 text-sm transition-all"
               />
@@ -329,7 +330,7 @@ export default function VotePage() {
               ? "e.g., Or perhaps something even more intriguing..."
               : "e.g., Instead of those ideas, how about we..."}
             value={counterProposal}
-            maxLength={500}
+            maxLength={COUNTER_PROPOSAL_MAX}
             onChange={(e) => setCounterProposal(e.target.value)}
             rows={3}
             className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-purple-500 transition-all resize-none"

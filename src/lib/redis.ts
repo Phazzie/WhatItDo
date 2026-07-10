@@ -11,7 +11,17 @@ export interface RedisLike {
   set(key: string, value: string | number | null, options?: { ex?: number }): Promise<string | number | null>
   rpush(key: string, ...values: string[]): Promise<number>
   lrange(key: string, start: number, stop: number): Promise<string[]>
+  ltrim(key: string, start: number, stop: number): Promise<string>
   expire(key: string, seconds: number): Promise<number>
+}
+
+if (process.env.USE_MOCK_REDIS === '1' && process.env.VERCEL === '1') {
+  // Fail loud rather than silently running a real Vercel deployment on
+  // non-persistent, per-instance in-memory storage (e.g. USE_MOCK_REDIS left
+  // set from a copied env config). Gated on `VERCEL` rather than
+  // `NODE_ENV=production` because e2e/CI intentionally run a production
+  // build (`next build && next start`) with USE_MOCK_REDIS=1 outside Vercel.
+  throw new Error('USE_MOCK_REDIS=1 is not allowed on Vercel deployments')
 }
 
 // USE_MOCK_REDIS=1 swaps in the in-memory test double (used in dev/e2e when
@@ -57,6 +67,14 @@ export async function checkRateLimit(
   const count = await redis.rpush(key, String(now))
   await redis.expire(key, windowSeconds)
 
+  // Bound the list so sustained traffic (allowed or denied) can't grow it
+  // without limit — a generous multiple of `limit` still leaves enough
+  // history for the windowed recount below to be accurate at the boundary.
+  const cap = Math.max(limit * 4, 50)
+  if (count > cap) {
+    await redis.ltrim(key, -cap, -1)
+  }
+
   if (count <= limit) {
     return true
   }
@@ -69,11 +87,16 @@ export async function checkRateLimit(
   return recent.length <= limit
 }
 
-/** Extracts the client IP from the first value of `x-forwarded-for`. */
-export function getClientIp(request: { headers: { get(name: string): string | null } }): string {
+/**
+ * Extracts the client IP from the first value of `x-forwarded-for`, or
+ * `null` if absent. Callers should skip rate limiting rather than fall back
+ * to a shared bucket — a fixed placeholder would pool every such client
+ * into one quota, letting one of them lock out all the others.
+ */
+export function getClientIp(request: { headers: { get(name: string): string | null } }): string | null {
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
     return forwardedFor.split(',')[0].trim()
   }
-  return 'unknown'
+  return null
 }

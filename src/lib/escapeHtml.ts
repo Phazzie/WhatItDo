@@ -13,3 +13,11 @@ const HTML_ESCAPES: Record<string, string> = {
 export function escapeHtml(input: string): string {
   return input.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char])
 }
+
+/**
+ * Strips CR/LF from `input` so it's safe to interpolate into an email
+ * header (e.g. Subject) without allowing header injection.
+ */
+export function sanitizeHeaderValue(input: string): string {
+  return input.replace(/[\r\n]+/g, ' ')
+}

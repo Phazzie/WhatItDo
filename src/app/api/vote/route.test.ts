@@ -142,6 +142,40 @@ describe('POST /api/vote validation (2.1, C3/H3)', () => {
     expect(payload.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
   })
 
+  it('strips CR/LF from voterName/title in the email subject to prevent header injection (self-review)', async () => {
+    const { POST } = await import('./route')
+    sendMock.mockClear()
+
+    const response = await POST(
+      postRequest({
+        pollId: normalPoll.id,
+        voterName: 'Al\r\nBcc: evil@example.com',
+        votes: [
+          { text: 'Pizza', vote: 'yes' },
+          { text: 'Tacos', vote: 'no' },
+        ],
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(sendMock).toHaveBeenCalledTimes(1)
+    const payload = sendMock.mock.calls[0][0]
+    expect(payload.subject).not.toMatch(/[\r\n]/)
+  })
+
+  it('rejects a pollId that collides with the responses list key namespace with 404, not a crash (self-review)', async () => {
+    const { POST } = await import('./route')
+    const response = await POST(
+      postRequest({
+        pollId: `${normalPoll.id}:responses`,
+        voterName: 'Alice',
+        votes: [{ text: 'Pizza', vote: 'yes' }],
+      })
+    )
+
+    expect(response.status).toBe(404)
+  })
+
   it('falls back to request.nextUrl.origin when NEXT_PUBLIC_BASE_URL is unset and no origin header is sent (2.4, H1)', async () => {
     const { POST } = await import('./route')
     sendMock.mockClear()

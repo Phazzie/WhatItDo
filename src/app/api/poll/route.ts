@@ -2,7 +2,7 @@ import { redis, POLL_TTL_SECONDS, checkRateLimit, getClientIp } from '@/lib/redi
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Poll, PollMode, PollResponse } from '@/lib/types'
-import { validatePollInput } from '@/lib/validation'
+import { validatePollInput, isValidPollId } from '@/lib/validation'
 
 const POLL_RATE_LIMIT = 10
 const POLL_RATE_WINDOW_SECONDS = 60 * 60
@@ -11,9 +11,11 @@ export async function POST(request: NextRequest) {
   try {
     if (process.env.RATE_LIMIT_ENABLED === '1') {
       const ip = getClientIp(request)
-      const allowed = await checkRateLimit(`ratelimit:poll:${ip}`, POLL_RATE_LIMIT, POLL_RATE_WINDOW_SECONDS)
-      if (!allowed) {
-        return NextResponse.json({ error: 'Too many polls created. Please try again later.' }, { status: 429 })
+      if (ip) {
+        const allowed = await checkRateLimit(`ratelimit:poll:${ip}`, POLL_RATE_LIMIT, POLL_RATE_WINDOW_SECONDS)
+        if (!allowed) {
+          return NextResponse.json({ error: 'Too many polls created. Please try again later.' }, { status: 429 })
+        }
       }
     }
 
@@ -59,6 +61,10 @@ export async function GET(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Poll ID required' }, { status: 400 })
+    }
+
+    if (!isValidPollId(id)) {
+      return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
     const data = await redis.get(`poll:${id}`)

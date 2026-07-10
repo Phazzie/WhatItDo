@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { escapeHtml } from './escapeHtml'
+import { escapeHtml, sanitizeHeaderValue } from './escapeHtml'
 
 describe('escapeHtml', () => {
   it('escapes an XSS payload so it cannot execute as markup', () => {
@@ -18,5 +18,16 @@ describe('escapeHtml', () => {
 
   it('leaves plain text untouched', () => {
     expect(escapeHtml('Pizza night')).toBe('Pizza night')
+  })
+})
+
+describe('sanitizeHeaderValue', () => {
+  it('strips CR/LF to prevent email header injection', () => {
+    const input = 'Al\r\nBcc: evil@example.com'
+    expect(sanitizeHeaderValue(input)).not.toMatch(/[\r\n]/)
+  })
+
+  it('leaves plain text untouched', () => {
+    expect(sanitizeHeaderValue('Pizza night')).toBe('Pizza night')
   })
 })

@@ -18,6 +18,15 @@ function fail(error: string): ValidationResult {
   return { valid: false, error }
 }
 
+// nanoid(10)'s default alphabet. Rejecting anything else (notably `:`) stops
+// an id like `<realId>:responses` from colliding with the `poll:{id}:responses`
+// list key and hitting redis.get() on a list (WRONGTYPE in real Redis).
+const POLL_ID_PATTERN = /^[A-Za-z0-9_-]+$/
+
+export function isValidPollId(id: string): boolean {
+  return POLL_ID_PATTERN.test(id)
+}
+
 /** Validates the body of `POST /api/poll`. */
 export function validatePollInput(body: unknown): ValidationResult {
   if (!body || typeof body !== 'object') {

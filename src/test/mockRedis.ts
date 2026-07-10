@@ -62,6 +62,12 @@ class MockRedis {
     return list.slice(from, to + 1)
   }
 
+  async ltrim(key: string, start: number, stop: number): Promise<string> {
+    const trimmed = await this.lrange(key, start, stop)
+    this.lists.set(key, trimmed)
+    return 'OK'
+  }
+
   async expire(key: string, seconds: number): Promise<number> {
     if (!this.store.has(key) && !this.lists.has(key)) {
       return 0

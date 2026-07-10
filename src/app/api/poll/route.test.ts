@@ -165,4 +165,18 @@ describe('GET /api/poll merges the responses list (2.2, C1)', () => {
     expect(json.poll.responses).toHaveLength(2)
     expect(json.poll.responses[0].voterName).toBe('Alice')
   })
+
+  it('returns 404, not a crash, for an id crafted to collide with the responses list key (self-review)', async () => {
+    const { GET } = await import('./route')
+
+    await mockRedis.rpush(
+      'poll:real-poll:responses',
+      JSON.stringify({ id: 'r1', voterName: 'Alice', votes: [], submittedAt: Date.now() })
+    )
+
+    const request = new NextRequest('http://localhost/api/poll?id=real-poll:responses')
+    const response = await GET(request)
+
+    expect(response.status).toBe(404)
+  })
 })

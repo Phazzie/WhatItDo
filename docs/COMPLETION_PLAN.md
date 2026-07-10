@@ -87,10 +87,21 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 - [x] **3.1 E2E smoke** — done: 2 Playwright specs (both modes, YOLO + counter proposal), CI e2e job; webServer uses `next build && next start` because dev-mode on-demand compilation resets the in-process mock-Redis singleton mid-run
   **Files**: `e2e/` (new), `playwright.config.ts` (new), `package.json` + `package-lock.json` (add `@playwright/test`, `e2e` script), `.github/workflows/ci.yml` (e2e job)
   **Special info**: run `next dev` with `USE_MOCK_REDIS=1`; one happy-path spec per mode: create → vote (incl. YOLO in dubious) → results show counts + counter proposal; CI installs via `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` — do not re-download.
-- [ ] **3.2 Orchestrator self-review** (not a sub-agent task)
-  Run `/code-review` (high) + `/security-review` on the full branch diff; fix or explicitly waive every finding; humans without those Claude Code commands substitute a manual diff review against the audit table.
+- [x] **3.2 Orchestrator self-review** — done: `/code-review` (high) + `/security-review` run against the full branch diff.
+  **`/code-review` (8 findings, all fixed)**:
+  1. `GET /api/poll?id=<id>:responses` collided with the `poll:{id}:responses` list key → Redis WRONGTYPE → 500. Fixed with `isValidPollId` guard on both `poll` and `vote` routes.
+  2. Notification email *subject* line wasn't escaped like the body (CR/LF header-injection risk). Fixed with `sanitizeHeaderValue` in `escapeHtml.ts`.
+  3. Rate-limit sliding-window list grew unbounded under sustained traffic. Fixed with `LTRIM` capping in `checkRateLimit`.
+  4. Clients without `x-forwarded-for` shared one rate-limit bucket, letting one pool innocent users into the same quota. `getClientIp` now returns `null` and callers skip limiting instead of pooling into `'unknown'`.
+  5. UI unconditionally promises an email notification that silently no-ops (console.log only) if `POLL_CREATOR_EMAIL` is unset. **Waived** — covered operationally by the 4.2 owner checklist below.
+  6. `maxLength={50}` hardcoded instead of importing `VOTER_NAME_MAX`; fixed, plus the two sibling `COMMENT_MAX`/`COUNTER_PROPOSAL_MAX` caps for consistency.
+  7. `USE_MOCK_REDIS=1` had no production guardrail. Now throws if set alongside `VERCEL=1` (not `NODE_ENV`, so the e2e/CI `next build && next start` flow is unaffected).
+  8. `RATE_LIMIT_ENABLED` wasn't documented in `.env.example`; added. **Waived**: the identical rate-limit gate in both routes (2 call sites, a few lines each) is left duplicated rather than extracted into shared middleware — for 2 sites, the abstraction is more debt than the duplication.
+  8 regression tests added (`isValidPollId` collision on both routes, subject sanitization, rate-limit list capping, `getClientIp` null fallback).
+  **`/security-review`**: one candidate (unescaped `resultsUrl` in the email `href`) was raised and filtered out at confidence 2/10 — it requires an untrusted Host header reaching the app, which the documented Vercel deploy target normalizes away; worst case is a swapped link, not attribute-breakout XSS. No findings met the report threshold.
+  Full suite green after fixes: tsc, lint, 56 unit tests, `next build`, both e2e specs.
 
-**Wave gate**: lint + typecheck + test + e2e + build all green.
+**Wave gate**: MET — lint + typecheck + test + e2e + build all green (2026-07-10).
 
 ## Wave 4 — Ship (orchestrator)
 

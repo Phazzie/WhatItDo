@@ -3,8 +3,8 @@ import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { Poll, PollResponse } from '@/lib/types'
-import { validateVoteInput } from '@/lib/validation'
-import { escapeHtml } from '@/lib/escapeHtml'
+import { validateVoteInput, isValidPollId } from '@/lib/validation'
+import { escapeHtml, sanitizeHeaderValue } from '@/lib/escapeHtml'
 import { getVoteEmoji } from '@/lib/voteDisplay'
 
 const VOTE_RATE_LIMIT = 20
@@ -23,9 +23,11 @@ export async function POST(request: NextRequest) {
   try {
     if (process.env.RATE_LIMIT_ENABLED === '1') {
       const ip = getClientIp(request)
-      const allowed = await checkRateLimit(`ratelimit:vote:${ip}`, VOTE_RATE_LIMIT, VOTE_RATE_WINDOW_SECONDS)
-      if (!allowed) {
-        return NextResponse.json({ error: 'Too many votes submitted. Please try again later.' }, { status: 429 })
+      if (ip) {
+        const allowed = await checkRateLimit(`ratelimit:vote:${ip}`, VOTE_RATE_LIMIT, VOTE_RATE_WINDOW_SECONDS)
+        if (!allowed) {
+          return NextResponse.json({ error: 'Too many votes submitted. Please try again later.' }, { status: 429 })
+        }
       }
     }
 
@@ -39,6 +41,10 @@ export async function POST(request: NextRequest) {
 
     if (!pollId || !votes) {
       return NextResponse.json({ error: 'Poll ID and votes required' }, { status: 400 })
+    }
+
+    if (!isValidPollId(pollId)) {
+      return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
     const data = await redis.get(`poll:${pollId}`)
@@ -106,7 +112,7 @@ export async function POST(request: NextRequest) {
         await emailClient.emails.send({
           from: process.env.EMAIL_FROM || 'What It Do <notifications@resend.dev>',
           to: poll.creatorEmail,
-          subject: `${subjectPrefix} ${response.voterName} voted on: ${poll.title}${counterProposal ? ' (+counter!)' : ''}${yoloNote}`,
+          subject: `${subjectPrefix} ${sanitizeHeaderValue(response.voterName)} voted on: ${sanitizeHeaderValue(poll.title)}${counterProposal ? ' (+counter!)' : ''}${yoloNote}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <h1 style="color: ${isDubious ? '#f97316' : '#a855f7'};">${isDubious ? '🌶️ New Dare Response!' : '📊 New Vote Received!'}</h1>
