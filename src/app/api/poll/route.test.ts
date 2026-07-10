@@ -208,3 +208,33 @@ describe('creatorEmail is never exposed to clients (Codex review)', () => {
     expect(data.poll).not.toHaveProperty('creatorEmail')
   })
 })
+
+describe('legacy polls with embedded responses (Codex review)', () => {
+  beforeEach(() => {
+    mockRedis.reset()
+    vi.unstubAllEnvs()
+  })
+
+  it('GET falls back to responses embedded in the poll object when the list key is empty', async () => {
+    const { GET } = await import('./route')
+    const legacyPoll = {
+      id: 'legacy1',
+      title: 'Old poll',
+      suggestions: ['A'],
+      creatorEmail: '',
+      createdAt: Date.now(),
+      mode: 'normal',
+      responses: [
+        { id: 'r1', voterName: 'OldVoter', votes: [{ text: 'A', vote: 'yes', comment: '' }], submittedAt: Date.now() },
+      ],
+    }
+    await mockRedis.set('poll:legacy1', JSON.stringify(legacyPoll))
+    // No poll:legacy1:responses list exists — pre-migration data layout.
+
+    const res = await GET(new NextRequest('http://localhost/api/poll?id=legacy1'))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.poll.responses).toHaveLength(1)
+    expect(data.poll.responses[0].voterName).toBe('OldVoter')
+  })
+})

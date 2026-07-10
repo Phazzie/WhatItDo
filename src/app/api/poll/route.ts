@@ -85,7 +85,10 @@ export async function GET(request: NextRequest) {
 
     const rawResponses = await redis.lrange(`poll:${id}:responses`, 0, -1)
     const responses: PollResponse[] = rawResponses.map((r) => (typeof r === 'string' ? JSON.parse(r) : r))
-    poll.responses = responses
+    // Legacy polls (created before responses moved to the list key) still
+    // carry their responses embedded in the poll object — keep serving those
+    // when no list entries exist, so pre-migration votes aren't lost.
+    poll.responses = responses.length > 0 ? responses : poll.responses ?? []
 
     return NextResponse.json({ poll: toPublicPoll(poll) })
   } catch (error) {
