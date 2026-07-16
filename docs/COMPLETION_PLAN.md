@@ -1,5 +1,9 @@
 # WhatItDo — Completion Checklist (parallel sub-agent execution)
 
+> **Historical record (completed July 2026).** This checklist describes the former Next.js 14
+> implementation and deleted test scaffolding. Do not use it as current operating guidance. See
+> [`FINISH_EXEC_PLAN.md`](./FINISH_EXEC_PLAN.md) and the repository-root [`AGENTS.md`](../AGENTS.md).
+
 Companion to `docs/AUDIT.md` (finding IDs C1–C5, H1–H5, M1–M6 referenced below).
 Each unchecked box is one dispatchable sub-agent task. Items in the same wave with disjoint
 **Files** lists may run in parallel; items sharing a file must run in the listed order.

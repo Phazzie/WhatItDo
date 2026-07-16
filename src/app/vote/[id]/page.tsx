@@ -1,362 +1,244 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Poll, VoteOption } from '@/lib/types'
-import { getVoteEmoji, getVoteColor } from '@/lib/voteDisplay'
-import { VOTER_NAME_MAX, COMMENT_MAX, COUNTER_PROPOSAL_MAX } from '@/lib/validation'
-
-type Vote = VoteOption | null
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import type { NotificationStatus, PublicPoll, VoteOption } from '@/lib/types'
+import { COMMENT_MAX, COUNTER_PROPOSAL_MAX, VOTER_NAME_MAX } from '@/lib/validation'
 
 interface SuggestionVote {
   text: string
-  vote: Vote
+  vote: VoteOption | null
   comment: string
 }
 
-const MYSTERIOUS_NAMES = [
-  'A Mysterious Presence',
-  'Someone Intriguing',
-  'An Enigmatic Soul',
-  'Your Secret Admirer',
-  'A Whisper in the Dark',
-  'The Midnight Wanderer',
-  'An Alluring Stranger',
-  'A Captivating Mystery'
+interface SubmissionPayload {
+  pollId: string
+  submissionId: string
+  voterName: string
+  votes: { text: string; vote: VoteOption; comment: string }[]
+  counterProposal?: string
+}
+
+const VOTES: { value: VoteOption; label: string; symbol: string }[] = [
+  { value: 'yes', label: 'Yes', symbol: '✓' },
+  { value: 'maybe', label: 'Maybe', symbol: '~' },
+  { value: 'no', label: 'Nope', symbol: '×' },
+  { value: 'yolo', label: 'YOLO', symbol: '⚡' },
 ]
 
-export default function VotePage() {
-  const params = useParams()
-  const pollId = params.id as string
+const MYSTERY_NAMES = ['A Midnight Caller', 'The Plot Twist', 'An Enigmatic Pal', 'Someone With Taste']
 
-  const [poll, setPoll] = useState<Poll | null>(null)
+function statusCopy(status: NotificationStatus) {
+  switch (status) {
+    case 'sent': return 'Vote sealed. The email alert was accepted for delivery.'
+    case 'not_configured': return 'Vote sealed. Email alerts are not configured, but your response is safe.'
+    case 'failed': return 'Vote sealed. The email alert fizzled, but your response is safe.'
+    case 'duplicate': return 'This exact vote was already sealed. Nothing was duplicated.'
+  }
+}
+
+export default function VotePage() {
+  const { id } = useParams<{ id: string }>()
+  const [poll, setPoll] = useState<PublicPoll | null>(null)
   const [suggestions, setSuggestions] = useState<SuggestionVote[]>([])
   const [voterName, setVoterName] = useState('')
   const [counterProposal, setCounterProposal] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadState, setLoadState] = useState<'not-found' | 'retired' | 'error' | ''>('')
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [error, setError] = useState('')
   const [submitError, setSubmitError] = useState('')
+  const [notification, setNotification] = useState<NotificationStatus | null>(null)
+  const [receipt, setReceipt] = useState<SubmissionPayload | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const pendingSubmission = useRef<SubmissionPayload | null>(null)
 
   useEffect(() => {
-    async function loadPoll() {
+    let active = true
+    async function load() {
       try {
-        const res = await fetch(`/api/poll?id=${pollId}`)
-        if (!res.ok) throw new Error('Poll not found')
-        const data = await res.json()
-        setPoll(data.poll)
-        setSuggestions(data.poll.suggestions.map((text: string) => ({
-          text,
-          vote: null,
-          comment: ''
-        })))
+        const response = await fetch(`/api/poll?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
+        const body = (await response.json().catch(() => ({}))) as { poll?: PublicPoll }
+        if (!active) return
+        if (!response.ok || !body.poll) {
+          setLoadState(response.status === 410 ? 'retired' : response.status === 404 ? 'not-found' : 'error')
+          return
+        }
+        setPoll(body.poll)
+        setSuggestions(body.poll.suggestions.map((text) => ({ text, vote: null, comment: '' })))
       } catch {
-        setError('Poll not found')
+        if (active) setLoadState('error')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
-    loadPoll()
-  }, [pollId])
+    load()
+    return () => { active = false }
+  }, [id, loadAttempt])
 
-  const handleVote = (index: number, vote: Vote) => {
-    setSuggestions(prev => prev.map((s, i) =>
-      i === index ? { ...s, vote } : s
-    ))
+  function retryLoad() {
+    setLoadState('')
+    setLoading(true)
+    setLoadAttempt((attempt) => attempt + 1)
+  }
+
+  function choose(index: number, vote: VoteOption) {
+    setSuggestions((current) => current.map((item, i) => i === index ? { ...item, vote } : item))
     setSubmitError('')
   }
 
-  const handleComment = (index: number, comment: string) => {
-    setSuggestions(prev => prev.map((s, i) =>
-      i === index ? { ...s, comment } : s
-    ))
+  function comment(index: number, value: string) {
+    setSuggestions((current) => current.map((item, i) => i === index ? { ...item, comment: value } : item))
   }
 
-  const allVoted = suggestions.length > 0 && suggestions.every(s => s.vote !== null)
-
-  const submitVotes = async () => {
-    if (!allVoted) {
-      setSubmitError('Vote on all suggestions first!')
-      return
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    let payload = pendingSubmission.current
+    if (!payload) {
+      if (!suggestions.length || suggestions.some((item) => !item.vote)) {
+        setSubmitError('Choose one response for every possibility.')
+        return
+      }
+      const resolvedName = voterName.trim() || (poll?.mode === 'dubious'
+        ? MYSTERY_NAMES[Math.floor(Math.random() * MYSTERY_NAMES.length)]
+        : 'Anonymous')
+      payload = {
+        pollId: id,
+        submissionId: crypto.randomUUID(),
+        voterName: resolvedName,
+        votes: suggestions.map((item) => ({ text: item.text, vote: item.vote as VoteOption, comment: item.comment.trim() })),
+        ...(counterProposal.trim() ? { counterProposal: counterProposal.trim() } : {}),
+      }
+      pendingSubmission.current = payload
     }
 
-    setSubmitError('')
     setSubmitting(true)
+    setSubmitError('')
     try {
-      const res = await fetch('/api/vote', {
+      const response = await fetch('/api/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pollId,
-          voterName: getDisplayName(),
-          votes: suggestions.map(s => ({
-            text: s.text,
-            vote: s.vote,
-            comment: s.comment.trim()
-          })),
-          counterProposal: counterProposal.trim() || undefined
-        })
+        body: JSON.stringify(payload),
       })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        throw new Error(data?.error || 'Failed to submit')
+      const body = (await response.json().catch(() => ({}))) as { error?: string; notification?: NotificationStatus }
+      if (!response.ok) {
+        if (response.status === 410) setLoadState('retired')
+        // A non-5xx response confirms that this request was not ambiguously
+        // accepted, so the voter may correct it and create a fresh receipt.
+        if (response.status < 500) pendingSubmission.current = null
+        const fallback = response.status === 429
+          ? 'Too many votes arrived at once. Wait a moment, then retry—your choices are still here.'
+          : response.status === 410 ? 'This older poll has been retired.' : 'Your vote did not land. Try again.'
+        throw new Error(body.error || fallback)
       }
-      setSubmitted(true)
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to submit votes. Please try again.')
+      setReceipt(payload)
+      setNotification(body.notification || 'failed')
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : 'Your vote did not land. Try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const isDubious = poll?.mode === 'dubious'
-
-  const getDisplayName = () => {
-    if (!voterName.trim()) {
-      if (isDubious) {
-        return MYSTERIOUS_NAMES[Math.floor(Math.random() * MYSTERIOUS_NAMES.length)]
-      }
-      return 'Anonymous'
-    }
-    return voterName.trim()
-  }
-
   if (loading) {
+    return <main className="site-shell center-stage"><div className="loading-card" role="status"><span className="spinner" aria-hidden="true" />Opening the ballot…</div></main>
+  }
+
+  if (loadState || !poll) {
+    const retired = loadState === 'retired'
     return (
-      <main className="min-h-screen py-12 px-4 flex items-center justify-center">
-        <div className="text-purple-300 text-xl animate-pulse">Loading poll...</div>
+      <main className="site-shell center-stage">
+        <section className="paper-card state-card tape-top">
+          <p className="card-label hot">{retired ? 'ARCHIVED' : loadState === 'error' ? 'SIGNAL LOST' : 'NOT FOUND'}</p>
+          <h1>{retired ? 'This old poll has left the building.' : loadState === 'error' ? 'The ballot booth is offline.' : 'Nothing doing here.'}</h1>
+          <p>{retired ? 'Legacy polls were retired to protect private responses. Ask the creator to make a fresh one.' : loadState === 'error' ? 'Try reloading in a moment.' : 'The link may be mistyped, expired, or already gone.'}</p>
+          {loadState === 'error' && <button className="primary-button cyan" type="button" onClick={retryLoad}>Try the ballot again</button>}
+          <Link className="primary-button pink" href="/">Make a fresh poll</Link>
+        </section>
       </main>
     )
   }
 
-  if (error || !poll) {
+  if (notification) {
     return (
-      <main className="min-h-screen py-12 px-4 flex items-center justify-center scanlines">
-        <div className="text-center card-gradient p-8 rounded-2xl neon-border">
-          <h1 className="text-3xl font-bold text-white mb-4">Poll not found</h1>
-          <a href="/" className="text-fuchsia-400 hover:text-fuchsia-300 font-medium">Create a new poll</a>
-        </div>
+      <main className="site-shell center-stage">
+        <section className="paper-card state-card success-card tape-top">
+          <div className="giant-stamp" aria-hidden="true">COUNTED</div>
+          <p className="eyebrow">Democracy, approximately</p>
+          <h1>Your vote is in.</h1>
+          <p className="status-message" role="status">{statusCopy(notification)}</p>
+          <div className="receipt">
+            <p>{poll.title}</p>
+            {(receipt?.votes ?? []).map((item, index) => <span key={item.text}><b>{String(index + 1).padStart(2, '0')}</b> {item.vote.toUpperCase()} — {item.text}</span>)}
+          </div>
+          <Link className="primary-button cyan" href="/">Start your own dilemma ↗</Link>
+        </section>
       </main>
     )
   }
 
-  if (submitted) {
-    return (
-      <main className="min-h-screen py-12 px-4 scanlines">
-        <div className="max-w-xl mx-auto">
-          <div className="text-center mb-10">
-            <div className="rainbow-bar w-32 mx-auto mb-6" />
-            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-violet-400 to-purple-400 mb-4 floating">
-              Votes Submitted!
-            </h1>
-            <p className="text-xl text-purple-200/80">{poll.title}</p>
-          </div>
-
-          <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow mb-6">
-            <div className="space-y-6">
-              {suggestions.map((s, index) => (
-                <div key={index} className="border-b border-purple-500/30 pb-4 last:border-0 last:pb-0">
-                  <p className="text-white text-lg mb-2">&ldquo;{s.text}&rdquo;</p>
-                  <p className={`font-bold text-xl ${getVoteColor(s.vote)}`}>
-                    {getVoteEmoji(s.vote)} {s.vote?.toUpperCase()}
-                  </p>
-                  {s.comment && (
-                    <p className="text-purple-300/70 mt-2 italic text-sm">&ldquo;{s.comment}&rdquo;</p>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {counterProposal.trim() && (
-              <div className="mt-6 pt-6 border-t border-purple-500/30">
-                <p className="text-violet-400 text-sm font-medium mb-2">Your Suggestion:</p>
-                <p className="text-white italic">&ldquo;{counterProposal.trim()}&rdquo;</p>
-              </div>
-            )}
-          </div>
-
-          <div className="card-gradient rounded-2xl p-6 neon-border text-center">
-            <p className="text-green-400 mb-4">The poll creator has been notified of your votes!</p>
-            <a
-              href="/"
-              className="text-purple-300 hover:text-white text-sm transition-all"
-            >
-              Create your own poll
-            </a>
-          </div>
-        </div>
-      </main>
-    )
-  }
+  const dubious = poll.mode === 'dubious'
+  const complete = suggestions.length > 0 && suggestions.every((item) => item.vote)
 
   return (
-    <main className={`min-h-screen py-12 px-4 scanlines ${isDubious ? 'dubious-mode' : ''}`}>
-      <div className="max-w-xl mx-auto">
-        <div className="text-center mb-10">
-          <div className="rainbow-bar w-32 mx-auto mb-6" />
-          <h1 className={`text-4xl md:text-5xl font-black text-transparent bg-clip-text mb-4 floating ${
-            isDubious
-              ? 'bg-gradient-to-r from-rose-400 via-purple-400 to-violet-400'
-              : 'bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400'
-          }`}>
-            {poll.title}
-          </h1>
-          <p className="text-xl text-purple-200/80">
-            {isDubious ? 'What calls to you?' : 'Vote on these suggestions!'}
-          </p>
-          {isDubious && (
-            <p className="text-sm text-rose-400/70 mt-2">
-              Dubious Mode · YOLO voting available
-            </p>
-          )}
-        </div>
+    <main className="site-shell ballot-shell">
+      <header className="compact-header">
+        <Link href="/" className="mini-brand">WHAT IT <i>DO?</i></Link>
+        <span>{dubious ? 'DUBIOUS BALLOT' : 'CLASSIC BALLOT'}</span>
+      </header>
+      <section className="ballot-intro">
+        <p className="eyebrow">An important-ish decision awaits</p>
+        <h1>{poll.title}</h1>
+        <p>{dubious ? 'Answer honestly. Or dramatically. Ideally both.' : 'Mark every possibility, then seal your ballot.'}</p>
+      </section>
 
-        <div className="card-gradient rounded-2xl p-6 neon-border mb-6">
-          <label htmlFor="voter-name" className="block text-purple-300 text-sm mb-2 font-medium">
-            {isDubious ? 'Your Name (optional)' : 'Your Name (optional)'}
-          </label>
-          <input
-            id="voter-name"
-            type="text"
-            placeholder={isDubious ? "Remain anonymous for intrigue..." : "Enter your name"}
-            value={voterName}
-            maxLength={VOTER_NAME_MAX}
-            onChange={(e) => setVoterName(e.target.value)}
-            className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-violet-500 transition-all"
-          />
-          {isDubious && !voterName.trim() && (
-            <p className="text-rose-400/60 text-xs mt-2">
-              You&apos;ll appear as an enigmatic presence...
-            </p>
-          )}
-        </div>
+      <form className="ballot-form" onSubmit={submit}>
+        <section className="paper-card identity-card tape-top">
+          <label className="field-label" htmlFor="voter-name">Your alias <span>optional</span></label>
+          <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Leave blank for a mysterious alias' : 'Anonymous is allowed'} />
+          <p className="fine-print">Your name and notes are visible only to the poll creator.</p>
+        </section>
 
-        <div className="space-y-6 mb-8">
-          {suggestions.map((suggestion, index) => (
-            <div
-              key={index}
-              className={`card-gradient rounded-2xl p-6 neon-border ${
-                suggestion.vote === 'yolo' ? 'ring-2 ring-violet-500 ring-opacity-50' : ''
-              }`}
-            >
-              <p className="text-white text-xl font-medium mb-4">
-                {isDubious && <span className="text-rose-400 mr-2">#{index + 1}</span>}
-                &ldquo;{suggestion.text}&rdquo;
-              </p>
-
-              <div className={`grid gap-3 mb-4 ${isDubious ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                <button
-                  onClick={() => handleVote(index, 'yes')}
-                  aria-pressed={suggestion.vote === 'yes'}
-                  aria-label={`Vote yes for "${suggestion.text}"`}
-                  className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
-                    suggestion.vote === 'yes'
-                      ? 'bg-green-500 text-white shadow-lg shadow-green-500/50'
-                      : 'bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-white border border-green-500/30'
-                  }`}
-                >
-                  YES
-                </button>
-                <button
-                  onClick={() => handleVote(index, 'maybe')}
-                  aria-pressed={suggestion.vote === 'maybe'}
-                  aria-label={`Vote maybe for "${suggestion.text}"`}
-                  className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
-                    suggestion.vote === 'maybe'
-                      ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/50'
-                      : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-white border border-yellow-500/30'
-                  }`}
-                >
-                  MAYBE
-                </button>
-                <button
-                  onClick={() => handleVote(index, 'no')}
-                  aria-pressed={suggestion.vote === 'no'}
-                  aria-label={`Vote no for "${suggestion.text}"`}
-                  className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
-                    suggestion.vote === 'no'
-                      ? 'bg-red-500 text-white shadow-lg shadow-red-500/50'
-                      : 'bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30'
-                  }`}
-                >
-                  NO
-                </button>
-                {isDubious && (
-                  <button
-                    onClick={() => handleVote(index, 'yolo')}
-                    aria-pressed={suggestion.vote === 'yolo'}
-                    aria-label={`Vote YOLO for "${suggestion.text}"`}
-                    className={`vote-btn py-3 px-4 rounded-xl font-bold text-lg transition-all ${
-                      suggestion.vote === 'yolo'
-                        ? 'bg-gradient-to-r from-violet-500 via-purple-500 to-rose-500 text-white shadow-lg shadow-violet-500/50 animate-pulse'
-                        : 'bg-violet-500/20 text-violet-400 hover:bg-gradient-to-r hover:from-violet-500 hover:via-purple-500 hover:to-rose-500 hover:text-white border border-violet-500/30'
-                    }`}
-                  >
-                    YOLO
-                  </button>
-                )}
-              </div>
-
-              <label htmlFor={`comment-${index}`} className="sr-only">
-                Add a comment for &quot;{suggestion.text}&quot; (optional)
+        <ol className="ballot-list">
+          {suggestions.map((item, index) => (
+            <li className="paper-card ballot-card" key={item.text}>
+              <div className="ballot-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
+              <fieldset>
+                <legend>{item.text}</legend>
+                <div className={`vote-grid ${dubious ? 'four' : ''}`}>
+                  {VOTES.filter((choice) => choice.value !== 'yolo' || dubious).map((choice) => (
+                    <button
+                      type="button"
+                      key={choice.value}
+                      aria-pressed={item.vote === choice.value}
+                      className={`vote-choice ${choice.value} ${item.vote === choice.value ? 'selected' : ''}`}
+                      onClick={() => choose(index, choice.value)}
+                    >
+                      <span aria-hidden="true">{choice.symbol}</span>{choice.label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="note-input" htmlFor={`comment-${index}`}>
+                <span>Margin note <small>optional</small></span>
+                <input id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="Context, conditions, strong feelings…" />
               </label>
-              <input
-                id={`comment-${index}`}
-                type="text"
-                placeholder={isDubious ? "Add your thoughts..." : "Add a comment (optional)"}
-                value={suggestion.comment}
-                maxLength={COMMENT_MAX}
-                onChange={(e) => handleComment(index, e.target.value)}
-                className="w-full bg-black/40 border border-purple-500/30 rounded-lg px-4 py-2 text-white placeholder-purple-300/40 focus:outline-none focus:border-purple-500 text-sm transition-all"
-              />
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
 
-        <div className="card-gradient rounded-2xl p-6 neon-border mb-6">
-          <label htmlFor="counter-proposal" className="block text-purple-300 text-sm mb-2 font-medium">
-            {isDubious ? "Your Own Suggestion (optional)" : 'Counter Proposal (optional)'}
-          </label>
-          <p className="text-purple-400/60 text-xs mb-3">
-            {isDubious
-              ? 'Have something more enticing in mind?'
-              : 'Have a better idea? Suggest an alternative!'}
-          </p>
-          <textarea
-            id="counter-proposal"
-            placeholder={isDubious
-              ? "e.g., Or perhaps something even more intriguing..."
-              : "e.g., Instead of those ideas, how about we..."}
-            value={counterProposal}
-            maxLength={COUNTER_PROPOSAL_MAX}
-            onChange={(e) => setCounterProposal(e.target.value)}
-            rows={3}
-            className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-purple-500 transition-all resize-none"
-          />
-        </div>
+        <section className="paper-card counter-card">
+          <label className="field-label" htmlFor="counter-proposal">Plot twist <span>optional</span></label>
+          <p>None of these? Pitch one rogue alternative.</p>
+          <textarea id="counter-proposal" value={counterProposal} maxLength={COUNTER_PROPOSAL_MAX} onChange={(event) => setCounterProposal(event.target.value)} rows={3} placeholder="Hear me out…" />
+        </section>
 
-        {submitError && (
-          <div role="alert" aria-live="assertive" className="bg-rose-950/40 border border-rose-500/40 text-rose-300 rounded-xl px-4 py-3 mb-6 text-sm">
-            {submitError}
-          </div>
-        )}
-
-        <button
-          onClick={submitVotes}
-          disabled={!allVoted || submitting}
-          className={`w-full font-bold py-4 px-6 rounded-xl text-lg transition-all ${
-            allVoted && !submitting
-              ? isDubious
-                ? 'btn-neon bg-gradient-to-r from-rose-600 via-purple-600 to-violet-600 hover:from-rose-500 hover:via-purple-500 hover:to-violet-500 text-white transform hover:scale-[1.02]'
-                : 'btn-neon bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 text-white transform hover:scale-[1.02]'
-              : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
-          }`}
-        >
-          {submitting ? 'Submitting...' : allVoted ? (isDubious ? 'Submit Votes' : 'Submit Votes') : `Vote on all ${suggestions.length} ${isDubious ? 'options' : 'suggestions'}`}
+        {submitError && <p className="notice notice-error" role="alert" aria-live="assertive">{submitError}</p>}
+        <button className="primary-button jumbo seal-button" type="submit" disabled={submitting}>
+          {submitting ? 'Sealing…' : complete ? 'Seal my ballot ↗' : `Choose ${suggestions.filter((item) => !item.vote).length} more`}
         </button>
-      </div>
+      </form>
+      <footer className="site-footer"><span>PRIVATE BY DESIGN</span><span>Only the poll owner sees details.</span></footer>
     </main>
   )
 }

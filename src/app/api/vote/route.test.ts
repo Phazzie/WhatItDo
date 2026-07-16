@@ -1,342 +1,154 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { mockRedis } from '@/test/mockRedis'
-import type { Poll } from '@/lib/types'
+import { inMemoryRedis } from '@/lib/inMemoryRedis'
+import { getRedis, resetRedisForTests } from '@/lib/redis'
+import { hashResultsToken } from '@/lib/resultsToken'
+import type { StoredPoll } from '@/lib/types'
 
-const THIRTY_DAYS_SECONDS_MOCK = 60 * 60 * 24 * 30
-
-// Reimplements the small redis.ts helpers against this test's `mockRedis`
-// instance (rather than partially mocking the real module) so route tests
-// exercise the same sliding-window-log logic without depending on module
-// load order / env vars for the real Upstash client.
-vi.mock('@/lib/redis', () => ({
-  redis: mockRedis,
-  POLL_TTL_SECONDS: THIRTY_DAYS_SECONDS_MOCK,
-  checkRateLimit: async (key: string, limit: number, windowSeconds: number) => {
-    const now = Date.now()
-    const raw = await mockRedis.get<string>(key)
-    const timestamps: number[] = raw ? JSON.parse(raw) : []
-    const windowStart = now - windowSeconds * 1000
-    const recent = timestamps.filter((t) => t > windowStart)
-    if (recent.length >= limit) return false
-    recent.push(now)
-    await mockRedis.set(key, JSON.stringify(recent), { ex: windowSeconds })
-    return true
-  },
-  getClientIp: (request: { headers: { get(name: string): string | null } }) => {
-    const forwardedFor = request.headers.get('x-forwarded-for')
-    if (forwardedFor) return forwardedFor.split(',')[0].trim()
-    return 'unknown'
-  },
+const sendMock = vi.fn()
+vi.mock('resend', () => ({
+  Resend: vi.fn().mockImplementation(function (this: { emails: { send: typeof sendMock } }) {
+    this.emails = { send: sendMock }
+  }),
 }))
-const sendMock = vi.fn().mockResolvedValue({ data: { id: 'email-1' } })
 
-vi.mock('resend', () => {
-  return {
-    Resend: vi.fn().mockImplementation(function (this: { emails: { send: typeof sendMock } }) {
-      this.emails = { send: sendMock }
-    }),
-  }
-})
+const pollId = 'vote000001'
+const submissionId = '550e8400-e29b-41d4-a716-446655440000'
 
-function postRequest(body: unknown, headers: Record<string, string> = {}) {
+function request(overrides: Record<string, unknown> = {}, headers: Record<string, string> = {}) {
   return new NextRequest('http://localhost/api/vote', {
     method: 'POST',
-    body: typeof body === 'string' ? body : JSON.stringify(body),
+    body: JSON.stringify({
+      pollId,
+      submissionId,
+      voterName: 'Alice',
+      votes: [{ text: 'Pizza', vote: 'yes', comment: '' }],
+      ...overrides,
+    }),
     headers: { 'content-type': 'application/json', ...headers },
   })
 }
 
-const normalPoll: Poll = {
-  id: 'poll1',
-  title: 'What It Do?',
-  suggestions: ['Pizza', 'Tacos'],
-  creatorEmail: 'creator@example.com',
-  createdAt: Date.now(),
-  responses: [],
-  mode: 'normal',
+async function seed(overrides: Partial<StoredPoll> = {}) {
+  const now = Date.now()
+  const poll: StoredPoll = {
+    id: pollId, title: 'Dinner?', suggestions: ['Pizza'], mode: 'normal', createdAt: now,
+    expiresAt: now + 60_000, resultsTokenHash: hashResultsToken('A_-bcdefghijklmnopqrstuv'), ...overrides,
+  }
+  await inMemoryRedis.set(`poll:${pollId}`, JSON.stringify(poll))
 }
 
-describe('POST /api/vote validation (2.1, C3/H3)', () => {
+describe('POST /api/vote', () => {
   beforeEach(async () => {
-    mockRedis.reset()
-    vi.resetModules()
-    process.env.RESEND_API_KEY = 'test-key'
-    await mockRedis.set(`poll:${normalPoll.id}`, JSON.stringify(normalPoll))
-  })
-
-  it('rejects a non-string vote value with 400 instead of throwing/500', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(
-      postRequest({
-        pollId: normalPoll.id,
-        voterName: 'Alice',
-        votes: [
-          { text: 'Pizza', vote: 123 },
-          { text: 'Tacos', vote: 'no' },
-        ],
-      })
-    )
-
-    expect(response.status).toBe(400)
-  })
-
-  it('rejects malformed JSON with 400, not 500', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(postRequest('{not json'))
-    expect(response.status).toBe(400)
-  })
-
-  it('does not lose a response when two votes are submitted concurrently (2.2, C1)', async () => {
-    const { POST } = await import('./route')
-
-    const [responseA, responseB] = await Promise.all([
-      POST(
-        postRequest({
-          pollId: normalPoll.id,
-          voterName: 'Alice',
-          votes: [
-            { text: 'Pizza', vote: 'yes' },
-            { text: 'Tacos', vote: 'no' },
-          ],
-        })
-      ),
-      POST(
-        postRequest({
-          pollId: normalPoll.id,
-          voterName: 'Bob',
-          votes: [
-            { text: 'Pizza', vote: 'no' },
-            { text: 'Tacos', vote: 'yes' },
-          ],
-        })
-      ),
-    ])
-
-    expect(responseA.status).toBe(200)
-    expect(responseB.status).toBe(200)
-
-    const storedResponses = await mockRedis.lrange(`poll:${normalPoll.id}:responses`, 0, -1)
-    expect(storedResponses.length).toBe(2)
-  })
-
-  it('escapes an XSS voterName before it reaches the notification email HTML (2.3, C2)', async () => {
-    const { POST } = await import('./route')
-    sendMock.mockClear()
-
-    const response = await POST(
-      postRequest({
-        pollId: normalPoll.id,
-        voterName: '<img src=x onerror=alert(1)>',
-        votes: [
-          { text: 'Pizza', vote: 'yes' },
-          { text: 'Tacos', vote: 'no' },
-        ],
-      })
-    )
-
-    expect(response.status).toBe(200)
-    expect(sendMock).toHaveBeenCalledTimes(1)
-    const payload = sendMock.mock.calls[0][0]
-    expect(payload.html).not.toContain('<img src=x onerror=alert(1)>')
-    expect(payload.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
-  })
-
-  it('strips CR/LF from voterName/title in the email subject to prevent header injection (self-review)', async () => {
-    const { POST } = await import('./route')
-    sendMock.mockClear()
-
-    const response = await POST(
-      postRequest({
-        pollId: normalPoll.id,
-        voterName: 'Al\r\nBcc: evil@example.com',
-        votes: [
-          { text: 'Pizza', vote: 'yes' },
-          { text: 'Tacos', vote: 'no' },
-        ],
-      })
-    )
-
-    expect(response.status).toBe(200)
-    expect(sendMock).toHaveBeenCalledTimes(1)
-    const payload = sendMock.mock.calls[0][0]
-    expect(payload.subject).not.toMatch(/[\r\n]/)
-  })
-
-  it('rejects a pollId that collides with the responses list key namespace with 404, not a crash (self-review)', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(
-      postRequest({
-        pollId: `${normalPoll.id}:responses`,
-        voterName: 'Alice',
-        votes: [{ text: 'Pizza', vote: 'yes' }],
-      })
-    )
-
-    expect(response.status).toBe(404)
-  })
-
-  it('falls back to request.nextUrl.origin when NEXT_PUBLIC_BASE_URL is unset and no origin header is sent (2.4, H1)', async () => {
-    const { POST } = await import('./route')
-    sendMock.mockClear()
-    delete process.env.NEXT_PUBLIC_BASE_URL
-
-    const response = await POST(
-      new NextRequest('http://example.test/api/vote', {
-        method: 'POST',
-        body: JSON.stringify({
-          pollId: normalPoll.id,
-          voterName: 'Alice',
-          votes: [
-            { text: 'Pizza', vote: 'yes' },
-            { text: 'Tacos', vote: 'no' },
-          ],
-        }),
-        headers: { 'content-type': 'application/json' },
-      })
-    )
-
-    expect(response.status).toBe(200)
-    expect(sendMock).toHaveBeenCalledTimes(1)
-    const payload = sendMock.mock.calls[0][0]
-    expect(payload.html).not.toContain('undefined/results/')
-    expect(payload.html).toContain('http://example.test/results/')
-  })
-
-  it('skips sending email and does not error when POLL_CREATOR_EMAIL/creatorEmail is unset (2.4, C4)', async () => {
-    const { POST } = await import('./route')
-    sendMock.mockClear()
-
-    const pollWithoutEmail: Poll = { ...normalPoll, id: 'poll-no-email', creatorEmail: '' }
-    await mockRedis.set(`poll:${pollWithoutEmail.id}`, JSON.stringify(pollWithoutEmail))
-
-    const response = await POST(
-      postRequest({
-        pollId: pollWithoutEmail.id,
-        voterName: 'Alice',
-        votes: [
-          { text: 'Pizza', vote: 'yes' },
-          { text: 'Tacos', vote: 'no' },
-        ],
-      })
-    )
-
-    expect(response.status).toBe(200)
-    expect(sendMock).not.toHaveBeenCalled()
-  })
-
-  it('accepts a valid vote', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(
-      postRequest({
-        pollId: normalPoll.id,
-        voterName: 'Alice',
-        votes: [
-          { text: 'Pizza', vote: 'yes' },
-          { text: 'Tacos', vote: 'no' },
-        ],
-      })
-    )
-    const json = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(json.success).toBe(true)
-  })
-})
-
-const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30
-
-describe('POST /api/vote TTL refresh (2.5, H2)', () => {
-  beforeEach(async () => {
-    mockRedis.reset()
-    vi.resetModules()
-    process.env.RESEND_API_KEY = 'test-key'
-    await mockRedis.set(`poll:${normalPoll.id}`, JSON.stringify(normalPoll))
-  })
-
-  it('refreshes the 30-day TTL on both the poll key and the responses key after a vote', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(
-      postRequest({
-        pollId: normalPoll.id,
-        voterName: 'Alice',
-        votes: [
-          { text: 'Pizza', vote: 'yes' },
-          { text: 'Tacos', vote: 'no' },
-        ],
-      })
-    )
-
-    expect(response.status).toBe(200)
-    expect(mockRedis.getTtl(`poll:${normalPoll.id}`)).toBe(THIRTY_DAYS_SECONDS)
-    expect(mockRedis.getTtl(`poll:${normalPoll.id}:responses`)).toBe(THIRTY_DAYS_SECONDS)
-  })
-})
-
-describe('POST /api/vote rate limiting (2.5, C5)', () => {
-  const originalEnv = process.env.RATE_LIMIT_ENABLED
-
-  beforeEach(async () => {
-    mockRedis.reset()
-    vi.resetModules()
-    process.env.RESEND_API_KEY = 'test-key'
-    await mockRedis.set(`poll:${normalPoll.id}`, JSON.stringify(normalPoll))
+    vi.unstubAllEnvs()
+    resetRedisForTests()
+    // Select the test-only client before individual cases exercise production
+    // identity rules. The route still sees the same seeded storage instance.
+    getRedis()
+    sendMock.mockReset().mockResolvedValue({ data: { id: 'email-1' }, error: null })
+    await seed()
   })
 
   afterEach(() => {
-    process.env.RATE_LIMIT_ENABLED = originalEnv
-  })
-
-  it('returns 429 after the vote limit (20/hr) is exceeded when enabled', async () => {
-    process.env.RATE_LIMIT_ENABLED = '1'
-    const { POST } = await import('./route')
-
-    const statuses: number[] = []
-    for (let i = 0; i < 25; i++) {
-      const response = await POST(
-        postRequest(
-          {
-            pollId: normalPoll.id,
-            voterName: 'Alice',
-            votes: [
-              { text: 'Pizza', vote: 'yes' },
-              { text: 'Tacos', vote: 'no' },
-            ],
-          },
-          { 'x-forwarded-for': '10.0.0.3' }
-        )
-      )
-      statuses.push(response.status)
-    }
-
-    expect(statuses.filter((s) => s === 200).length).toBe(20)
-    expect(statuses.filter((s) => s === 429).length).toBe(5)
-  })
-})
-
-describe('POST /api/vote sanitizes stored votes (Codex review)', () => {
-  beforeEach(() => {
-    mockRedis.reset()
     vi.unstubAllEnvs()
+    vi.restoreAllMocks()
   })
 
-  it('strips extra fields from vote objects before persisting', async () => {
+  it('records a normalized vote and truthfully reports email is not configured', async () => {
     const { POST } = await import('./route')
-    await mockRedis.set('poll:poll1', JSON.stringify(normalPoll))
+    const response = await POST(request({ voterName: ' Alice ', counterProposal: ' Sushi ' }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ success: true, notification: 'not_configured' })
+    const stored = JSON.parse((await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1))[0])
+    expect(stored).toMatchObject({ voterName: 'Alice', counterProposal: 'Sushi' })
+    expect(stored.votes[0]).toEqual({ text: 'Pizza', vote: 'yes', comment: '' })
+  })
 
-    const res = await POST(postRequest({
-      pollId: 'poll1',
-      voterName: 'Mallory',
-      votes: [
-        { text: 'Pizza', vote: 'yes', comment: 'ok', payload: { junk: 'x'.repeat(50) } },
-        { text: 'Tacos', vote: 'no', comment: '' },
-      ],
+  it('retires tokenless legacy polls with 410 and does not mutate them', async () => {
+    const { POST } = await import('./route')
+    await seed({ resultsTokenHash: '' })
+    const response = await POST(request())
+    expect(response.status).toBe(410)
+    expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toEqual([])
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('returns duplicate without claiming the prior email outcome or sending again', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    const { POST } = await import('./route')
+    expect(await (await POST(request())).json()).toMatchObject({ notification: 'sent' })
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL', '')
+    vi.stubEnv('TRUST_PROXY', '')
+    expect(await (await POST(request())).json()).toEqual({ success: true, notification: 'duplicate' })
+    expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps notification email free of poll and voter details and sets provider idempotency', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    await seed({ title: 'Dinner\r\nBcc: bad@example.com <script>' })
+    const { POST } = await import('./route')
+    const response = await POST(request({
+      voterName: 'Al\r\nBcc: bad@example.com <img src=x>',
+      counterProposal: '<b>danger</b>',
+      votes: [{ text: 'Pizza', vote: 'yes', comment: '<svg onload=x>' }],
     }))
-    expect(res.status).toBe(200)
+    expect(response.status).toBe(200)
+    const [message, options] = sendMock.mock.calls[0]
+    const serialized = JSON.stringify(message)
+    expect(serialized).not.toContain('bad@example.com')
+    expect(serialized).not.toContain('Dinner')
+    expect(serialized).not.toContain('danger')
+    expect(serialized).not.toContain('Pizza')
+    expect(serialized).not.toContain('svg')
+    expect(serialized).not.toContain('Bcc')
+    expect(options).toEqual({ idempotencyKey: `vote/${pollId}/${submissionId}` })
+  })
 
-    const stored = await mockRedis.lrange('poll:poll1:responses', 0, -1)
-    const persisted = JSON.parse(stored[0])
-    expect(persisted.votes[0]).not.toHaveProperty('payload')
-    expect(Object.keys(persisted.votes[0]).sort()).toEqual(['comment', 'text', 'vote'])
+  it('reports a resolved provider error as failed, never sent', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    sendMock.mockResolvedValue({ data: null, error: { message: 'rejected' } })
+    const { POST } = await import('./route')
+    expect(await (await POST(request())).json()).toEqual({ success: true, notification: 'failed' })
+  })
+
+  it('fails closed in production when only spoofable proxy headers exist', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL', '')
+    vi.stubEnv('TRUST_PROXY', '')
+    const { POST } = await import('./route')
+    const response = await POST(request({}, { 'x-forwarded-for': '203.0.113.9' }))
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('60')
+    expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toEqual([])
+  })
+
+  it('never copies a payload-bearing storage error into logs', async () => {
+    const storage = await import('@/lib/redis')
+    vi.spyOn(storage, 'appendVoteAtomically').mockRejectedValueOnce(
+      new Error('SENTINEL_PRIVATE_BALLOT Alice secret comment')
+    )
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { POST } = await import('./route')
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(500)
+    expect(JSON.stringify(errorSpy.mock.calls)).toBe('[["[whatitdo] vote_submit_failed"]]')
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SENTINEL_PRIVATE_BALLOT')
+  })
+
+  it('rejects a no-CORS-compatible text body before reading poll data', async () => {
+    const { POST } = await import('./route')
+    const response = await POST(new NextRequest('http://localhost/api/vote', {
+      method: 'POST',
+      body: JSON.stringify({ pollId, submissionId }),
+      headers: { 'content-type': 'text/plain' },
+    }))
+    expect(response.status).toBe(415)
+    expect(await response.json()).toEqual({ error: 'Content-Type must be application/json' })
   })
 })
