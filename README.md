@@ -74,9 +74,9 @@ TRUST_PROXY=1
 creator email addresses per poll. Alerts include the normalized poll title, voter name, choices,
 notes, and counterproposal, with every user-controlled HTML value escaped. They never include the
 private results link, results credential, notification address, or internal poll, response, or
-submission IDs. The provider wait is capped at five seconds. If Resend or the address is absent,
-voting still succeeds and the UI says email is not configured; provider failures likewise never undo
-a recorded vote or claim that mail was sent.
+submission IDs. The provider wait is capped at five seconds. If the Resend key, destination address,
+or verified sender is absent, voting still succeeds and the UI says email is not configured;
+provider failures likewise never undo a recorded vote or claim that mail was sent.
 
 Do not set `E2E_TEST`, `E2E_BASE_URL`, or `USE_IN_MEMORY_REDIS` in a deployed environment. In-memory
 storage is available only when `NODE_ENV=test`, or when the dedicated E2E marker uses a loopback URL

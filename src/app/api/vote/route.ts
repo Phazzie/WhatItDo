@@ -42,10 +42,19 @@ function getResend(): Resend | null {
   return resend
 }
 
-function errorResponse(error: string, status: number, retryAfter?: number) {
+function errorResponse(
+  error: string,
+  status: number,
+  options: { retryAfter?: number; code?: string } = {}
+) {
   return NextResponse.json(
-    { error },
-    { status, ...(retryAfter ? { headers: { 'Retry-After': String(retryAfter) } } : {}) }
+    { error, ...(options.code ? { code: options.code } : {}) },
+    {
+      status,
+      ...(options.retryAfter
+        ? { headers: { 'Retry-After': String(options.retryAfter) } }
+        : {}),
+    }
   )
 }
 
@@ -55,8 +64,9 @@ async function notifyCreator(
   submissionId: string
 ): Promise<Exclude<NotificationStatus, 'duplicate'>> {
   const to = process.env.POLL_CREATOR_EMAIL?.trim()
+  const from = process.env.EMAIL_FROM?.trim()
   const client = getResend()
-  if (!to || !client) return 'not_configured'
+  if (!to || !from || !client) return 'not_configured'
 
   try {
     const voteDetails = response.votes.map((vote) => `
@@ -70,7 +80,7 @@ async function notifyCreator(
       : ''
     const result = await withTimeout(client.emails.send(
       {
-        from: sanitizeHeaderValue(process.env.EMAIL_FROM || 'What It Do <notifications@resend.dev>'),
+        from: sanitizeHeaderValue(from),
         to,
         subject: 'A What It Do poll received a response',
         html: `
@@ -104,13 +114,21 @@ export async function POST(request: NextRequest) {
     const pollId = candidate && typeof candidate === 'object' && !Array.isArray(candidate)
       ? (candidate as Record<string, unknown>).pollId
       : undefined
-    if (!isValidPollId(pollId)) return errorResponse('Poll not found', 404)
+    if (!isValidPollId(pollId)) {
+      return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
+    }
 
     const raw = await storage.getRedis().get<string | StoredPoll>(`poll:${pollId}`)
-    if (!raw) return errorResponse('Poll not found', 404)
+    if (!raw) return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
     const poll = (typeof raw === 'string' ? JSON.parse(raw) : raw) as StoredPoll
-    if (!poll.resultsTokenHash) return errorResponse('This legacy poll is no longer available', 410)
-    if (poll.expiresAt <= Date.now()) return errorResponse('Poll not found', 404)
+    if (!poll.resultsTokenHash) {
+      return errorResponse('This legacy poll is no longer available', 410, {
+        code: 'LEGACY_POLL_RETIRED',
+      })
+    }
+    if (poll.expiresAt <= Date.now()) {
+      return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
+    }
 
     const parsed = parseVoteInput(candidate, poll)
     if (!parsed.ok) return errorResponse(parsed.error, 400)
@@ -144,19 +162,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, notification: 'duplicate' satisfies NotificationStatus })
     }
     if (appended.status === 'idempotency_conflict') {
-      return errorResponse('Submission ID was already used for a different ballot', 409)
+      return errorResponse('Submission ID was already used for a different ballot', 409, {
+        code: 'SUBMISSION_CONFLICT',
+      })
     }
     if (appended.status === 'not_found' || appended.status === 'expired') {
-      return errorResponse('Poll not found', 404)
+      return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
     }
     if (appended.status === 'identity_unavailable') {
-      return errorResponse('Unable to verify request identity', 429, 60)
+      return errorResponse('Unable to verify request identity', 429, {
+        retryAfter: 60,
+        code: 'IDENTITY_UNAVAILABLE',
+      })
     }
     if (appended.status === 'capacity_reached') {
-      return errorResponse('This poll has reached its response limit', 409)
+      return errorResponse('This poll has reached its response limit', 409, { code: 'POLL_FULL' })
     }
     if (appended.status === 'rate_limited') {
-      return errorResponse('Too many votes submitted. Please try again later.', 429, appended.retryAfterSeconds ?? 3600)
+      return errorResponse('Too many votes submitted. Please try again later.', 429, {
+        retryAfter: appended.retryAfterSeconds ?? 3600,
+        code: 'RATE_LIMITED',
+      })
     }
 
     const notification = await notifyCreator(poll, response, parsed.data.submissionId)

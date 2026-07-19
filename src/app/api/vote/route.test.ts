@@ -38,6 +38,12 @@ async function seed(overrides: Partial<StoredPoll> = {}) {
   await inMemoryRedis.set(`poll:${pollId}`, JSON.stringify(poll))
 }
 
+function configureEmail() {
+  vi.stubEnv('RESEND_API_KEY', 'test-key')
+  vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+  vi.stubEnv('EMAIL_FROM', 'What It Do <notifications@example.com>')
+}
+
 describe('POST /api/vote', () => {
   beforeEach(async () => {
     vi.unstubAllEnvs()
@@ -65,6 +71,18 @@ describe('POST /api/vote', () => {
     expect(stored.votes[0]).toEqual({ text: 'Pizza', vote: 'yes', comment: '' })
   })
 
+  it('treats a missing verified sender as not configured without calling Resend', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    const { POST } = await import('./route')
+
+    const response = await POST(request())
+
+    expect(await response.json()).toEqual({ success: true, notification: 'not_configured' })
+    expect(sendMock).not.toHaveBeenCalled()
+    expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toHaveLength(1)
+  })
+
   it('retires tokenless legacy polls with 410 and does not mutate them', async () => {
     const { POST } = await import('./route')
     await seed({ resultsTokenHash: '' })
@@ -75,8 +93,7 @@ describe('POST /api/vote', () => {
   })
 
   it('returns duplicate without claiming the prior email outcome or sending again', async () => {
-    vi.stubEnv('RESEND_API_KEY', 'test-key')
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    configureEmail()
     const { POST } = await import('./route')
     expect(await (await POST(request())).json()).toMatchObject({ notification: 'sent' })
     vi.stubEnv('NODE_ENV', 'production')
@@ -87,8 +104,7 @@ describe('POST /api/vote', () => {
   })
 
   it('treats a normalization-equivalent retry as the same ballot', async () => {
-    vi.stubEnv('RESEND_API_KEY', 'test-key')
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    configureEmail()
     const { POST } = await import('./route')
 
     expect(await (await POST(request({
@@ -105,8 +121,7 @@ describe('POST /api/vote', () => {
   })
 
   it('rejects reuse of a submission ID for a changed ballot without mutation or email', async () => {
-    vi.stubEnv('RESEND_API_KEY', 'test-key')
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    configureEmail()
     const { POST } = await import('./route')
     expect((await POST(request())).status).toBe(200)
 
@@ -118,6 +133,7 @@ describe('POST /api/vote', () => {
     expect(conflict.status).toBe(409)
     expect(await conflict.json()).toEqual({
       error: 'Submission ID was already used for a different ballot',
+      code: 'SUBMISSION_CONFLICT',
     })
     expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toHaveLength(1)
     expect(sendMock).toHaveBeenCalledTimes(1)
@@ -138,8 +154,7 @@ describe('POST /api/vote', () => {
   })
 
   it('sends escaped ballot details without private credentials or internal IDs', async () => {
-    vi.stubEnv('RESEND_API_KEY', 'test-key')
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    configureEmail()
     vi.stubEnv('EMAIL_FROM', 'What It Do\r\nBcc: injected@example.com <notifications@example.com>')
     await seed({
       title: 'Dinner\r\nBcc: bad@example.com <script>',
@@ -179,8 +194,7 @@ describe('POST /api/vote', () => {
 
   it('bounds the provider wait at five seconds without undoing the recorded vote', async () => {
     vi.useFakeTimers()
-    vi.stubEnv('RESEND_API_KEY', 'test-key')
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    configureEmail()
     let markStarted: () => void = () => undefined
     const started = new Promise<void>((resolve) => {
       markStarted = resolve
@@ -205,11 +219,37 @@ describe('POST /api/vote', () => {
   })
 
   it('reports a resolved provider error as failed, never sent', async () => {
-    vi.stubEnv('RESEND_API_KEY', 'test-key')
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    configureEmail()
     sendMock.mockResolvedValue({ data: null, error: { message: 'rejected' } })
     const { POST } = await import('./route')
     expect(await (await POST(request())).json()).toEqual({ success: true, notification: 'failed' })
+  })
+
+  it('returns a stable terminal code when the poll reaches capacity', async () => {
+    const storage = await import('@/lib/redis')
+    vi.spyOn(storage, 'appendVoteAtomically').mockResolvedValueOnce({ status: 'capacity_reached' })
+    const { POST } = await import('./route')
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      error: 'This poll has reached its response limit',
+      code: 'POLL_FULL',
+    })
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('returns a stable terminal code when the poll expires during submission', async () => {
+    const storage = await import('@/lib/redis')
+    vi.spyOn(storage, 'appendVoteAtomically').mockResolvedValueOnce({ status: 'expired' })
+    const { POST } = await import('./route')
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Poll not found', code: 'POLL_UNAVAILABLE' })
+    expect(sendMock).not.toHaveBeenCalled()
   })
 
   it('fails closed in production when only spoofable proxy headers exist', async () => {

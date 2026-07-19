@@ -45,7 +45,9 @@ export default function VotePage() {
   const [voterName, setVoterName] = useState('')
   const [counterProposal, setCounterProposal] = useState('')
   const [loading, setLoading] = useState(true)
-  const [loadState, setLoadState] = useState<'not-found' | 'retired' | 'error' | ''>('')
+  const [loadState, setLoadState] = useState<
+    'not-found' | 'unavailable' | 'full' | 'retired' | 'error' | ''
+  >('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [notification, setNotification] = useState<NotificationStatus | null>(null)
@@ -120,9 +122,27 @@ export default function VotePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const body = (await response.json().catch(() => ({}))) as { error?: string; notification?: NotificationStatus }
+      const body = (await response.json().catch(() => ({}))) as {
+        code?: string
+        error?: string
+        notification?: NotificationStatus
+      }
       if (!response.ok) {
-        if (response.status === 410) setLoadState('retired')
+        if (body.code === 'POLL_FULL') {
+          pendingSubmission.current = null
+          setLoadState('full')
+          return
+        }
+        if (body.code === 'POLL_UNAVAILABLE') {
+          pendingSubmission.current = null
+          setLoadState('unavailable')
+          return
+        }
+        if (response.status === 410) {
+          pendingSubmission.current = null
+          setLoadState('retired')
+          return
+        }
         // A non-5xx response confirms that this request was not ambiguously
         // accepted, so the voter may correct it and create a fresh receipt.
         if (response.status < 500) pendingSubmission.current = null
@@ -146,12 +166,14 @@ export default function VotePage() {
 
   if (loadState || !poll) {
     const retired = loadState === 'retired'
+    const full = loadState === 'full'
+    const unavailable = loadState === 'unavailable'
     return (
       <main className="site-shell center-stage">
         <section className="paper-card state-card tape-top">
-          <p className="card-label hot">{retired ? 'ARCHIVED' : loadState === 'error' ? 'SIGNAL LOST' : 'NOT FOUND'}</p>
-          <h1>{retired ? 'This old poll has left the building.' : loadState === 'error' ? 'The ballot booth is offline.' : 'Nothing doing here.'}</h1>
-          <p>{retired ? 'Legacy polls were retired to protect private responses. Ask the creator to make a fresh one.' : loadState === 'error' ? 'Try reloading in a moment.' : 'The link may be mistyped, expired, or already gone.'}</p>
+          <p className="card-label hot">{retired ? 'ARCHIVED' : full || unavailable ? 'CLOSED' : loadState === 'error' ? 'SIGNAL LOST' : 'NOT FOUND'}</p>
+          <h1>{retired ? 'This old poll has left the building.' : full ? 'This poll is full.' : unavailable ? 'This poll is no longer available.' : loadState === 'error' ? 'The ballot booth is offline.' : 'Nothing doing here.'}</h1>
+          <p>{retired ? 'Legacy polls were retired to protect private responses. Ask the creator to make a fresh one.' : full ? 'It reached the 250-response limit, so the ballot booth is closed.' : unavailable ? 'It expired or was removed before this ballot could land.' : loadState === 'error' ? 'Try reloading in a moment.' : 'The link may be mistyped, expired, or already gone.'}</p>
           {loadState === 'error' && <button className="primary-button cyan" type="button" onClick={retryLoad}>Try the ballot again</button>}
           <Link className="primary-button pink" href="/">Make a fresh poll</Link>
         </section>
@@ -196,7 +218,7 @@ export default function VotePage() {
         <section className="paper-card identity-card tape-top">
           <label className="field-label" htmlFor="voter-name">Your alias <span>optional</span></label>
           <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Leave blank for a mysterious alias' : 'Anonymous is allowed'} />
-          <p className="fine-print">Your name and notes are visible only to the poll creator.</p>
+          <p className="fine-print">Your name and notes are visible to anyone holding the private results link.</p>
         </section>
 
         <ol className="ballot-list">
@@ -221,7 +243,7 @@ export default function VotePage() {
               </fieldset>
               <label className="note-input" htmlFor={`comment-${index}`}>
                 <span>Margin note <small>optional</small></span>
-                <input id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="Context, conditions, strong feelings…" />
+                <input aria-label={`Margin note for ${item.text} (optional)`} id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="Context, conditions, strong feelings…" />
               </label>
             </li>
           ))}
@@ -238,7 +260,7 @@ export default function VotePage() {
           {submitting ? 'Sealing…' : complete ? 'Seal my ballot ↗' : `Choose ${suggestions.filter((item) => !item.vote).length} more`}
         </button>
       </form>
-      <footer className="site-footer"><span>PRIVATE BY DESIGN</span><span>Only the poll owner sees details.</span></footer>
+      <footer className="site-footer"><span>PRIVATE BY DESIGN</span><span>The private results link reveals details.</span></footer>
     </main>
   )
 }

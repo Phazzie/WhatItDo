@@ -124,7 +124,8 @@ test('Classic: creates separate links, records a ballot, and unlocks owner resul
   await choose(page, first, 'Yes')
   await choose(page, second, 'Nope')
   await page.getByLabel(/Your alias/i).fill('Night Owl')
-  await page.getByLabel(/Margin note/i).first().fill('Book the corner table')
+  await page.getByLabel(`Margin note for ${first} (optional)`).fill('Book the corner table')
+  await expect(page.getByLabel(`Margin note for ${second} (optional)`)).toBeVisible()
   await page.getByRole('button', { name: /Seal my ballot/i }).click()
 
   await expect(page.getByRole('heading', { name: /Your vote is in/i })).toBeVisible()
@@ -280,6 +281,34 @@ test('keyboard form submission exposes create and vote validation errors', async
   await page.keyboard.press('Enter')
   await expect(appAlert(page)).toContainText('Choose one response for every possibility')
 })
+
+for (const terminal of [
+  { code: 'POLL_FULL', status: 409, heading: 'This poll is full.' },
+  { code: 'POLL_UNAVAILABLE', status: 404, heading: 'This poll is no longer available.' },
+] as const) {
+  test(`ballot closes when vote submission returns ${terminal.code}`, async ({ page }) => {
+    const suggestion = `Terminal ${terminal.code}`
+    const links = await createPoll(page, {
+      mode: 'normal',
+      title: 'Terminal ballot state',
+      suggestions: [suggestion],
+    })
+    await page.route('**/api/vote', async (route) => {
+      await route.fulfill({
+        status: terminal.status,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: terminal.code, error: 'terminal' }),
+      })
+    })
+
+    await page.goto(links.voteUrl)
+    await choose(page, suggestion, 'Yes')
+    await page.getByRole('button', { name: /Seal my ballot/i }).click()
+
+    await expect(page.getByRole('heading', { name: terminal.heading })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Seal my ballot/i })).toHaveCount(0)
+  })
+}
 
 test('forced-colors focus stays visible on links, buttons, inputs, and textareas', async ({ page }) => {
   const suggestion = 'Keep the outline'
