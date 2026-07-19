@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createClient } from 'redis'
 import {
   APPEND_VOTE_LUA_SCRIPT,
+  CREATE_POLL_LUA_SCRIPT,
   MAX_POLL_RESPONSES,
   POLL_ABSOLUTE_TTL_SECONDS,
   POLL_IDLE_TTL_SECONDS,
@@ -93,6 +94,49 @@ describeRedis('Redis 7 Lua integration', () => {
   async function pollTtls(keys: AppendKeys): Promise<number[]> {
     return Promise.all(keys.slice(0, 3).map((key) => client.ttl(key)))
   }
+
+  it('atomically allows only one creator to claim a free three-key namespace', async () => {
+    const pollId = randomUUID()
+    const keys = [
+      `integration:${runId}:create:${pollId}`,
+      `integration:${runId}:create:${pollId}:responses`,
+      `integration:${runId}:create:${pollId}:submissions`,
+    ]
+    keys.forEach((key) => cleanupKeys.add(key))
+    const pollJson = JSON.stringify({ id: pollId, createdAt: Date.now() })
+    const create = () => client.eval(CREATE_POLL_LUA_SCRIPT, {
+      keys,
+      arguments: [pollJson, String(POLL_IDLE_TTL_SECONDS)],
+    }) as Promise<unknown[]>
+
+    const results = await Promise.all([create(), create()])
+
+    expect(results.map((result) => result[0]).sort()).toEqual(['created', 'namespace_conflict'])
+    expect(await client.get(keys[0])).toBe(pollJson)
+    expect(await client.ttl(keys[0])).toBeGreaterThan(POLL_IDLE_TTL_SECONDS - 2)
+    expect(await Promise.all(keys.slice(1).map((key) => client.exists(key)))).toEqual([0, 0])
+  })
+
+  it.each(['responses', 'submissions'])('does not overwrite an occupied %s companion namespace', async (suffix) => {
+    const pollId = randomUUID()
+    const keys = [
+      `integration:${runId}:collision:${pollId}`,
+      `integration:${runId}:collision:${pollId}:responses`,
+      `integration:${runId}:collision:${pollId}:submissions`,
+    ]
+    keys.forEach((key) => cleanupKeys.add(key))
+    const occupiedIndex = suffix === 'responses' ? 1 : 2
+    await client.set(keys[occupiedIndex], 'existing-private-data')
+
+    const result = await client.eval(CREATE_POLL_LUA_SCRIPT, {
+      keys,
+      arguments: [JSON.stringify({ id: pollId }), String(POLL_IDLE_TTL_SECONDS)],
+    }) as unknown[]
+
+    expect(result).toEqual(['namespace_conflict'])
+    expect(await client.exists(keys[0])).toBe(0)
+    expect(await client.get(keys[occupiedIndex])).toBe('existing-private-data')
+  })
 
   it('atomically appends concurrent votes and deduplicates a retry', async () => {
     const keys = await createPoll()

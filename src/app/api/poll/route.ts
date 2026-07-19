@@ -6,12 +6,11 @@ import { isValidPollId, parsePollInput } from '@/lib/validation'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 
-const IDLE_TTL_SECONDS = 60 * 60 * 24 * 30
 const ABSOLUTE_TTL_MS = 90 * 24 * 60 * 60 * 1000
+const MAX_CREATE_ATTEMPTS = 3
 
 type RedisReader = {
   get<T = unknown>(key: string): Promise<T | null>
-  set(key: string, value: string, options?: { ex?: number }): Promise<unknown>
 }
 type StorageContract = {
   getRedis(): RedisReader
@@ -21,6 +20,10 @@ type StorageContract = {
   checkPollCreateRateLimit(ip: string): Promise<
     | { allowed: true; remaining: number }
     | { allowed: false; remaining: 0; retryAfterSeconds: number }
+  >
+  createPollAtomically(poll: StoredPoll): Promise<
+    | { status: 'created' }
+    | { status: 'namespace_conflict' }
   >
 }
 const storage = storageModule as unknown as StorageContract
@@ -53,19 +56,28 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const id = nanoid(10)
-    const resultsToken = createResultsToken()
-    const createdAt = Date.now()
-    const poll: StoredPoll = {
-      id,
-      ...parsed.data,
-      createdAt,
-      expiresAt: createdAt + ABSOLUTE_TTL_MS,
-      resultsTokenHash: hashResultsToken(resultsToken),
+    for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt += 1) {
+      const id = nanoid(10)
+      const resultsToken = createResultsToken()
+      const createdAt = Date.now()
+      const poll: StoredPoll = {
+        id,
+        ...parsed.data,
+        createdAt,
+        expiresAt: createdAt + ABSOLUTE_TTL_MS,
+        resultsTokenHash: hashResultsToken(resultsToken),
+      }
+
+      const created = await storage.createPollAtomically(poll)
+      if (created.status === 'created') {
+        return NextResponse.json(
+          { id, resultsToken, poll: publicPoll(poll) },
+          { headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
+        )
+      }
     }
 
-    await storage.getRedis().set(`poll:${id}`, JSON.stringify(poll), { ex: IDLE_TTL_SECONDS })
-    return NextResponse.json({ id, resultsToken, poll: publicPoll(poll) })
+    return jsonError('Failed to create poll', 500)
   } catch {
     console.error('[whatitdo] poll_create_failed')
     return jsonError('Failed to create poll', 500)

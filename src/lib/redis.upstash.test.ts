@@ -19,9 +19,12 @@ vi.mock('@upstash/redis', () => ({ Redis: upstash.Redis }))
 
 import {
   APPEND_VOTE_LUA_SCRIPT,
+  CREATE_POLL_LUA_SCRIPT,
+  POLL_IDLE_TTL_SECONDS,
   RATE_LIMIT_LUA_SCRIPT,
   appendVoteAtomically,
   checkPollCreateRateLimit,
+  createPollAtomically,
   getRedis,
   resetRedisForTests,
 } from './redis'
@@ -80,6 +83,34 @@ describe('durable Upstash adapter', () => {
       ['ratelimit:poll:203.0.113.1'],
       [10, 3600]
     )
+  })
+
+  it('creates a poll through the three-key Lua boundary and parses namespace conflicts', async () => {
+    const poll = {
+      id: 'poll123456',
+      title: 'Atomic poll',
+      suggestions: ['A'],
+      mode: 'normal' as const,
+      createdAt: 1_800_000_000_000,
+      expiresAt: 1_807_776_000_000,
+      resultsTokenHash: 'a'.repeat(64),
+    }
+    upstash.client.eval
+      .mockResolvedValueOnce(['created'])
+      .mockResolvedValueOnce(['namespace_conflict'])
+
+    await expect(createPollAtomically(poll)).resolves.toEqual({ status: 'created' })
+    expect(upstash.client.eval).toHaveBeenNthCalledWith(
+      1,
+      CREATE_POLL_LUA_SCRIPT,
+      [
+        'poll:poll123456',
+        'poll:poll123456:responses',
+        'poll:poll123456:submissions',
+      ],
+      [JSON.stringify(poll), POLL_IDLE_TTL_SECONDS]
+    )
+    await expect(createPollAtomically(poll)).resolves.toEqual({ status: 'namespace_conflict' })
   })
 
   it.each([

@@ -6,13 +6,27 @@ import {
   POLL_IDLE_TTL_SECONDS,
   appendVoteAtomically,
   checkPollCreateRateLimit,
+  createPollAtomically,
   getRedis,
   isInMemoryRedisAllowed,
   resetRedisForTests,
   resolveClientIp,
 } from './redis'
+import type { StoredPoll } from './types'
 
 const now = 1_800_000_000_000
+
+function storedPoll(id = 'poll123456'): StoredPoll {
+  return {
+    id,
+    title: 'Atomic poll',
+    suggestions: ['A'],
+    mode: 'normal',
+    createdAt: now,
+    expiresAt: now + POLL_ABSOLUTE_TTL_SECONDS * 1000,
+    resultsTokenHash: 'a'.repeat(64),
+  }
+}
 
 async function seedPoll(id = 'poll123456', createdAt = now, expiresAt?: number) {
   await inMemoryRedis.set(
@@ -169,6 +183,45 @@ describe('atomic vote append', () => {
     expect((await append('oldpoll123', 'one')).status).toBe('appended')
     expect(inMemoryRedis.getTtl('poll:oldpoll123')).toBeLessThanOrEqual(remainingSeconds)
     expect(inMemoryRedis.getTtl('poll:oldpoll123')).toBeGreaterThan(remainingSeconds - 2)
+  })
+})
+
+describe('atomic poll creation', () => {
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'test')
+    resetRedisForTests()
+  })
+
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('allows exactly one concurrent creator to claim a free poll namespace', async () => {
+    const poll = storedPoll()
+    const results = await Promise.all([
+      createPollAtomically(poll),
+      createPollAtomically(poll),
+    ])
+
+    expect(results.map((result) => result.status).sort()).toEqual(['created', 'namespace_conflict'])
+    await expect(inMemoryRedis.get(`poll:${poll.id}`)).resolves.toBe(JSON.stringify(poll))
+    expect(inMemoryRedis.getTtl(`poll:${poll.id}`)).toBeGreaterThan(POLL_IDLE_TTL_SECONDS - 2)
+  })
+
+  it.each(['responses', 'submissions'])('does not create metadata over an occupied %s namespace', async (suffix) => {
+    const poll = storedPoll('occupied01')
+    const companionKey = `poll:${poll.id}:${suffix}`
+    await inMemoryRedis.set(companionKey, 'existing-private-data')
+
+    await expect(createPollAtomically(poll)).resolves.toEqual({ status: 'namespace_conflict' })
+    await expect(inMemoryRedis.get(`poll:${poll.id}`)).resolves.toBeNull()
+    await expect(inMemoryRedis.get(companionKey)).resolves.toBe('existing-private-data')
+  })
+
+  it('does not overwrite existing poll metadata', async () => {
+    const poll = storedPoll('occupied02')
+    await inMemoryRedis.set(`poll:${poll.id}`, 'existing-poll')
+
+    await expect(createPollAtomically(poll)).resolves.toEqual({ status: 'namespace_conflict' })
+    await expect(inMemoryRedis.get(`poll:${poll.id}`)).resolves.toBe('existing-poll')
   })
 })
 

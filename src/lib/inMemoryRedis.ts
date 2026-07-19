@@ -10,6 +10,16 @@ export interface InMemoryRateLimitResult {
   retryAfterSeconds?: number
 }
 
+export interface InMemoryCreatePollInput {
+  pollKey: string
+  responsesKey: string
+  submissionsKey: string
+  pollJson: string
+  idleTtlSeconds: number
+}
+
+export type InMemoryCreatePollResult = ['created'] | ['namespace_conflict']
+
 export interface InMemoryAppendInput {
   pollKey: string
   responsesKey: string
@@ -103,6 +113,16 @@ export class InMemoryRedis {
 
   async consumeRateLimit(key: string, limit: number, windowSeconds: number): Promise<InMemoryRateLimitResult> {
     return this.consumeRateLimitSync(key, limit, windowSeconds)
+  }
+
+  async createPollAtomically(input: InMemoryCreatePollInput): Promise<InMemoryCreatePollResult> {
+    if ([input.pollKey, input.responsesKey, input.submissionsKey].some((key) => this.hasKey(key))) {
+      return ['namespace_conflict']
+    }
+
+    this.values.set(input.pollKey, input.pollJson)
+    this.expiresAt.set(input.pollKey, Date.now() + input.idleTtlSeconds * 1000)
+    return ['created']
   }
 
   private consumeRateLimitSync(key: string, limit: number, windowSeconds: number): InMemoryRateLimitResult {

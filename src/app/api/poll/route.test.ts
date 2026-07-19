@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { inMemoryRedis } from '@/lib/inMemoryRedis'
+import * as redis from '@/lib/redis'
 import { POLL_IDLE_TTL_SECONDS, resetRedisForTests } from '@/lib/redis'
 
 function post(body: unknown) {
@@ -14,6 +15,7 @@ function post(body: unknown) {
 describe('/api/poll public privacy contract', () => {
   beforeEach(() => {
     vi.unstubAllEnvs()
+    vi.restoreAllMocks()
     resetRedisForTests()
   })
 
@@ -35,6 +37,43 @@ describe('/api/poll public privacy contract', () => {
     expect(stored).not.toHaveProperty('creatorEmail')
     expect(stored).not.toHaveProperty('responses')
     expect(inMemoryRedis.getTtl(`poll:${json.id}`)).toBeLessThanOrEqual(POLL_IDLE_TTL_SECONDS)
+    expect(response.headers.get('cache-control')).toBe('private, no-store, max-age=0')
+  })
+
+  it('charges the create rate once and retries a colliding namespace with fresh credentials', async () => {
+    const rateSpy = vi.spyOn(redis, 'checkPollCreateRateLimit')
+    const createSpy = vi.spyOn(redis, 'createPollAtomically')
+      .mockResolvedValueOnce({ status: 'namespace_conflict' })
+      .mockResolvedValueOnce({ status: 'created' })
+    const { POST } = await import('./route')
+
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+    const json = await response.json()
+    const attemptedPolls = createSpy.mock.calls.map(([poll]) => poll)
+
+    expect(response.status).toBe(200)
+    expect(rateSpy).toHaveBeenCalledTimes(1)
+    expect(createSpy).toHaveBeenCalledTimes(2)
+    expect(attemptedPolls[0].id).not.toBe(attemptedPolls[1].id)
+    expect(attemptedPolls[0].resultsTokenHash).not.toBe(attemptedPolls[1].resultsTokenHash)
+    expect(json.id).toBe(attemptedPolls[1].id)
+  })
+
+  it('stops after three namespace collisions without spending another rate attempt', async () => {
+    const rateSpy = vi.spyOn(redis, 'checkPollCreateRateLimit')
+    const createSpy = vi.spyOn(redis, 'createPollAtomically')
+      .mockResolvedValue({ status: 'namespace_conflict' })
+    const { POST } = await import('./route')
+
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Failed to create poll' })
+    expect(rateSpy).toHaveBeenCalledTimes(1)
+    expect(createSpy).toHaveBeenCalledTimes(3)
+    const attemptedPolls = createSpy.mock.calls.map(([poll]) => poll)
+    expect(new Set(attemptedPolls.map((poll) => poll.id)).size).toBe(3)
+    expect(new Set(attemptedPolls.map((poll) => poll.resultsTokenHash)).size).toBe(3)
   })
 
   it('GET returns exactly title/mode/suggestions with no-store', async () => {

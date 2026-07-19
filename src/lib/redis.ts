@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis'
 import { isIP } from 'node:net'
 import { InMemoryRedis, inMemoryRedis } from './inMemoryRedis'
+import type { StoredPoll } from './types'
 
 export const POLL_IDLE_TTL_SECONDS = 60 * 60 * 24 * 30
 export const POLL_ABSOLUTE_TTL_SECONDS = 60 * 60 * 24 * 90
@@ -20,6 +21,10 @@ export interface RedisLike {
 export type RateLimitResult =
   | { allowed: true; remaining: number }
   | { allowed: false; remaining: 0; retryAfterSeconds: number }
+
+export type CreatePollResult =
+  | { status: 'created' }
+  | { status: 'namespace_conflict' }
 
 export type AppendVoteResult =
   | { status: 'appended'; responseId: string; responseCount: number }
@@ -133,6 +138,14 @@ if next == 1 then redis.call('EXPIRE', KEYS[1], window) end
 return {'allowed', limit - next}
 `
 
+export const CREATE_POLL_LUA_SCRIPT = `
+if redis.call('EXISTS', KEYS[1], KEYS[2], KEYS[3]) ~= 0 then
+  return {'namespace_conflict'}
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+return {'created'}
+`
+
 export const APPEND_VOTE_LUA_SCRIPT = `
 local rawPoll = redis.call('GET', KEYS[1])
 if not rawPoll then return {'not_found'} end
@@ -218,6 +231,33 @@ async function consumeRateLimit(key: string, limit: number, windowSeconds: numbe
 
 export function checkPollCreateRateLimit(clientIp: string): Promise<RateLimitResult> {
   return consumeRateLimit(`ratelimit:poll:${clientIp}`, POLL_CREATE_RATE_LIMIT, RATE_LIMIT_WINDOW_SECONDS)
+}
+
+function parseCreatePollResult(raw: unknown): CreatePollResult {
+  if (!Array.isArray(raw)) throw new Error('Redis returned an invalid create-poll result')
+  if (raw[0] === 'created') return { status: 'created' }
+  if (raw[0] === 'namespace_conflict') return { status: 'namespace_conflict' }
+  throw new Error(`Redis returned an unknown create-poll status: ${String(raw[0])}`)
+}
+
+export async function createPollAtomically(poll: StoredPoll): Promise<CreatePollResult> {
+  const keys = [
+    `poll:${poll.id}`,
+    `poll:${poll.id}:responses`,
+    `poll:${poll.id}:submissions`,
+  ]
+  const pollJson = JSON.stringify(poll)
+  const client = getRedis()
+  const raw = client instanceof InMemoryRedis
+    ? await client.createPollAtomically({
+        pollKey: keys[0],
+        responsesKey: keys[1],
+        submissionsKey: keys[2],
+        pollJson,
+        idleTtlSeconds: POLL_IDLE_TTL_SECONDS,
+      })
+    : await client.eval<unknown>(CREATE_POLL_LUA_SCRIPT, keys, [pollJson, POLL_IDLE_TTL_SECONDS])
+  return parseCreatePollResult(raw)
 }
 
 function parseAppendVoteResult(raw: unknown): AppendVoteResult {
