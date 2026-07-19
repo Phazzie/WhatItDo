@@ -282,6 +282,45 @@ test('keyboard form submission exposes create and vote validation errors', async
   await expect(appAlert(page)).toContainText('Choose one response for every possibility')
 })
 
+test('poll creation surfaces the API error message', async ({ page }) => {
+  await page.route('**/api/poll', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'The server rejected this test poll.' }),
+    })
+  })
+
+  await page.goto('/')
+  await page.getByLabel(/Name the dilemma/i).fill('Rejected poll')
+  await page.getByRole('group', { name: /Possible moves/i }).getByRole('textbox').first().fill('Try again')
+  await page.getByRole('button', { name: /Make the poll/i }).click()
+
+  await expect(appAlert(page)).toContainText('The server rejected this test poll.')
+})
+
+test('vote submission surfaces the API error message', async ({ page }) => {
+  const suggestion = 'Preserve the server reason'
+  const links = await createPoll(page, {
+    mode: 'normal',
+    title: 'Rejected ballot',
+    suggestions: [suggestion],
+  })
+  await page.route('**/api/vote', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'The server rejected this test ballot.' }),
+    })
+  })
+
+  await page.goto(links.voteUrl)
+  await choose(page, suggestion, 'Yes')
+  await page.getByRole('button', { name: /Seal my ballot/i }).click()
+
+  await expect(appAlert(page)).toContainText('The server rejected this test ballot.')
+})
+
 for (const terminal of [
   { code: 'POLL_FULL', status: 409, heading: 'This poll is full.' },
   { code: 'POLL_UNAVAILABLE', status: 404, heading: 'This poll is no longer available.' },

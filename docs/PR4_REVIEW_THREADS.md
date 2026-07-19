@@ -5,21 +5,31 @@ Pull request: `#4`
 Baseline head: `02f73ef`
 Baseline on 2026-07-16: 28 unresolved threads (17 current, 11 outdated)
 
-Stack snapshot on 2026-07-19 at pushed head `b2b3ea4`:
+Stack snapshot on 2026-07-19 at pushed head `c12b160`:
 
 - Draft prerequisite PR #5 is `75f432d..02f73ef` with exactly 16 commits and 28 paths.
 - PR #4 is retargeted to `pr4-audit-prerequisites`, starts at giant commit `de8af4a`, and has exact
-  pushed head `b2b3ea4`.
+  pushed head `c12b160`.
 - The complete paginated GraphQL refetch returned 29 unresolved thread IDs: 1 current and 28 outdated.
   The original 28 threads remain preserved and outdated; the new current thread is
   `PRRT_kwDOQoDeUc6SFC8r` at `src/lib/validation.ts:2` for the browser/server boundary split.
 - No effective approval or change-request review exists; the latest bot reviews are comments only.
-- Exact-head CI runs `29689374588` and `29689376387` are green; each Redis 7 job reports 14 passed
-  with zero skipped. Preview deployment `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF` returned the intentional
-  read-only 404 sentinel.
+- Exact-head CI runs `29689940711` and `29689941869` are green; each Redis 7 job reports 14 passed
+  with zero skipped. Preview deployment `dpl_39BdZpasnZGjZw6ibscbDYjYtCP6` returned the intentional
+  read-only 404 sentinel with no redirect.
+- A reply-by-reply proof audit found that the giant rewrite had removed the old direct regressions
+  for threads 5 and 7. The replacement adapter implements both behaviors correctly, but those two
+  assertions must be restored and proven on the next exact head before any thread is resolved.
+- The same audit found that both outside-diff UI error-propagation changes were implemented but not
+  directly asserted. Intercepted create and vote API failures are therefore part of the focused
+  follow-up browser proof before the top-level review disposition is posted.
 - Node 22 final local proof is green: lint, typecheck, build, zero-vulnerability audit, 147 Vitest
   cases passed, the permitted 14 Redis-only cases skipped without `REDIS_URL`, and 17 full-browser
   cases passed. Coverage is 90.95% statements, 85.11% branches, 96.33% functions, and 94.43% lines.
+- The focused thread-proof follow-up passes both direct in-memory regressions, both intercepted-
+  response browser cases, a fresh production build, lint, typecheck, and the full 149-case coverage
+  suite. Coverage remains above every gate at 90.95% statements, 85.33% branches, 96.33% functions,
+  and 94.43% lines; exact-head review and remote proof remain pending.
 
 Update this ledger after each push. A thread moves to `resolved` only after its required evidence is
 green and a concise reply has been posted. The final GraphQL fetch must report zero unresolved.
@@ -30,9 +40,9 @@ green and a concise reply has been posted. The final GraphQL fetch must report z
 | 2 | `PRRT_kwDOQoDeUc6ObWE9` | `package-lock.json:270` | outdated | MIT-0 license metadata; verify and explain | Final lock + dependency license notice | pending | pending |
 | 3 | `PRRT_kwDOQoDeUc6ObWE-` | `package-lock.json:4791` | outdated | BlueOak-1.0.0 dev dependency; verify and explain | Final lock + dependency license notice | pending | pending |
 | 4 | `PRRT_kwDOQoDeUc6ObWFA` | `package-lock.json:5900` | outdated | MIT-0 license metadata; verify and explain | Final lock + dependency license notice | pending | pending |
-| 5 | `PRRT_kwDOQoDeUc6ObWGy` | `src/test/mockRedis.ts:63` | outdated | LRANGE negative stop; already fixed | Focused mock test + full unit suite | pending | pending |
+| 5 | `PRRT_kwDOQoDeUc6ObWGy` | `src/test/mockRedis.ts:63` | outdated | LRANGE negative stop; replacement is fixed | Direct in-memory regression + full unit suite | pending | pending |
 | 6 | `PRRT_kwDOQoDeUc6ObWu0` | `vitest.config.ts` | outdated | ESM `__dirname`; already fixed | Lint/type/test on final head | pending | pending |
-| 7 | `PRRT_kwDOQoDeUc6ObWu8` | `src/test/mockRedis.ts:39` | outdated | SET without EX TTL; already fixed | Focused mock test + Redis contract | pending | pending |
+| 7 | `PRRT_kwDOQoDeUc6ObWu8` | `src/test/mockRedis.ts:39` | outdated | SET without EX clears TTL; replacement is fixed | Direct in-memory regression + Redis contract | pending | pending |
 | 8 | `PRRT_kwDOQoDeUc6ObWu-` | `.github/workflows/ci.yml:27` | outdated | Node version; already fixed and will remain supported | Final CI on Node 22 | pending | pending |
 | 9 | `PRRT_kwDOQoDeUc6ObWvB` | `docs/COMPLETION_PLAN.md` | outdated | Absolute local path; already fixed | Portable final docs | pending | pending |
 | 10 | `PRRT_kwDOQoDeUc6ObWvF` | `package.json:9` | outdated | Node engine; already fixed, README must match | Manifest/README + CI | pending | pending |
@@ -64,11 +74,13 @@ the green workflow run in the PR conversation.
 
 ## Final proof
 
-- Latest remote head: `b2b3ea4`
-- Latest local code head: `b2b3ea4`
-- Exact-head CI: runs `29689374588` and `29689376387` green; 14 Redis tests passed with zero
+- Latest remote head: `c12b160`
+- Latest local code base: `c12b160`; four focused proof cases are restored locally and pass their
+  affected gates, pending a focused commit and exact-head review
+- Exact-head CI: runs `29689940711` and `29689941869` green; 14 Redis tests passed with zero
   skipped in each run
-- Exact-head Preview: `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF`; read-only sentinel returned 404
+- Exact-head Preview: `dpl_39BdZpasnZGjZw6ibscbDYjYtCP6`; read-only sentinel returned 404 with
+  no redirect
 - Thread fetch/date: complete paginated GraphQL refetch on 2026-07-19
 - Unresolved current: 1
 - Unresolved outdated: 28

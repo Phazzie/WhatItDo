@@ -64,14 +64,20 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   closes. The first Redis-repair review caught a healthy-idle socket churn defect; the command-
   scoped replacement and its full local gate are green, and three exact-head lanes cleared
   `b2b3ea4`. A new current client/server import-boundary thread arrived after that push, so its small
-  follow-up must receive the same affected gates and exact-head review before C-08 closes. Its
-  focused tests, lint, typecheck, build, emitted-client scan, coverage, and 17/17 browser run are
-  green; only final exact-head review/remote proof remain.
+  follow-up passed focused tests, lint, typecheck, build, emitted-client scan, coverage, 17/17
+  browser proof, three exact-head reviews, both CI event suites, and exact Preview proof. The final
+  thread-by-thread disposition audit then caught two deleted mock regressions: negative `LRANGE`
+  stop handling and plain `SET` clearing an existing TTL. The replacement in-memory adapter is
+  correct; both direct assertions and both missing browser error-propagation checks are now restored.
+  Their focused tests, production build, lint, typecheck, and 149-case coverage gate pass; repeat
+  exact-head review and remote proof before C-08 closes.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
   evidence-only closeout; record its final exact-head proof in PR #4. Candidate `b2b3ea4` passed
   push run `29689374588`, pull-request run `29689376387`, 14/14 Redis cases in both, and exact
-  Preview `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF`; the newly arrived 29th thread is being repaired before
-  disposition.
+  Preview `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF`. Follow-up `c12b160` passed push run `29689940711`,
+  pull-request run `29689941869`, 14/14 Redis cases in both, and exact Preview
+  `dpl_39BdZpasnZGjZw6ibscbDYjYtCP6`; the four restored proof cases pass locally and still need
+  exact-head review and remote proof before disposition.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, prove PR-A's exact head in CI and
   Preview, leave PR #5 draft, and STOP with default and Production unchanged.
 - [ ] C-11 OWNER GATE: after separately recorded owner authorization, verify an owner-approved
@@ -505,6 +511,11 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [x] Split browser-safe results-token format checks from server-only hashing. Fifty-two focused
   token/validation/results-route tests, lint, typecheck, production build, and 17/17 E2E pass. The
   fresh emitted-client scan contains none of the three server-crypto markers found before the split.
+- [x] Audit every proposed thread reply against its required evidence. This found that the giant
+  rewrite had deleted the direct negative-`LRANGE` and plain-`SET` TTL regressions even though the
+  replacement adapter behavior was correct. It also found that the implemented create/vote API-
+  error propagation from CodeRabbit's outside-diff review lacked direct browser assertions. All
+  four focused checks are restored and pass locally before thread or top-level disposition.
 - [ ] Obtain final exact-head history, application/security, and CI reviews.
 
 ### D. PR #4 proof and cleanup
