@@ -12,7 +12,7 @@ link for results. No account is required.
 - Accepts names, per-option notes, and an optional counterproposal.
 - Shows exact counts, proportional percentages, ties, and individual ballots without fake rankings.
 - Keeps up to ten recent private links in the creator's browser, with a clear-history control.
-- Optionally sends a metadata-only, best-effort response notification through Resend.
+- Optionally sends an escaped, link-free ballot notification through Resend on a best-effort basis.
 
 The interface is an original midnight-zine collage: tactile paper, loud ink, playful copy, visible
 focus, reduced-motion support, mobile-safe controls, and no essential information in the artwork.
@@ -71,10 +71,12 @@ TRUST_PROXY=1
 ```
 
 `POLL_CREATOR_EMAIL` is one deployment-owned notification address; the app does not collect or store
-creator email addresses per poll. Alerts deliberately omit the poll title, voter name, choices,
-notes, counterproposal, and private results link. If Resend or the address is absent, voting still
-succeeds and the UI says email is not configured. Provider failures likewise never undo a recorded
-vote or claim that mail was sent.
+creator email addresses per poll. Alerts include the normalized poll title, voter name, choices,
+notes, and counterproposal, with every user-controlled HTML value escaped. They never include the
+private results link, results credential, notification address, or internal poll, response, or
+submission IDs. The provider wait is capped at five seconds. If Resend or the address is absent,
+voting still succeeds and the UI says email is not configured; provider failures likewise never undo
+a recorded vote or claim that mail was sent.
 
 Do not set `E2E_TEST`, `E2E_BASE_URL`, or `USE_IN_MEMORY_REDIS` in a deployed environment. In-memory
 storage is available only when `NODE_ENV=test`, or when the dedicated E2E marker uses a loopback URL
@@ -141,7 +143,9 @@ Returns exactly:
 }
 ```
 
-The UUIDv4 submission ID stays stable across a browser retry. The response is
+The UUIDv4 submission ID stays stable across a browser retry. Repeating that ID with the same
+normalized ballot is a successful duplicate; reusing it with a changed ballot returns HTTP 409 and
+does not mutate storage or send another email. The response is
 `{ "success": true, "notification": "sent" | "not_configured" | "failed" | "duplicate" }`.
 A duplicate means only that the vote was already recorded; it makes no claim about an earlier email.
 
@@ -165,16 +169,18 @@ using trusted client identity; unique votes are limited to 20/hour/IP and 100/ho
 ```text
 poll:{id}                    stored poll metadata and results-token hash
 poll:{id}:responses          append-only, bounded response list
-poll:{id}:submissions        submission UUID -> response ID idempotency map
+poll:{id}:submissions        submission UUID -> response ID + normalized-ballot digest receipt
 ratelimit:poll:{ip}          poll-creation fixed window
 ratelimit:vote:ip:{ip}       vote fixed window by client
 ratelimit:vote:poll:{id}     vote fixed window by poll
 ```
 
-A single Redis Lua operation checks poll existence and expiry, resolves duplicates before capacity
-or rate limits, enforces both vote buckets and the lifetime cap, appends the response, records the
-submission ID, and refreshes all poll-owned TTLs. Missing durable Redis configuration fails clearly
-on a request rather than during a Next.js build.
+A single Redis Lua operation checks poll existence and expiry, resolves matching digest receipts
+before capacity or rate limits, rejects changed or legacy receipts before mutation, enforces both
+vote buckets and the lifetime cap, appends the response, records the submission receipt, and
+refreshes all poll-owned TTLs. Resend receives that same submission UUID as its provider idempotency
+key. Missing durable Redis configuration fails clearly on a request rather than during a Next.js
+build.
 
 ## Project map
 
@@ -191,5 +197,5 @@ e2e/poll-flows.spec.ts          privacy, product, mobile, and axe flows
 ```
 
 Repository-specific agent guardrails are in `AGENTS.md`; the active completion record is
-`docs/FINISH_EXEC_PLAN.md`. Transitive dependency license notes are documented in
+`docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`. Transitive dependency license notes are documented in
 `docs/THIRD_PARTY_LICENSES.md`.

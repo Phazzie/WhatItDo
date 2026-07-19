@@ -1,9 +1,10 @@
 import * as storageModule from '@/lib/redis'
-import { sanitizeHeaderValue } from '@/lib/escapeHtml'
+import { escapeHtml, sanitizeHeaderValue } from '@/lib/escapeHtml'
 import { readJsonBody } from '@/lib/requestBody'
 import { createSubmissionDigest } from '@/lib/submissionDigest'
 import type { NotificationStatus, StoredPoll, StoredPollResponse } from '@/lib/types'
 import { isValidPollId, parseVoteInput } from '@/lib/validation'
+import { withTimeout } from '@/lib/withTimeout'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
@@ -32,6 +33,7 @@ type StorageContract = {
   }): Promise<AppendResult>
 }
 const storage = storageModule as unknown as StorageContract
+const NOTIFICATION_TIMEOUT_MS = 5_000
 
 let resend: Resend | null = null
 function getResend(): Resend | null {
@@ -49,7 +51,7 @@ function errorResponse(error: string, status: number, retryAfter?: number) {
 
 async function notifyCreator(
   poll: StoredPoll,
-  _response: StoredPollResponse,
+  response: StoredPollResponse,
   submissionId: string
 ): Promise<Exclude<NotificationStatus, 'duplicate'>> {
   const to = process.env.POLL_CREATOR_EMAIL?.trim()
@@ -57,15 +59,32 @@ async function notifyCreator(
   if (!to || !client) return 'not_configured'
 
   try {
-    const result = await client.emails.send(
+    const voteDetails = response.votes.map((vote) => `
+      <li>
+        <strong>${escapeHtml(vote.text)}</strong>: ${escapeHtml(vote.vote)}
+        ${vote.comment ? `<br><span>Note: ${escapeHtml(vote.comment)}</span>` : ''}
+      </li>
+    `).join('')
+    const counterProposal = response.counterProposal
+      ? `<p><strong>Counterproposal:</strong> ${escapeHtml(response.counterProposal)}</p>`
+      : ''
+    const result = await withTimeout(client.emails.send(
       {
         from: sanitizeHeaderValue(process.env.EMAIL_FROM || 'What It Do <notifications@resend.dev>'),
         to,
         subject: 'A What It Do poll received a response',
-        html: '<div><h1>New response received</h1><p>A response was recorded successfully.</p><p>Open the private results link you saved when creating the poll to see its details.</p></div>',
+        html: `
+          <div>
+            <h1>New response received</h1>
+            <p><strong>Poll:</strong> ${escapeHtml(poll.title)}</p>
+            <p><strong>Voter:</strong> ${escapeHtml(response.voterName)}</p>
+            <ul>${voteDetails}</ul>
+            ${counterProposal}
+          </div>
+        `,
       },
-      { idempotencyKey: `vote/${poll.id}/${submissionId}` }
-    )
+      { idempotencyKey: submissionId }
+    ), NOTIFICATION_TIMEOUT_MS)
     if (result.error) {
       console.error('[whatitdo] vote_notification_failed')
       return 'failed'

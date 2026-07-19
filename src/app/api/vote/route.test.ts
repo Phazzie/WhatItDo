@@ -50,6 +50,7 @@ describe('POST /api/vote', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
@@ -136,10 +137,14 @@ describe('POST /api/vote', () => {
     expect(sendMock).not.toHaveBeenCalled()
   })
 
-  it('keeps notification email free of poll and voter details and sets provider idempotency', async () => {
+  it('sends escaped ballot details without private credentials or internal IDs', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test-key')
     vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
-    await seed({ title: 'Dinner\r\nBcc: bad@example.com <script>' })
+    vi.stubEnv('EMAIL_FROM', 'What It Do\r\nBcc: injected@example.com <notifications@example.com>')
+    await seed({
+      title: 'Dinner\r\nBcc: bad@example.com <script>',
+      resultsTokenHash: 'private-results-hash-sentinel',
+    })
     const { POST } = await import('./route')
     const response = await POST(request({
       voterName: 'Al\r\nBcc: bad@example.com <img src=x>',
@@ -148,14 +153,55 @@ describe('POST /api/vote', () => {
     }))
     expect(response.status).toBe(200)
     const [message, options] = sendMock.mock.calls[0]
-    const serialized = JSON.stringify(message)
-    expect(serialized).not.toContain('bad@example.com')
-    expect(serialized).not.toContain('Dinner')
-    expect(serialized).not.toContain('danger')
-    expect(serialized).not.toContain('Pizza')
-    expect(serialized).not.toContain('svg')
-    expect(serialized).not.toContain('Bcc')
-    expect(options).toEqual({ idempotencyKey: `vote/${pollId}/${submissionId}` })
+    const html = String(message.html)
+    const stored = JSON.parse((await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1))[0])
+
+    expect(message).toMatchObject({
+      from: 'What It Do Bcc: injected@example.com <notifications@example.com>',
+      to: 'owner@example.com',
+      subject: 'A What It Do poll received a response',
+    })
+    expect(String(message.from)).not.toMatch(/[\r\n]/)
+    expect(String(message.subject)).not.toMatch(/[\r\n]/)
+    expect(html).toContain('Dinner\r\nBcc: bad@example.com &lt;script&gt;')
+    expect(html).toContain('Al\r\nBcc: bad@example.com &lt;img src=x&gt;')
+    expect(html).toContain('<strong>Pizza</strong>: yes')
+    expect(html).toContain('Note: &lt;svg onload=x&gt;')
+    expect(html).toContain('Counterproposal:</strong> &lt;b&gt;danger&lt;/b&gt;')
+    expect(html).not.toMatch(/<(?:script|img|svg|b)(?:\s|>)/i)
+    expect(html).not.toContain('owner@example.com')
+    expect(html).not.toContain(pollId)
+    expect(html).not.toContain(submissionId)
+    expect(html).not.toContain(stored.id)
+    expect(html).not.toContain('private-results-hash-sentinel')
+    expect(options).toEqual({ idempotencyKey: submissionId })
+  })
+
+  it('bounds the provider wait at five seconds without undoing the recorded vote', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    let markStarted: () => void = () => undefined
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    sendMock.mockImplementation(() => {
+      markStarted()
+      return new Promise(() => undefined)
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { POST } = await import('./route')
+
+    const pending = POST(request())
+    await started
+    await vi.advanceTimersByTimeAsync(5_000)
+    const response = await pending
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ success: true, notification: 'failed' })
+    expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toHaveLength(1)
+    expect(sendMock).toHaveBeenCalledTimes(1)
+    expect(errorSpy.mock.calls).toEqual([['[whatitdo] vote_notification_failed']])
   })
 
   it('reports a resolved provider error as failed, never sent', async () => {
