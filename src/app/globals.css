@@ -279,5 +279,10 @@ input:focus, textarea:focus { border-color: var(--pink); box-shadow: 4px 4px 0 v
 
 @media (forced-colors: active) {
   .paper-card, .primary-button, .secondary-button, .vote-choice, input, textarea { border: 2px solid CanvasText; }
+  :is(a, button, input, textarea):focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+    box-shadow: none;
+  }
   .private-link { filter: none; }
 }

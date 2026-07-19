@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 type PollMode = 'normal' | 'dubious'
 
@@ -89,6 +89,28 @@ async function assertNoHorizontalOverflow(page: Page) {
     scrollWidth: document.documentElement.scrollWidth,
   }))
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth)
+}
+
+async function tabToVisibleFocusRing(page: Page, locator: Locator) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.keyboard.press('Tab')
+    if (await locator.evaluate((element) => element === document.activeElement)) {
+      await expect(locator).toBeFocused()
+      const outline = await locator.evaluate((element) => {
+        const style = window.getComputedStyle(element)
+        return {
+          style: style.outlineStyle,
+          width: Number.parseFloat(style.outlineWidth),
+          offset: Number.parseFloat(style.outlineOffset),
+        }
+      })
+      expect(outline.style).toBe('solid')
+      expect(outline.width).toBeGreaterThanOrEqual(3)
+      expect(outline.offset).toBeGreaterThanOrEqual(2)
+      return
+    }
+  }
+  throw new Error(`Keyboard focus did not reach ${locator}`)
 }
 
 test('Classic: creates separate links, records a ballot, and unlocks owner results', async ({ page }) => {
@@ -257,6 +279,30 @@ test('keyboard form submission exposes create and vote validation errors', async
   await page.getByRole('button', { name: /Choose 1 more/i }).focus()
   await page.keyboard.press('Enter')
   await expect(appAlert(page)).toContainText('Choose one response for every possibility')
+})
+
+test('forced-colors focus stays visible on links, buttons, inputs, and textareas', async ({ page }) => {
+  const suggestion = 'Keep the outline'
+  const links = await createPoll(page, {
+    mode: 'normal',
+    title: 'Visible focus proof',
+    suggestions: [suggestion],
+  })
+
+  await page.emulateMedia({ forcedColors: 'active' })
+  await page.goto(links.voteUrl)
+  await expect(page.getByRole('heading', { name: 'Visible focus proof' })).toBeVisible()
+  expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true)
+
+  const controls = [
+    page.getByRole('link', { name: /What It Do/i }),
+    page.getByLabel(/Your alias/i),
+    page.getByRole('group', { name: suggestion, exact: true })
+      .getByRole('button', { name: 'Yes', exact: true }),
+    page.getByLabel(/Margin note/i),
+    page.getByLabel(/Plot twist/i),
+  ]
+  for (const control of controls) await tabToVisibleFocusRing(page, control)
 })
 
 for (const [notification, copy] of [
