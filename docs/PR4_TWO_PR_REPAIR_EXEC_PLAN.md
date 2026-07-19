@@ -62,9 +62,16 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   its authenticated Preview sentinel exposed the dead deployed Redis resource. Recover the durable
   provider path, rerun the complete local gate, and repeat literal final-SHA review before C-08
   closes. The first Redis-repair review caught a healthy-idle socket churn defect; the command-
-  scoped replacement and its full local gate are green, with final exact-head re-review still due.
+  scoped replacement and its full local gate are green, and three exact-head lanes cleared
+  `b2b3ea4`. A new current client/server import-boundary thread arrived after that push, so its small
+  follow-up must receive the same affected gates and exact-head review before C-08 closes. Its
+  focused tests, lint, typecheck, build, emitted-client scan, coverage, and 17/17 browser run are
+  green; only final exact-head review/remote proof remain.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
-  evidence-only closeout; record its final exact-head proof in PR #4.
+  evidence-only closeout; record its final exact-head proof in PR #4. Candidate `b2b3ea4` passed
+  push run `29689374588`, pull-request run `29689376387`, 14/14 Redis cases in both, and exact
+  Preview `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF`; the newly arrived 29th thread is being repaired before
+  disposition.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, prove PR-A's exact head in CI and
   Preview, leave PR #5 draft, and STOP with default and Production unchanged.
 - [ ] C-11 OWNER GATE: after separately recorded owner authorization, verify an owner-approved
@@ -134,6 +141,12 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   single command. A five-second value would churn healthy idle connections and briefly reject warm-
   process traffic. The repair now leaves healthy idle sockets alone and applies a five-second
   command-scoped deadline that discards only the timed-out client without retrying the mutation.
+- The first pushed repaired candidate caused GitHub to add a 29th, current review thread: shared
+  `validation.ts` imported `resultsToken.ts`, whose hashing helpers import `node:crypto`, while the
+  ballot client imports validation limits. The current build tree-shook the server code and passed,
+  but the emitted ballot chunk contained `crypto-browserify`. Pure token-format validation is now
+  split from server-only hashing; a fresh build contains no `crypto-browserify`, `createHash`, or
+  `timingSafeEqual` marker in `.next/static/chunks` or the vote client manifest.
 
 ## Decision Log
 
@@ -481,7 +494,7 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [x] Provision/connect only the already-authorized official Redis free plan; its direct read passed
   and `REDIS_URL` is bound to Preview only without displaying its value.
 - [x] Rerun the complete local gate after C-08a. Under Node 22, lint, typecheck, build, and audit
-  passed; audit found zero vulnerabilities; Vitest reported 136 passed and the permitted 14 local
+  passed; audit found zero vulnerabilities; Vitest reported 147 passed and the permitted 14 local
   Redis skips; the explicit integration run reported the same 14 skips without `REDIS_URL`;
   Playwright reported 17/17 passed. Coverage passed at 90.95% statements, 85.11% branches, 96.33%
   functions, and 94.43% lines.
@@ -489,6 +502,9 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
   empty Preview database with its credential injected transiently and not printed: one selected test
   passed and the 13 unrelated cases were filtered. Require all future exact-head Redis CI jobs to
   run the complete file and report 14 passed with zero skips.
+- [x] Split browser-safe results-token format checks from server-only hashing. Fifty-two focused
+  token/validation/results-route tests, lint, typecheck, production build, and 17/17 E2E pass. The
+  fresh emitted-client scan contains none of the three server-crypto markers found before the split.
 - [ ] Obtain final exact-head history, application/security, and CI reviews.
 
 ### D. PR #4 proof and cleanup
@@ -497,7 +513,8 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [ ] Require successful `push` and `pull_request` runs on the exact code SHA: build, Redis, E2E.
 - [ ] Require Vercel Preview `READY`, metadata SHA equality, and an authenticated, no-redirect,
   read-only 404 sentinel.
-- [ ] Reply to and resolve all 28 baseline review threads; refetch and require zero unresolved.
+- [ ] Reply to and resolve all 29 review threads (28 baseline plus the new current boundary thread);
+  refetch and require zero unresolved.
 - [ ] Require no current `CHANGES_REQUESTED` review. Do not invent an approval requirement.
 - [ ] Record the green run IDs, Preview ID, replies, and zero-thread result in the plan/ledger; commit
   only those evidence files and push once.
@@ -755,7 +772,7 @@ first; only then resolve. Do not automate a generic response across materially d
           '.data.resolveReviewThread.thread.id == $id and
            .data.resolveReviewThread.thread.isResolved == true'
 
-After all 28 dispositions, require zero unresolved and no latest per-reviewer change request.
+After all 29 dispositions, require zero unresolved and no latest per-reviewer change request.
 
     WHATITDO_FINAL_THREAD_PAGES=$(gh api graphql --paginate --slurp \
       -f owner=Phazzie -f repo=WhatItDo -F number="$WHATITDO_PROOF_PR" \
@@ -1162,6 +1179,8 @@ the expected clean result; inspect and redact any user data before recording a r
 Focused commands, selected by changed packet:
 
     npx vitest run src/app/api/poll/route.test.ts
+    npx vitest run src/lib/resultsTokenFormat.test.ts src/lib/resultsToken.test.ts \
+      src/lib/validation.test.ts src/app/api/results/route.test.ts
     npx vitest run src/lib/redis.test.ts src/lib/redis.upstash.test.ts src/lib/redis.protocol.test.ts
     npx vitest run src/lib/submissionDigest.test.ts src/app/api/vote/route.test.ts
     npx vitest run src/lib/withTimeout.test.ts src/lib/escapeHtml.test.ts src/app/api/vote/route.test.ts

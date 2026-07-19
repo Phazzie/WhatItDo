@@ -1,16 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { nanoid } from 'nanoid'
+import { RESULTS_TOKEN_LENGTH } from './resultsTokenFormat'
 
-export const RESULTS_TOKEN_LENGTH = 24
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{24}$/
+export { RESULTS_TOKEN_LENGTH, isValidResultsToken } from './resultsTokenFormat'
 const HASH_PATTERN = /^[a-f0-9]{64}$/
 
 export function createResultsToken(): string {
   return nanoid(RESULTS_TOKEN_LENGTH)
-}
-
-export function isValidResultsToken(token: unknown): token is string {
-  return typeof token === 'string' && TOKEN_PATTERN.test(token)
 }
 
 export function hashResultsToken(token: string): string {

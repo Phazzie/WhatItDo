@@ -1,5 +1,5 @@
 import type { PollMode, PollVote, StoredPoll } from './types'
-import { isValidResultsToken } from './resultsToken'
+import { isValidResultsToken } from './resultsTokenFormat'
 
 export const VOTER_NAME_MAX = 50
 export const COMMENT_MAX = 200

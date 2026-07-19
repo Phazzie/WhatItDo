@@ -46,7 +46,7 @@ This document records the remaining finish scope.
 | ID | Finding | Required outcome |
 |---|---|---|
 | F18 | README still claims Node 18, calls live response-list storage future work, says `EMAIL_FROM` is not wired, and mixes Adventurous/BOLD with Dubious/YOLO. | Rewrite setup, architecture, terminology, storage, notification, privacy, scripts, and environment documentation against the final code. |
-| F19 | PR #4 has 28 unresolved review threads: 19 already-fixed/obsolete, three evidence-backed false positives, four license-identification items, and current docs/config findings. | Fix remaining code/docs, record dependency license metadata, reply with evidence, and resolve all 28 threads. |
+| F19 | PR #4 began with 28 unresolved threads and gained one current client/server import-boundary thread after the repaired candidate push. | Fix remaining code/docs, record dependency license metadata, reply with evidence, and resolve all 29 threads. |
 | F20 | GitHub Actions use mutable `@v4` tags despite a review requesting immutable pins. | Pin every third-party action to a full commit SHA with a version comment. Add Redis integration and accessibility/mobile gates. |
 | F21 | The earlier Vercel failure masked a dead Upstash resource: its encrypted variables remain, but the hostname no longer resolves and the linked resource is uninstalled. | PR #4 and PR #5 may complete empty Preview proof with the Preview-only free resource. Do not merge PR #5 to default or promote Production until the owner authorizes persistent storage and the exact Production deployment is verified against it. |
 
@@ -76,7 +76,7 @@ Vercel evidence still required by `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`.
 | F16 | Implemented / local verified | The original project-owned background and midnight-scrapbook UI are present with no essential information in the artwork. |
 | F17 | Implemented / local verified | Designed global error and not-found pages are present; the not-found axe flow passes. |
 | F18 | Implemented / local verified | README now matches Node/tooling, Redis receipts, retention, privacy, terminology, detailed link-free notification behavior, and the active plan. |
-| F19 | Remote evidence pending | All 28 original threads survived retargeting and remain deliberately unresolved until the exact candidate CI/Preview proof is green; each will receive an evidence-specific reply before resolution. |
+| F19 | Remote evidence pending | All 28 original threads survived retargeting; the new 29th boundary finding is repaired locally with emitted-client proof. All 29 remain deliberately unresolved until the new exact-head CI/Preview proof is green; each will receive an evidence-specific reply before resolution. |
 | F20 | Implemented / remote evidence pending | Third-party actions are immutable-SHA pinned; build, Redis 7, and full browser jobs each have a hard ten-minute ceiling; both exact-head event suites must still pass with Redis reporting 14 passed and zero skipped. |
 | F21 | Preview evidence pending / Production owner-blocked | The dead Upstash incident is recorded, and the standard-Redis repair permits empty Preview verification for PR #4 and PR #5. No default merge or Production promotion is authorized until the owner selects persistent storage and its exact Production deployment passes the guarded sentinel and release proof. |
 
