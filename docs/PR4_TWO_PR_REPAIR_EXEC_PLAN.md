@@ -55,29 +55,32 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   time-bounded as `bc09e29`; 16 focused route/timeout cases, typecheck, and focused lint passed.
 - [x] (2026-07-19) C-07 Restored forced-colors keyboard focus as `3b014dc`; typecheck, focused lint,
   and the two-case forced-colors/ambiguous-retry production-browser proof passed.
-- [ ] C-08 Run the integrated local gate and exact-head adversarial reviews. The first complete local
-  gate was green. Three hostile lanes found no blocker in application/history, two high release-
-  runbook gaps, and ten useful medium findings; app follow-up is `2164293`, CI job bounds are
-  `5f0bf28`. The post-review full local gate is green. Exact-head CI was also green at `222fc6d`, but
-  its authenticated Preview sentinel exposed the dead deployed Redis resource. Recover the durable
-  provider path, rerun the complete local gate, and repeat literal final-SHA review before C-08
-  closes. The first Redis-repair review caught a healthy-idle socket churn defect; the command-
-  scoped replacement and its full local gate are green, and three exact-head lanes cleared
-  `b2b3ea4`. A new current client/server import-boundary thread arrived after that push, so its small
+- [x] (2026-07-19) C-08 Ran the integrated local gate and exact-head adversarial reviews. The first
+  complete local gate was green. Three hostile lanes found no blocker in application/history, two
+  high release-runbook gaps, and ten useful medium findings; app follow-up is `2164293`, CI job
+  bounds are `5f0bf28`. The post-review full local gate is green. Exact-head CI was also green at
+  `222fc6d`, but its authenticated Preview sentinel exposed the dead deployed Redis resource. That required the
+  standard Redis adapter and Preview provider path, another complete local gate, and literal final-
+  SHA review before C-08 could close. The first Redis-repair review caught a healthy-idle socket
+  churn defect; the command-scoped replacement and its full local gate are green, and three exact-
+  head lanes cleared `b2b3ea4`. A new current client/server import-boundary thread arrived after that push, so its small
   follow-up passed focused tests, lint, typecheck, build, emitted-client scan, coverage, 17/17
   browser proof, three exact-head reviews, both CI event suites, and exact Preview proof. The final
   thread-by-thread disposition audit then caught two deleted mock regressions: negative `LRANGE`
   stop handling and plain `SET` clearing an existing TTL. The replacement in-memory adapter is
-  correct; both direct assertions and both missing browser error-propagation checks are now restored.
-  Their focused tests, production build, lint, typecheck, and 149-case coverage gate pass; repeat
-  exact-head review and remote proof before C-08 closes.
+  correct; both direct assertions and both missing browser error-propagation checks were restored.
+  Their focused tests, production build, lint, typecheck, 149-case coverage gate, three exact-head
+  reviews, both CI event suites, and exact Preview proof all pass at `2da1d00`.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
   evidence-only closeout; record its final exact-head proof in PR #4. Candidate `b2b3ea4` passed
   push run `29689374588`, pull-request run `29689376387`, 14/14 Redis cases in both, and exact
   Preview `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF`. Follow-up `c12b160` passed push run `29689940711`,
   pull-request run `29689941869`, 14/14 Redis cases in both, and exact Preview
-  `dpl_39BdZpasnZGjZw6ibscbDYjYtCP6`; the four restored proof cases pass locally and still need
-  exact-head review and remote proof before disposition.
+  `dpl_39BdZpasnZGjZw6ibscbDYjYtCP6`. Final code head `2da1d00` passed push run `29690493749`, pull-
+  request run `29690494814`, 14/14 Redis and 19/19 browser cases in both, and exact Preview
+  `dpl_DiwQyw7KexX5mT9kxA25gfXCACgk`. All 29 threads have evidence replies and are resolved; the
+  GraphQL refetch reports zero unresolved and no change-request review. Record and prove the
+  evidence-only closeout before C-09 closes.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, prove PR-A's exact head in CI and
   Preview, leave PR #5 draft, and STOP with default and Production unchanged.
 - [ ] C-11 OWNER GATE: after separately recorded owner authorization, verify an owner-approved
@@ -153,6 +156,10 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   but the emitted ballot chunk contained `crypto-browserify`. Pure token-format validation is now
   split from server-only hashing; a fresh build contains no `crypto-browserify`, `createHash`, or
   `timingSafeEqual` marker in `.next/static/chunks` or the vote client manifest.
+- The reply-by-reply disposition audit found two fixes whose direct regressions had disappeared when
+  the giant rewrite replaced the original mock, plus two outside-diff UI fixes that lacked direct
+  browser assertions. Green aggregate gates did not reveal that evidence loss. Restoring all four
+  cases before resolution raised the final unit count to 149 and browser count to 19.
 
 ## Decision Log
 
@@ -516,17 +523,20 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
   replacement adapter behavior was correct. It also found that the implemented create/vote API-
   error propagation from CodeRabbit's outside-diff review lacked direct browser assertions. All
   four focused checks are restored and pass locally before thread or top-level disposition.
-- [ ] Obtain final exact-head history, application/security, and CI reviews.
+- [x] Obtain final exact-head history, application/security, and CI reviews. Three lanes explicitly
+  cleared `2da1d00` after its 149-case coverage and focused browser proof.
 
 ### D. PR #4 proof and cleanup
 
-- [ ] Update pre-push plan/ledger state, then push the code candidate once.
-- [ ] Require successful `push` and `pull_request` runs on the exact code SHA: build, Redis, E2E.
-- [ ] Require Vercel Preview `READY`, metadata SHA equality, and an authenticated, no-redirect,
+- [x] Updated pre-push plan/ledger state and pushed final code head `2da1d00` with a guarded parent.
+- [x] Required successful `push` and `pull_request` runs on the exact code SHA: build, 14/14 Redis,
+  and 19/19 E2E passed in runs `29690493749` and `29690494814`.
+- [x] Required Vercel Preview `READY`, metadata SHA equality, and an authenticated, no-redirect,
   read-only 404 sentinel.
-- [ ] Reply to and resolve all 29 review threads (28 baseline plus the new current boundary thread);
-  refetch and require zero unresolved.
-- [ ] Require no current `CHANGES_REQUESTED` review. Do not invent an approval requirement.
+- [x] Replied to and resolved all 29 review threads (28 baseline plus the boundary thread); the full
+  refetch reports zero unresolved.
+- [x] Required no current `CHANGES_REQUESTED` review. The review decision is empty and all submitted
+  reviews are comments; no approval requirement was invented.
 - [ ] Record the green run IDs, Preview ID, replies, and zero-thread result in the plan/ledger; commit
   only those evidence files and push once.
 - [ ] Require both CI event suites, no current change request, zero unresolved threads, deployment

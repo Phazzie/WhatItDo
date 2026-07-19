@@ -52,23 +52,25 @@ This document records the remaining finish scope.
 
 ## Candidate disposition ledger
 
-Updated 2026-07-19 for the repaired PR #4 candidate. `Implemented / local verified` means the final
-code and its local proof are present; it does not substitute for the exact-head GitHub, Redis 7, or
-Vercel evidence still required by `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`.
+Updated 2026-07-19 for the repaired PR #4 candidate. PR #4 exact head `2da1d00` passed both GitHub
+event suites, Redis 7, full browser coverage, and its authenticated Preview sentinel. The status
+`Implemented / local verified` below still identifies findings whose most useful evidence is a
+focused local test; the integrated remote gates are recorded in
+`docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`.
 
 | ID | Status | Disposition and candidate evidence |
 |---|---|---|
 | F1 | Implemented / local verified | Independent fragment-only results credentials, exact public DTOs, private POST results reads, and privacy route/browser tests are present. |
 | F2 | Implemented / local verified | Next 16.2.10/React 19.2.7 toolchain is locked; the candidate build passes and `npm audit --audit-level=high` reports zero vulnerabilities. |
 | F3 | Implemented / local verified | Tokenless legacy reads and votes return 410 without response mutation or notification; legacy and submit-time unavailable states close the ballot instead of inviting retries. |
-| F4 | Implemented / full CI Redis proof pending | Vote append, deduplication, capacity/rate checks, and TTL refresh use one Lua boundary. The new adapter-mediated case passed against the empty Preview Redis resource; exact-head CI must run all 14 Redis 7 cases non-skipping. |
+| F4 | Implemented / exact-head Redis verified | Vote append, deduplication, capacity/rate checks, and TTL refresh use one Lua boundary. Both exact-head event suites ran all 14 Redis 7 cases with zero skips. |
 | F5 | Implemented / local verified | Stable client receipts plus digest-bound submission IDs reject changed retries, preserve normalization-equivalent duplicates, and use the exact UUID as Resend's idempotency key. |
 | F6 | Implemented / local verified | The API distinguishes sent, not configured, failed, and duplicate outcomes; a missing key, destination, or verified sender is not configured, while resolved errors and the five-second provider timeout never undo a recorded vote or claim delivery. |
 | F7 | Implemented / local verified | Results retain stale data, expose retry/manual refresh, and clear recoverable errors; the transient-refresh browser case passes. |
 | F8 | Implemented / local verified | Pure count/tie helpers, proportional bars, and neutral ballot numbering replace fake winners, minimum widths, and medals; unit/browser results pass. |
-| F9 | Implemented / exact-head CI pending | Redis/Resend initialize lazily; production owns the test-gated adapter; non-Vercel production and unsafe E2E configurations fail closed. A standard `REDIS_URL` protocol adapter now takes precedence over stale Upstash settings and has local lifecycle/mapping proof. The adapter workflow also passed against real Preview Redis; exact-head CI must run the complete 14-case file non-skipping. The non-persistent free resource is Preview-only. |
+| F9 | Implemented / exact-head verified | Redis/Resend initialize lazily; production owns the test-gated adapter; non-Vercel production and unsafe E2E configurations fail closed. A standard `REDIS_URL` protocol adapter takes precedence over stale Upstash settings. Both exact-head CI suites ran the complete 14-case Redis file, and the exact Preview sentinel passed. The non-persistent free resource remains Preview-only. |
 | F10 | Implemented / local verified | The 16 KiB JSON reader, exact identifiers, unknown-input validation, normalization, and stable status mapping have route and validation coverage. |
-| F11 | Implemented / CI Redis proof pending | Trusted identity resolution and atomic IP/poll/capacity buckets are always enforced in production; reaching 250 returns a stable terminal code that closes the ballot; unit coverage passes and Redis 7 CI remains mandatory. |
+| F11 | Implemented / exact-head Redis verified | Trusted identity resolution and atomic IP/poll/capacity buckets are always enforced in production; reaching 250 returns a stable terminal code that closes the ballot; both exact-head Redis 7 jobs passed all 14 cases without skips. |
 | F12 | Implemented / local verified | Raw results tokens remain in URL fragments and POST bodies only; stored hashes, no-store/no-referrer/noindex headers, disabled prefetch, and link-free email are covered. |
 | F13 | Implemented / local verified | Both links remain visible after creation; at most ten unexpired private links are stored locally with clear-history and storage-failure recovery. |
 | F14 | Implemented / local verified | Mode buttons expose pressed/group semantics, each repeated note control has a suggestion-specific accessible name, collection labeling is accurate, and blocking errors are live; keyboard and axe flows pass. |
@@ -76,9 +78,9 @@ Vercel evidence still required by `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`.
 | F16 | Implemented / local verified | The original project-owned background and midnight-scrapbook UI are present with no essential information in the artwork. |
 | F17 | Implemented / local verified | Designed global error and not-found pages are present; the not-found axe flow passes. |
 | F18 | Implemented / local verified | README now matches Node/tooling, Redis receipts, retention, privacy, terminology, detailed link-free notification behavior, and the active plan. |
-| F19 | Remote evidence pending | All 28 original threads survived retargeting; the new 29th boundary finding is repaired locally with emitted-client proof. All 29 remain deliberately unresolved until the new exact-head CI/Preview proof is green; each will receive an evidence-specific reply before resolution. |
-| F20 | Implemented / remote evidence pending | Third-party actions are immutable-SHA pinned; build, Redis 7, and full browser jobs each have a hard ten-minute ceiling; both exact-head event suites must still pass with Redis reporting 14 passed and zero skipped. |
-| F21 | Preview evidence pending / Production owner-blocked | The dead Upstash incident is recorded, and the standard-Redis repair permits empty Preview verification for PR #4 and PR #5. No default merge or Production promotion is authorized until the owner selects persistent storage and its exact Production deployment passes the guarded sentinel and release proof. |
+| F19 | Complete on PR #4 code head | All 29 threads received distinct evidence-linked replies and are resolved. The complete GraphQL refetch reports zero unresolved and no `CHANGES_REQUESTED` review. |
+| F20 | Implemented / exact-head verified | Third-party actions are immutable-SHA pinned; build, Redis 7, and full browser jobs each have a hard ten-minute ceiling. Both exact-head event suites passed; Redis reported 14/14 with zero skips and E2E reported 19/19. |
+| F21 | Preview verified / Production owner-blocked | The dead Upstash incident is recorded. Exact Preview `dpl_DiwQyw7KexX5mT9kxA25gfXCACgk` passed the authenticated 404 sentinel using Preview-only Redis. No default merge or Production promotion is authorized until the owner selects persistent storage and its exact Production deployment passes the guarded release proof. |
 
 ## Explicit deferrals
 
