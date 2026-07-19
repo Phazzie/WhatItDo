@@ -60,7 +60,9 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   runbook gaps, and ten useful medium findings; app follow-up is `2164293`, CI job bounds are
   `5f0bf28`. The post-review full local gate is green. Exact-head CI was also green at `222fc6d`, but
   its authenticated Preview sentinel exposed the dead deployed Redis resource. Recover the durable
-  provider path, rerun the complete local gate, and repeat literal final-SHA review before C-08 closes.
+  provider path, rerun the complete local gate, and repeat literal final-SHA review before C-08
+  closes. The first Redis-repair review caught a healthy-idle socket churn defect; the command-
+  scoped replacement and its full local gate are green, with final exact-head re-review still due.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
   evidence-only closeout; record its final exact-head proof in PR #4.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, prove PR-A's exact head in CI and
@@ -128,6 +130,10 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   invariants, and 30 connections is unsafe for unconstrained serverless scale. It is scoped to
   Preview only while empty and may prove the PR, but Production promotion requires an owner-approved
   persistent provider or an explicit product-invariant change.
+- Exact-head review caught that node-redis `socketTimeout` measures all TCP inactivity rather than a
+  single command. A five-second value would churn healthy idle connections and briefly reject warm-
+  process traffic. The repair now leaves healthy idle sockets alone and applies a five-second
+  command-scoped deadline that discards only the timed-out client without retrying the mutation.
 
 ## Decision Log
 
@@ -169,9 +175,10 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   behavior. Add a lazy Redis-protocol adapter selected by `REDIS_URL` and preserve the existing
   Upstash REST adapter as a fallback. `REDIS_URL` wins when both configurations exist so stale
   orphaned Upstash variables cannot mask a healthy linked resource. The protocol client uses a
-  five-second connect timeout and five-second socket-inactivity timeout with at most two bounded
-  reconnect attempts. A cold failure may span multiple timed attempts plus backoff; five seconds is
-  not a total request bound. Lua and DTO semantics remain provider-independent. Use the already-
+  five-second connect timeout with at most two bounded reconnect attempts, plus a separate five-
+  second deadline around each storage command. A timed-out command discards its client and is not
+  transparently retried. A cold failure may span multiple timed attempts plus backoff; five seconds
+  is not a total request bound. Lua and DTO semantics remain provider-independent. Use the already-
   authorized official Redis free plan only for empty Preview verification. It is not Production
   authorization; a paid persistent plan, new-provider terms, or weakened durability invariant
   requires the owner.
@@ -311,11 +318,12 @@ merges, and operates provider settings.
 - Runtime behavior: keep test-only in-memory selection unchanged. In all other processes, prefer a
   non-empty `REDIS_URL` and adapt node-redis to the existing four-command `RedisLike` boundary;
   otherwise use the existing Upstash REST URL/token pair. Construct clients lazily, connect only on
-  the first command, reuse one successful connection, use five-second connect and socket-inactivity
-  timeouts with at most two bounded reconnect attempts, attach a credential-free error listener, and
-  clear a rejected connection promise so a later request can retry. Do not claim a five-second total
-  cold-failure bound because retries and backoff may extend it. Preserve `SET` expiration, `LRANGE`,
-  and Lua key/argument semantics exactly.
+  the first command, reuse one successful connection, use a five-second connect timeout with at most
+  two bounded reconnect attempts, and wrap each storage command in a separate five-second deadline.
+  Attach a credential-free error listener, clear a rejected connection promise, and discard a client
+  whose command times out so a later request can connect cleanly. Never transparently retry an
+  ambiguous mutation. Do not claim a five-second total cold-failure bound because connection retries
+  and backoff may extend it. Preserve `SET` expiration, `LRANGE`, and Lua key/argument semantics.
 - Provider behavior: provision only the already-authorized official Redis `$0` plan, never select a
   paid tier, bind its credential to Preview only while the database is empty, and verify the
   project/environment names without printing values. Existing deployments retain old environment
@@ -469,14 +477,14 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
   `REDIS_URL`; Playwright reported 17/17 passed. Coverage passed at 91.27% statements, 85.71%
   branches, 97.61% functions, and 94.47% lines.
 - [x] Implement C-08a dual-provider selection and focused protocol-adapter proof. The protocol,
-  Upstash, and core Redis files pass 48 focused tests and the adapter passes TypeScript validation.
+  Upstash, and core Redis files pass 49 focused tests and the adapter passes TypeScript validation.
 - [x] Provision/connect only the already-authorized official Redis free plan; its direct read passed
   and `REDIS_URL` is bound to Preview only without displaying its value.
 - [x] Rerun the complete local gate after C-08a. Under Node 22, lint, typecheck, build, and audit
-  passed; audit found zero vulnerabilities; Vitest reported 135 passed and the permitted 14 local
+  passed; audit found zero vulnerabilities; Vitest reported 136 passed and the permitted 14 local
   Redis skips; the explicit integration run reported the same 14 skips without `REDIS_URL`;
-  Playwright reported 17/17 passed. Coverage passed at 91.70% statements, 85.97% branches, 96.96%
-  functions, and 94.96% lines.
+  Playwright reported 17/17 passed. Coverage passed at 90.95% statements, 85.11% branches, 96.33%
+  functions, and 94.43% lines.
 - [x] Add the adapter-mediated Redis 7 integration case. The focused workflow passed against the
   empty Preview database with its credential injected transiently and not printed: one selected test
   passed and the 13 unrelated cases were filtered. Require all future exact-head Redis CI jobs to

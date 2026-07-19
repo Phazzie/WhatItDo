@@ -60,6 +60,7 @@ describe('durable REDIS_URL protocol adapter', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     resetRedisForTests()
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
@@ -82,7 +83,6 @@ describe('durable REDIS_URL protocol adapter', () => {
       disableOfflineQueue: true,
       socket: {
         connectTimeout: 5_000,
-        socketTimeout: 5_000,
         reconnectStrategy: expect.any(Function),
       },
     })
@@ -230,6 +230,32 @@ describe('durable REDIS_URL protocol adapter', () => {
 
     expect(firstClient.connect).toHaveBeenCalledTimes(1)
     expect(replacementClient.connect).toHaveBeenCalledTimes(1)
+    expect(nodeRedis.createClient).toHaveBeenCalledTimes(2)
+  })
+
+  it('discards only a client whose command exceeds the command deadline', async () => {
+    vi.useFakeTimers()
+    const firstClient = nodeRedis.makeClient()
+    firstClient.get.mockReturnValue(new Promise(() => undefined))
+    const secondClient = nodeRedis.makeClient()
+    secondClient.get.mockResolvedValue('recovered')
+    nodeRedis.createClient
+      .mockReturnValueOnce(firstClient)
+      .mockReturnValueOnce(secondClient)
+
+    const redis = getRedis()
+    const timedOut = expect(redis.get('slow-key')).rejects.toThrow(
+      'Redis operation timed out after 5000ms'
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(firstClient.get).toHaveBeenCalledWith('slow-key')
+    await vi.advanceTimersByTimeAsync(5_000)
+    await timedOut
+
+    expect(firstClient.destroy).toHaveBeenCalledTimes(1)
+    expect(firstClient.isOpen).toBe(false)
+    await expect(redis.get('fresh-key')).resolves.toBe('recovered')
+    expect(secondClient.get).toHaveBeenCalledWith('fresh-key')
     expect(nodeRedis.createClient).toHaveBeenCalledTimes(2)
   })
 

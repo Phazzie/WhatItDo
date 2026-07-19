@@ -78,12 +78,13 @@ TRUST_PROXY=1
 
 `REDIS_URL` takes precedence when both provider configurations exist. The protocol connection is
 opened lazily on the first storage command and reused within a warm server process. Each connection
-attempt and established socket has a five-second inactivity timeout, with at most two bounded
-reconnect attempts, so an unavailable provider fails the request instead of enabling process-local
-production storage. The official Redis Cloud free plan has no disk persistence or high
-availability; choose a persistent provider plan for Production so recorded votes and the documented
-30/90-day retention contract survive a provider restart. A non-persistent free database is suitable
-only for empty Preview verification.
+attempt has a five-second timeout and at most two bounded reconnect attempts. Each storage command
+has a separate five-second deadline; a command timeout discards that connection and is never
+transparently retried. This makes an unavailable provider fail the request instead of enabling
+process-local production storage. The official Redis Cloud free plan has no disk persistence or
+high availability; choose a persistent provider plan for Production so recorded votes and the
+documented 30/90-day retention contract survive a provider restart. A non-persistent free database
+is suitable only for empty Preview verification.
 
 `POLL_CREATOR_EMAIL` is one deployment-owned notification address; the app does not collect or store
 creator email addresses per poll. Alerts include the normalized poll title, voter name, choices,

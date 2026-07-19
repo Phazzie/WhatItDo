@@ -92,7 +92,7 @@ export function isInMemoryRedisAllowed(): boolean {
 
 let selectedRedis: RedisLike | InMemoryRedis | null = null
 const PROTOCOL_REDIS_CONNECT_TIMEOUT_MS = 5_000
-const PROTOCOL_REDIS_SOCKET_TIMEOUT_MS = 5_000
+const PROTOCOL_REDIS_COMMAND_TIMEOUT_MS = 5_000
 const PROTOCOL_REDIS_MAX_RECONNECT_ATTEMPTS = 2
 
 function createProtocolRedisClient(url: string) {
@@ -101,7 +101,6 @@ function createProtocolRedisClient(url: string) {
     disableOfflineQueue: true,
     socket: {
       connectTimeout: PROTOCOL_REDIS_CONNECT_TIMEOUT_MS,
-      socketTimeout: PROTOCOL_REDIS_SOCKET_TIMEOUT_MS,
       reconnectStrategy: (retries) =>
         retries >= PROTOCOL_REDIS_MAX_RECONNECT_ATTEMPTS
           ? false
@@ -165,24 +164,65 @@ function connectProtocolRedis(url: string): Promise<ProtocolRedisClient> {
   return connection
 }
 
+async function runProtocolRedisCommand<T>(
+  url: string,
+  operation: (client: ProtocolRedisClient) => Promise<T>
+): Promise<T> {
+  const client = await connectProtocolRedis(url)
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      clearProtocolRedisClient(client)
+      try {
+        if (client.isOpen) client.destroy()
+      } catch {
+        // Cleanup must not replace the stable timeout error returned to the caller.
+      }
+      reject(new Error(`Redis operation timed out after ${PROTOCOL_REDIS_COMMAND_TIMEOUT_MS}ms`))
+    }, PROTOCOL_REDIS_COMMAND_TIMEOUT_MS)
+
+    Promise.resolve()
+      .then(() => operation(client))
+      .then(
+        (value) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          resolve(value)
+        },
+        (error: unknown) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          reject(error)
+        }
+      )
+  })
+}
+
 function createProtocolRedis(url: string): RedisLike {
   return {
-    get: async <T = unknown>(key: string) =>
-      (await (await connectProtocolRedis(url)).get(key)) as T | null,
-    set: async (key, value, options) => {
-      const client = await connectProtocolRedis(url)
-      const storedValue = String(value)
-      return options?.ex === undefined
-        ? client.set(key, storedValue)
-        : client.set(key, storedValue, { expiration: { type: 'EX', value: options.ex } })
-    },
-    lrange: async (key, start, stop) =>
-      (await connectProtocolRedis(url)).lRange(key, start, stop),
-    eval: async <T = unknown>(script: string, keys: string[], args: (string | number)[]) =>
-      (await connectProtocolRedis(url)).eval(script, {
-        keys,
-        arguments: args.map(String),
-      }) as Promise<T>,
+    get: <T = unknown>(key: string) =>
+      runProtocolRedisCommand(url, async (client) => (await client.get(key)) as T | null),
+    set: (key, value, options) =>
+      runProtocolRedisCommand(url, (client) => {
+        const storedValue = String(value)
+        return options?.ex === undefined
+          ? client.set(key, storedValue)
+          : client.set(key, storedValue, { expiration: { type: 'EX', value: options.ex } })
+      }),
+    lrange: (key, start, stop) =>
+      runProtocolRedisCommand(url, (client) => client.lRange(key, start, stop)),
+    eval: <T = unknown>(script: string, keys: string[], args: (string | number)[]) =>
+      runProtocolRedisCommand(
+        url,
+        (client) => client.eval(script, {
+          keys,
+          arguments: args.map(String),
+        }) as Promise<T>
+      ),
   }
 }
 
