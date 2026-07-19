@@ -35,7 +35,9 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - [x] (2026-07-19) Provisioned a checksum-verified Node 22.23.1 runtime for this run.
 - [x] (2026-07-19) C-01 Activated this plan in repository guidance with one docs-only commit after
   three hostile reviews cleared its execution and provider-safety runbook.
-- [ ] C-02 Install the temporary Vercel guard, create draft PR-A, and retarget PR #4.
+- [x] (2026-07-19) C-02 Installed/read back the temporary Vercel guard, pushed the exact first-16
+  ref, opened draft PR #5, and retargeted PR #4. The new stack is `75f432d <- PR #5 @ 02f73ef <-
+  PR #4 @ de8af4a`; all 28 review threads remain unresolved and are now outdated.
 - [ ] C-03 Commit the three existing CI test corrections.
 - [ ] C-04 Implement atomic/private poll creation.
 - [ ] C-05 Bind submission IDs to normalized ballot digests.
@@ -74,6 +76,11 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - The shell default Node 23.8.0 is unsupported. This run uses the verified Node 22.23.1 distribution
   recorded under Artifacts. No local Redis server or container runtime exists; local integration may
   skip, but GitHub Redis 7 must run all cases with zero skips before merge.
+- Vercel documents that a Git push whose SHA was deployed previously creates no new Deployment and
+  returns the last matching SHA deployment instead. The prerequisite ref reuses `02f73ef`; its only
+  prior deployment is terminal `ERROR`, and GitHub reports no deployment for the new ref. This is the
+  safe deduplication case in the guard proof. See
+  `https://vercel.com/docs/project-configuration/project-settings#ignored-build-step`.
 
 ## Decision Log
 
@@ -319,17 +326,17 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 
 ### B. Activation and stack
 
-- [ ] Patch `AGENTS.md` and `docs/FINISH_EXEC_PLAN.md` to route repair work here.
-- [ ] Stage exactly the three C-01 files; inspect `git diff --cached --check`; commit
+- [x] Patch `AGENTS.md` and `docs/FINISH_EXEC_PLAN.md` to route repair work here.
+- [x] Stage exactly the three C-01 files; inspect `git diff --cached --check`; commit
   `Activate lean PR #4 repair plan`.
-- [ ] Read the current Vercel project setting, then set and read back:
+- [x] Read the current Vercel project setting, then set and read back:
 
       if [ "$VERCEL_GIT_COMMIT_REF" = "pr4-audit-prerequisites" ]; then exit 0; else exit 1; fi
 
-- [ ] Push `02f73ef:refs/heads/pr4-audit-prerequisites` without checking out that branch.
-- [ ] Verify no usable Vercel deployment exists for that branch.
-- [ ] Open PR-A as a draft against the default branch and record its number/URL.
-- [ ] Export PR #4 thread state, retarget PR #4 to `pr4-audit-prerequisites`, and verify OIDs/diff.
+- [x] Push `02f73ef:refs/heads/pr4-audit-prerequisites` without checking out that branch.
+- [x] Verify no usable Vercel deployment exists for that branch.
+- [x] Open PR-A as draft PR #5 against the default branch and record its number/URL.
+- [x] Export PR #4 thread state, retarget PR #4 to `pr4-audit-prerequisites`, and verify OIDs/diff.
 - [ ] Commit C-03 with only the two existing test files.
 
 ### C. Implementation and local validation
@@ -436,21 +443,35 @@ out or force-pushing it.
     test "$(git ls-remote origin "refs/heads/$WHATITDO_PR_A_BRANCH" | cut -f1)" = \
       "$WHATITDO_FIRST16"
 
-Poll in communicated intervals for the exact PR-A branch and first-16 SHA. Absence is not success:
-the exact deployment must appear and reach terminal `CANCELED`. Any `BUILDING`, `READY`, `ERROR`, or
-other terminal state blocks PR creation and retargeting until the guard is repaired. Inspect only
-safe deployment fields.
+Poll in communicated intervals for the exact PR-A branch and first-16 SHA. For a never-deployed SHA,
+the exact deployment must appear and reach terminal `CANCELED`; absence is not success. Vercel's
+documented exception is a SHA deployed previously: no new Deployment is created and the last matching
+SHA deployment is returned. In that case require zero GitHub deployments for the new ref and require
+every prior matching-SHA Vercel deployment to be terminal and non-READY. Any ambiguous, `BUILDING`,
+or `READY` state blocks PR creation and retargeting. Inspect only safe fields.
 
     WHATITDO_DEPLOYMENTS=$(
       "$WHATITDO_VERCEL" api \
         "/v6/deployments?projectId=$WHATITDO_PROJECT_ID&limit=100" \
         --scope "$WHATITDO_VERCEL_SCOPE" --raw
     )
-    jq -e --arg ref "$WHATITDO_PR_A_BRANCH" --arg sha "$WHATITDO_FIRST16" '
+    WHATITDO_GITHUB_DEPLOYMENTS=$(gh api --method GET \
+      "repos/$WHATITDO_REPO/deployments" \
+      -f ref="$WHATITDO_PR_A_BRANCH" -f per_page=100)
+    jq -e --arg ref "$WHATITDO_PR_A_BRANCH" --arg sha "$WHATITDO_FIRST16" \
+      --argjson github "$WHATITDO_GITHUB_DEPLOYMENTS" '
       [.deployments[] |
        select(.meta.githubCommitRef == $ref and .meta.githubCommitSha == $sha) |
-       {uid, url, readyState, created, sha: .meta.githubCommitSha}] as $found |
-      ($found | length >= 1) and (($found | sort_by(.created) | last).readyState == "CANCELED")
+       {uid, url, readyState, created, sha: .meta.githubCommitSha}] as $exact_ref |
+      [.deployments[] |
+       select(.meta.githubCommitSha == $sha) |
+       {uid, url, readyState, created, ref: .meta.githubCommitRef}] as $same_sha |
+      if ($exact_ref | length) >= 1 then
+        (($exact_ref | sort_by(.created) | last).readyState == "CANCELED")
+      else
+        (($github | length) == 0 and ($same_sha | length) >= 1 and
+         ($same_sha | all(.readyState != "READY" and .readyState != "BUILDING")))
+      end
     ' <<<"$WHATITDO_DEPLOYMENTS"
 
 Open PR-A with its post-release evidence anchor, record its number, and assert its immutable shape.
@@ -873,6 +894,7 @@ interrupt it, retain partial evidence, and replace it with a narrower task.
 ## Artifacts and Notes
 
 - Existing PR #4: `https://github.com/Phazzie/WhatItDo/pull/4`
+- Prerequisite PR #5: `https://github.com/Phazzie/WhatItDo/pull/5`
 - Giant commit: `de8af4ada4df2462302d35d436a9bdd75b1c42ff`
 - First-16 tip/giant parent: `02f73efef6b57242073cc0573e105dd835b5009f`
 - Starting default: `75f432d78647103618619319320317e603bde23e`

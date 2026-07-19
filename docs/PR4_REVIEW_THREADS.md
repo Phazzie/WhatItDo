@@ -5,6 +5,14 @@ Pull request: `#4`
 Baseline head: `02f73ef`
 Baseline on 2026-07-16: 28 unresolved threads (17 current, 11 outdated)
 
+Stack snapshot on 2026-07-19:
+
+- Draft prerequisite PR #5 is `75f432d..02f73ef` with exactly 16 commits and 28 paths.
+- PR #4 is retargeted to `pr4-audit-prerequisites` and starts at giant commit `de8af4a`.
+- The complete paginated GraphQL refetch returned the same 28 unresolved thread IDs: 0 current and
+  28 outdated after retargeting. Retargeting did not resolve or discard any thread.
+- No effective approval or change-request review exists; the latest bot reviews are comments only.
+
 Update this ledger after each push. A thread moves to `resolved` only after its required evidence is
 green and a concise reply has been posted. The final GraphQL fetch must report zero unresolved.
 
@@ -49,7 +57,7 @@ the green workflow run in the PR conversation.
 
 - Latest head: pending
 - Thread fetch command/date: pending
-- Unresolved current: 17
-- Unresolved outdated: 11
+- Unresolved current: 0
+- Unresolved outdated: 28
 - Unresolved total: 28
 - Final GraphQL unresolved count: pending
