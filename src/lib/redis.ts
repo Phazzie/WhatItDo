@@ -92,6 +92,7 @@ export function isInMemoryRedisAllowed(): boolean {
 
 let selectedRedis: RedisLike | InMemoryRedis | null = null
 const PROTOCOL_REDIS_CONNECT_TIMEOUT_MS = 5_000
+const PROTOCOL_REDIS_SOCKET_TIMEOUT_MS = 5_000
 const PROTOCOL_REDIS_MAX_RECONNECT_ATTEMPTS = 2
 
 function createProtocolRedisClient(url: string) {
@@ -100,6 +101,7 @@ function createProtocolRedisClient(url: string) {
     disableOfflineQueue: true,
     socket: {
       connectTimeout: PROTOCOL_REDIS_CONNECT_TIMEOUT_MS,
+      socketTimeout: PROTOCOL_REDIS_SOCKET_TIMEOUT_MS,
       reconnectStrategy: (retries) =>
         retries >= PROTOCOL_REDIS_MAX_RECONNECT_ATTEMPTS
           ? false

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createClient } from 'redis'
 import {
   APPEND_VOTE_LUA_SCRIPT,
@@ -11,6 +11,10 @@ import {
   RATE_LIMIT_WINDOW_SECONDS,
   VOTE_IP_RATE_LIMIT,
   VOTE_POLL_RATE_LIMIT,
+  appendVoteAtomically,
+  createPollAtomically,
+  getRedis,
+  resetRedisForTests,
 } from './redis'
 
 const describeRedis = process.env.REDIS_URL ? describe : describe.skip
@@ -95,6 +99,79 @@ describeRedis('Redis 7 Lua integration', () => {
   async function pollTtls(keys: AppendKeys): Promise<number[]> {
     return Promise.all(keys.slice(0, 3).map((key) => client.ttl(key)))
   }
+
+  it('uses the production adapter for real SET, EVAL, and LRANGE commands', async () => {
+    const pollId = randomUUID().replaceAll('-', '').slice(0, 10)
+    const responseId = randomUUID().replaceAll('-', '').slice(0, 12)
+    const submissionId = randomUUID()
+    const clientIp = '192.0.2.44'
+    const setKey = `integration:${runId}:adapter:set:${pollId}`
+    const pollKeys = [
+      `poll:${pollId}`,
+      `poll:${pollId}:responses`,
+      `poll:${pollId}:submissions`,
+      `ratelimit:vote:ip:${clientIp}`,
+      `ratelimit:vote:poll:${pollId}`,
+    ]
+    const testKeys = [setKey, ...pollKeys]
+    testKeys.forEach((key) => cleanupKeys.add(key))
+
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('E2E_TEST', '')
+    resetRedisForTests()
+
+    try {
+      await client.del(testKeys)
+      const redis = getRedis()
+
+      await redis.set(setKey, 'protocol-adapter', { ex: 60 })
+      expect(await redis.get(setKey)).toBe('protocol-adapter')
+      expect(await client.ttl(setKey)).toBeGreaterThan(0)
+
+      const now = Date.now()
+      expect(await createPollAtomically({
+        id: pollId,
+        title: 'Protocol adapter integration',
+        suggestions: ['Keep the real connection'],
+        mode: 'normal',
+        createdAt: now,
+        expiresAt: now + POLL_ABSOLUTE_TTL_SECONDS * 1000,
+        resultsTokenHash: 'a'.repeat(64),
+      })).toEqual({ status: 'created' })
+
+      expect(await appendVoteAtomically({
+        pollId,
+        submissionId,
+        submissionDigest: 'b'.repeat(64),
+        responseId,
+        clientIp,
+        response: {
+          id: responseId,
+          voterName: 'Protocol Voter',
+          votes: [{
+            text: 'Keep the real connection',
+            vote: 'yes',
+            comment: 'SET, EVAL, and LRANGE all crossed the adapter.',
+          }],
+          submittedAt: now,
+        },
+        now,
+      })).toEqual({ status: 'appended', responseId, responseCount: 1 })
+
+      const storedResponses = await redis.lrange(pollKeys[1], 0, -1)
+      expect(storedResponses).toHaveLength(1)
+      expect(JSON.parse(storedResponses[0])).toMatchObject({
+        id: responseId,
+        voterName: 'Protocol Voter',
+      })
+      expect(getRedis()).toBe(redis)
+    } finally {
+      resetRedisForTests()
+      vi.unstubAllEnvs()
+      await client.del(testKeys)
+      testKeys.forEach((key) => cleanupKeys.delete(key))
+    }
+  })
 
   it('atomically allows only one creator to claim a free three-key namespace', async () => {
     const pollId = randomUUID()

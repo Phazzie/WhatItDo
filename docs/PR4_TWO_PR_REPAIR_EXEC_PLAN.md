@@ -1,8 +1,10 @@
 # Finish PR #4 with a Two-PR Repair Stack
 
 This ExecPlan follows `.agent/PLANS.md`. It is the execution checklist for the owner-authorized
-2026-07-19 repair run. Keep it current after every commit, push, merge, or stopping point. A fresh
-agent must be able to resume from this file and the repository without chat history.
+2026-07-19 repair run through PR-A's exact-head Preview proof. Keep it current after every commit,
+push, merge, or stopping point. Production is a separate owner-gated run because the provider
+incident introduced a paid/terms/credential decision that the original authorization did not cover.
+A fresh agent must be able to resume from this file and the repository without chat history.
 
 ## Purpose / Big Picture
 
@@ -28,8 +30,11 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - [x] (2026-07-18) Reduced the giant commit repair from the old 1,126-line Spark train to six required
   behavioral outcomes.
 - [x] (2026-07-18) Obtained history, application/security, and CI/release review of the two-PR design.
-- [x] (2026-07-19) Received owner authorization to make the plan execution-complete and carry it
-  through commits, PR changes, merges, review cleanup, and deployment verification.
+- [x] (2026-07-19) Received owner authorization to execute the planned safe repair through release.
+  During execution, the dead provider exposed a new terms/cost/durability decision that the plan did
+  not contain. The current safe run therefore ends after the PR #4 inner merge and PR-A's exact-head
+  Preview proof; it does not guess a provider choice, accept terms, buy a tier, weaken an invariant,
+  or advance PR #5/default/Production without that newly required decision.
 - [x] (2026-07-19) Rechecked GitHub authentication, PR #4 OIDs, merge-commit support, protection and
   ruleset state, Vercel identity/project linkage, and the production branch.
 - [x] (2026-07-19) Provisioned a checksum-verified Node 22.23.1 runtime for this run.
@@ -58,9 +63,12 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   provider path, rerun the complete local gate, and repeat literal final-SHA review before C-08 closes.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
   evidence-only closeout; record its final exact-head proof in PR #4.
-- [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, and launch PR-A's final gate.
-- [ ] C-11 Merge PR-A to default, verify the exact deployment, and promote it.
-- [ ] C-12 Record final evidence and retrospective.
+- [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, prove PR-A's exact head in CI and
+  Preview, leave PR #5 draft, and STOP with default and Production unchanged.
+- [ ] C-11 OWNER GATE: after separately recorded owner authorization, verify an owner-approved
+  persistent provider, fresh Production-only credentials, and the staged sentinel plan; only then
+  mark PR #5 ready, merge default, stage, verify, and promote Production.
+- [ ] C-12 After the authorized Production release, record final evidence and retrospective.
 
 ## Surprises & Discoveries
 
@@ -160,19 +168,29 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - Decision (2026-07-19): Recover the pre-existing storage outage without weakening fail-closed
   behavior. Add a lazy Redis-protocol adapter selected by `REDIS_URL` and preserve the existing
   Upstash REST adapter as a fallback. `REDIS_URL` wins when both configurations exist so stale
-  orphaned Upstash variables cannot mask a healthy linked resource. Connection attempts are bounded
-  and retryable; Lua and DTO semantics remain provider-independent. Use the already-authorized
-  official Redis free plan only for empty Preview verification. It is not Production authorization;
-  a paid persistent plan, new-provider terms, or weakened durability invariant requires the owner.
+  orphaned Upstash variables cannot mask a healthy linked resource. The protocol client uses a
+  five-second connect timeout and five-second socket-inactivity timeout with at most two bounded
+  reconnect attempts. A cold failure may span multiple timed attempts plus backoff; five seconds is
+  not a total request bound. Lua and DTO semantics remain provider-independent. Use the already-
+  authorized official Redis free plan only for empty Preview verification. It is not Production
+  authorization; a paid persistent plan, new-provider terms, or weakened durability invariant
+  requires the owner.
+- Decision (2026-07-19): The permitted run ends after PR #4 is merged into PR-A and PR-A's exact-head
+  CI and Preview proof pass. Leave PR #5 draft. C-11 and every command that can ready PR #5, merge
+  default, change domain assignment, create a Production deployment, promote, or roll back are
+  blocked until four facts are recorded: fresh owner authorization, an approved persistent provider,
+  fresh credentials scoped only to Production, and an approved staged sentinel/promotion/rollback
+  plan.
 
 ## Outcomes & Retrospective
 
 Planning outcome: the executable unit is a coherent behavior packet, not an arbitrary line count or
 one-file microticket. The run has five planned repair commits plus explicit hostile-review follow-up,
 two implementation waves, a final integrated local gate, and one intentional code-candidate push.
-Evidence-only commits are allowed where remote proof cannot exist earlier. Update this section
-through the C-10 inner merge in Git; append final
-exact-head CI, C-11/C-12 SHAs, URLs, checks, thread count, deployment ID, and retrospective to the
+Evidence-only commits are allowed where remote proof cannot exist earlier. The current run ends
+after the C-10 inner merge and PR-A's exact-head Preview proof, with PR #5 still draft and Production
+unchanged. Update this section through that stopping point in Git. Only a later owner-authorized C-11
+run may append the Production SHA, deployment, promotion, C-12 checks, and retrospective to the
 relevant PR's durable release-evidence record.
 
 ## Context and Orientation
@@ -293,16 +311,18 @@ merges, and operates provider settings.
 - Runtime behavior: keep test-only in-memory selection unchanged. In all other processes, prefer a
   non-empty `REDIS_URL` and adapt node-redis to the existing four-command `RedisLike` boundary;
   otherwise use the existing Upstash REST URL/token pair. Construct clients lazily, connect only on
-  the first command, reuse one successful connection, bound connection/reconnect behavior, attach a
-  credential-free error listener, and clear a rejected connection promise so a later request can
-  retry. Preserve `SET` expiration, `LRANGE`, and Lua key/argument semantics exactly.
+  the first command, reuse one successful connection, use five-second connect and socket-inactivity
+  timeouts with at most two bounded reconnect attempts, attach a credential-free error listener, and
+  clear a rejected connection promise so a later request can retry. Do not claim a five-second total
+  cold-failure bound because retries and backoff may extend it. Preserve `SET` expiration, `LRANGE`,
+  and Lua key/argument semantics exactly.
 - Provider behavior: provision only the already-authorized official Redis `$0` plan, never select a
   paid tier, bind its credential to Preview only while the database is empty, and verify the
   project/environment names without printing values. Existing deployments retain old environment
   snapshots, so require a fresh exact-SHA Preview after the provider connection exists. Never expose
   a Preview-tested credential to Production; persistent Production storage remains an owner gate.
 - Proof: focused Redis selection/protocol/Upstash/unit tests; typecheck and lint; complete local gate;
-  both exact-head GitHub event suites with all 13 Redis 7 cases and zero skips; exact Preview
+  both exact-head GitHub event suites with all 14 Redis 7 cases and zero skips; exact Preview
   metadata equality; valid-ID read-only sentinel returns 404 with `Poll not found` and no redirect.
 - Stop: no production in-memory fallback, no credential output, no acceptance of new provider terms,
   no paid plan, no weakening the valid-ID sentinel, no merge while Preview returns 500, and no final
@@ -347,7 +367,7 @@ merges, and operates provider settings.
   rerun only affected focused proofs, followed by the complete gate once on the final candidate.
 - Update this plan and `docs/PR4_REVIEW_THREADS.md` before the push.
 
-#### C-09 through C-12 — GitHub and Vercel finish
+#### C-09 and C-10 — GitHub finish and permitted inner merge
 
 - Push the complete repair train once. Require both automatically generated CI event suites green on
   the exact code head because earlier events disagreed on E2E.
@@ -357,10 +377,19 @@ merges, and operates provider settings.
   both CI event suites and the Preview sentinel again on that final exact head.
 - Restore the Vercel Ignored Build Step, merge PR #4 into PR-A with expected-head protection, prove
   tree equality/ancestry, and require the completed PR-A CI and Preview sentinel.
-- Disable automatic custom-domain assignment, merge PR-A with expected-head protection, wait for
-  default CI and the exact `target=production` staged deployment, run the generated-host sentinel,
-  promote it, and rerun the sentinel on the public Production domain.
-- Record final SHAs, URLs, check outcomes, thread count, deployment ID, rollback ID, and retrospective.
+- Leave PR #5 draft and STOP. Record the PR-A head, CI runs, Preview deployment, sentinel result, and
+  unresolved-thread count. Do not mark PR #5 ready or mutate default, Production credentials,
+  domains, aliases, promotion, or rollback state in this run.
+
+#### C-11 and C-12 — separately owner-gated Production release
+
+- Resume only after the owner authorization record names the persistent provider, authorizes fresh
+  Production-only credentials, and approves the exact staged sentinel/promotion/rollback sequence.
+- After all owner-gate checks are recorded, mark PR #5 ready, disable automatic custom-domain
+  assignment, merge with expected-head protection, require exact default CI and a staged
+  `target=production` deployment, run the generated-host sentinel, promote, and rerun the public
+  sentinel.
+- Record final SHAs, URLs, check outcomes, deployment and rollback IDs, log window, and retrospective.
 
 ## Concrete Steps
 
@@ -444,10 +473,14 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [x] Provision/connect only the already-authorized official Redis free plan; its direct read passed
   and `REDIS_URL` is bound to Preview only without displaying its value.
 - [x] Rerun the complete local gate after C-08a. Under Node 22, lint, typecheck, build, and audit
-  passed; audit found zero vulnerabilities; Vitest reported 135 passed and the permitted 13 local
-  Redis skips; the explicit integration run reported the same 13 skips without `REDIS_URL`;
-  Playwright reported 17/17 passed. Coverage passed at 91.69% statements, 85.97% branches, 96.96%
-  functions, and 94.95% lines.
+  passed; audit found zero vulnerabilities; Vitest reported 135 passed and the permitted 14 local
+  Redis skips; the explicit integration run reported the same 14 skips without `REDIS_URL`;
+  Playwright reported 17/17 passed. Coverage passed at 91.70% statements, 85.97% branches, 96.96%
+  functions, and 94.96% lines.
+- [x] Add the adapter-mediated Redis 7 integration case. The focused workflow passed against the
+  empty Preview database with its credential injected transiently and not printed: one selected test
+  passed and the 13 unrelated cases were filtered. Require all future exact-head Redis CI jobs to
+  run the complete file and report 14 passed with zero skips.
 - [ ] Obtain final exact-head history, application/security, and CI reviews.
 
 ### D. PR #4 proof and cleanup
@@ -463,7 +496,7 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [ ] Require both CI event suites, no current change request, zero unresolved threads, deployment
   SHA equality, and the Preview sentinel again on the evidence commit. This is PR #4's merge head.
 
-### E. Inner and final merges
+### E. Permitted inner merge and owner-gated Production
 
 - [ ] Restore the prior null Vercel Ignored Build Step and verify readback.
 - [ ] Recheck PR #4 base/head OIDs and merge with `--merge --match-head-commit`.
@@ -471,7 +504,23 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [ ] Update this plan through C-10 on PR-A, commit that inner-merge evidence, and push once.
 - [ ] Require completed PR-A CI, zero unresolved PR-A threads, no current change request, and the
   exact-host Preview sentinel on that evidence head.
-- [ ] Mark PR-A ready, read back `isDraft=false`, and recheck its exact base/head OIDs.
+- [ ] Leave PR #5 draft and STOP. Record the PR-A exact head and Preview evidence; confirm default,
+  Production credentials, domain assignment, aliases, and the current Production deployment did not
+  change during C-10.
+
+The following owner gate is intentionally unchecked. None of the C-11/C-12 items or Production
+commands below are authorized by the current run.
+
+- [ ] Record fresh owner authorization to resume C-11 and identify its durable evidence location.
+- [ ] Record the owner-approved persistent Redis provider/tier and prove it satisfies the recorded-
+  vote and 30/90-day retention invariants.
+- [ ] Install fresh credentials scoped to Production only; prove their project/environment names
+  without printing values and prove the free Preview credential is not available to Production.
+- [ ] Record owner approval of the staged release plan: keep aliases on the prior deployment, probe
+  the exact generated host read-only, promote only after it passes, and use the recorded rollback ID
+  if the post-promotion public sentinel fails.
+- [ ] OWNER GATE COMPLETE: only after all four preceding items are checked, mark PR-A ready, read back
+  `isDraft=false`, and recheck its exact base/head OIDs.
 - [ ] Recheck the live default OID. If it moved, merge that tip into PR-A and rerun PR-A proof.
 - [ ] Set Vercel `autoAssignCustomDomains=false`; record the prior production deployment/rollback ID.
 - [ ] Merge PR-A with `--merge --match-head-commit` and verify first-parent/ancestry/default tip.
@@ -616,7 +665,7 @@ For each PR #4 candidate—the code candidate and the later evidence-only closeo
 current head, read the remote ref back, and reset `WHATITDO_CANDIDATE_SHA`. Poll checks every 15
 seconds with a hard ten-minute deadline; never use an unbounded `gh pr checks --watch`. Then
 independently require one successful completed `CI` run for each event, all three named jobs, and a
-Redis reporter total of 13 passed with no skipped tests in each run.
+Redis reporter total of 14 passed with no skipped tests in each run.
 
     export WHATITDO_PROOF_PR=4
     export WHATITDO_CANDIDATE_SHA=$(git rev-parse HEAD)
@@ -672,7 +721,7 @@ Redis reporter total of 13 passed with no skipped tests in each run.
         <<<"$WHATITDO_RUN_VIEW")
       WHATITDO_REDIS_LOG=$(gh run view "$WHATITDO_RUN_ID" \
         --repo "$WHATITDO_REPO" --job "$WHATITDO_REDIS_JOB_ID" --log)
-      grep -Eq '13 passed.*\(13\)' <<<"$WHATITDO_REDIS_LOG"
+      grep -Eq '14 passed.*\(14\)' <<<"$WHATITDO_REDIS_LOG"
       if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_REDIS_LOG"; then
         exit 1
       fi
@@ -730,7 +779,7 @@ user data. On recovery, reuse/edit the existing evidence comment rather than cre
       -f body="$WHATITDO_UPDATED_BODY" \
       | jq -e --arg url "$WHATITDO_EVIDENCE_COMMENT_URL" '.body | contains($url)'
 
-### Deployment binding, authenticated sentinel, merge, promotion, and rollback
+### Preview binding and permitted inner merge
 
 Select a single `READY` deployment whose Git metadata matches the exact candidate. The authenticated
 CLI probe automatically handles Preview protection and must return the intentional JSON 404 without
@@ -816,9 +865,30 @@ proof with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`.
       "$WHATITDO_CANDIDATE_SHA"
     wait_for_pr_checks "$WHATITDO_PROOF_PR"
 
-After committing C-10 evidence on PR-A and its exact-head gates pass, mark it ready and protect the
-final merge with a readback SHA. Stop if the default tip has moved until it is merged into PR-A and
-all gates are rerun.
+After committing C-10 evidence on PR-A, repeat the exact-head CI, thread/review, deployment-metadata,
+and authenticated Preview sentinel proof above with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`. Record that
+evidence, prove PR #5 remains draft, and STOP. This is the current run endpoint; default and
+Production remain unchanged.
+
+    gh pr view "$WHATITDO_PR_A" --repo "$WHATITDO_REPO" \
+      --json isDraft,state,headRefOid \
+      | jq -e --arg head "$WHATITDO_CANDIDATE_SHA" '
+          .isDraft == true and .state == "OPEN" and .headRefOid == $head'
+
+### OWNER-GATED Production merge, staging, promotion, and rollback
+
+Do not execute any command in this section during the current run. A future run must first check the
+four owner-gate items in Checklist E and record non-secret evidence for each. The four shell evidence
+variables below are deliberately required as a second fail-closed boundary; an agent must never set
+them merely to bypass the checklist.
+
+    : "${WHATITDO_OWNER_AUTHORIZATION_RECORD:?STOP: recorded owner authorization is required}"
+    : "${WHATITDO_PERSISTENT_PROVIDER_RECORD:?STOP: approved persistent provider evidence is required}"
+    : "${WHATITDO_PRODUCTION_CREDENTIAL_RECORD:?STOP: fresh Production-only credential evidence is required}"
+    : "${WHATITDO_STAGED_SENTINEL_PLAN_RECORD:?STOP: approved staged sentinel plan is required}"
+
+Only after that gate passes may PR #5 be marked ready and the final merge protected with a readback
+SHA. Stop if the default tip moved until it is merged into PR-A and every PR-A gate is rerun.
 
     gh pr ready "$WHATITDO_PR_A" --repo "$WHATITDO_REPO"
     gh pr view "$WHATITDO_PR_A" --repo "$WHATITDO_REPO" \
@@ -929,7 +999,7 @@ after promotion.
       <<<"$WHATITDO_DEFAULT_RUN_VIEW")
     WHATITDO_DEFAULT_REDIS_LOG=$(gh run view "$WHATITDO_DEFAULT_RUN_ID" \
       --repo "$WHATITDO_REPO" --job "$WHATITDO_DEFAULT_REDIS_JOB_ID" --log)
-    grep -Eq '13 passed.*\(13\)' <<<"$WHATITDO_DEFAULT_REDIS_LOG"
+    grep -Eq '14 passed.*\(14\)' <<<"$WHATITDO_DEFAULT_REDIS_LOG"
     if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_DEFAULT_REDIS_LOG"; then
       exit 1
     fi
@@ -1084,7 +1154,7 @@ the expected clean result; inspect and redact any user data before recording a r
 Focused commands, selected by changed packet:
 
     npx vitest run src/app/api/poll/route.test.ts
-    npx vitest run src/lib/redis.test.ts src/lib/redis.upstash.test.ts
+    npx vitest run src/lib/redis.test.ts src/lib/redis.upstash.test.ts src/lib/redis.protocol.test.ts
     npx vitest run src/lib/submissionDigest.test.ts src/app/api/vote/route.test.ts
     npx vitest run src/lib/withTimeout.test.ts src/lib/escapeHtml.test.ts src/app/api/vote/route.test.ts
     REDIS_URL=redis://127.0.0.1:6379 npx vitest run src/lib/redis.integration.test.ts
@@ -1104,10 +1174,14 @@ The candidate is acceptable only when:
 - Classic, Dubious, unauthorized results, notification truth, retry, 375 px, accessibility, and
   forced-colors cases pass.
 - Lint, typecheck, unit tests, Redis 7 integration, E2E, build, and high-severity audit are green on
-  the required integrated heads.
+  the required integrated heads; every new exact-head Redis CI job reports 14 passed and zero
+  skipped.
 - Every PR #4 review thread has an evidence-backed reply and is resolved.
-- Default contains the repaired PR-A head, and Production serves the exact verified final merge
-  deployment with no observed post-deploy errors.
+- The current run is accepted at C-10 only when PR #4 is merged into PR-A, PR-A's exact head passes
+  CI and authenticated Preview proof, PR #5 remains draft, and default and Production are unchanged.
+- C-11/C-12 remain unacceptable until the four owner-gate records exist. Only the later authorized
+  run may accept that default contains the repaired PR-A head and Production serves the exact staged,
+  sentinel-verified final merge deployment with no observed post-deploy errors.
 
 Use this read-only sentinel with `DEPLOYMENT_URL` set to the exact provider-attested generated URL or
 the public Production URL. A protection bypass may come only from a non-printed environment variable.

@@ -82,6 +82,7 @@ describe('durable REDIS_URL protocol adapter', () => {
       disableOfflineQueue: true,
       socket: {
         connectTimeout: 5_000,
+        socketTimeout: 5_000,
         reconnectStrategy: expect.any(Function),
       },
     })

@@ -48,7 +48,7 @@ This document records the remaining finish scope.
 | F18 | README still claims Node 18, calls live response-list storage future work, says `EMAIL_FROM` is not wired, and mixes Adventurous/BOLD with Dubious/YOLO. | Rewrite setup, architecture, terminology, storage, notification, privacy, scripts, and environment documentation against the final code. |
 | F19 | PR #4 has 28 unresolved review threads: 19 already-fixed/obsolete, three evidence-backed false positives, four license-identification items, and current docs/config findings. | Fix remaining code/docs, record dependency license metadata, reply with evidence, and resolve all 28 threads. |
 | F20 | GitHub Actions use mutable `@v4` tags despite a review requesting immutable pins. | Pin every third-party action to a full commit SHA with a version comment. Add Redis integration and accessibility/mobile gates. |
-| F21 | Vercel cannot reach build initialization because of platform STS credentials. | Retry after the new head is pushed; inspect/repair project integration with Vercel tooling. If credentials remain account-owned, record exact evidence and leave no app failure disguised as a platform failure. |
+| F21 | The earlier Vercel failure masked a dead Upstash resource: its encrypted variables remain, but the hostname no longer resolves and the linked resource is uninstalled. | PR #4 and PR #5 may complete empty Preview proof with the Preview-only free resource. Do not merge PR #5 to default or promote Production until the owner authorizes persistent storage and the exact Production deployment is verified against it. |
 
 ## Candidate disposition ledger
 
@@ -61,12 +61,12 @@ Vercel evidence still required by `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`.
 | F1 | Implemented / local verified | Independent fragment-only results credentials, exact public DTOs, private POST results reads, and privacy route/browser tests are present. |
 | F2 | Implemented / local verified | Next 16.2.10/React 19.2.7 toolchain is locked; the candidate build passes and `npm audit --audit-level=high` reports zero vulnerabilities. |
 | F3 | Implemented / local verified | Tokenless legacy reads and votes return 410 without response mutation or notification; legacy and submit-time unavailable states close the ballot instead of inviting retries. |
-| F4 | Implemented / CI Redis proof pending | Vote append, deduplication, capacity/rate checks, and TTL refresh use one Lua boundary. All 13 Redis 7 cases exist and skip locally without `REDIS_URL`; CI must run them non-skipping. |
+| F4 | Implemented / full CI Redis proof pending | Vote append, deduplication, capacity/rate checks, and TTL refresh use one Lua boundary. The new adapter-mediated case passed against the empty Preview Redis resource; exact-head CI must run all 14 Redis 7 cases non-skipping. |
 | F5 | Implemented / local verified | Stable client receipts plus digest-bound submission IDs reject changed retries, preserve normalization-equivalent duplicates, and use the exact UUID as Resend's idempotency key. |
 | F6 | Implemented / local verified | The API distinguishes sent, not configured, failed, and duplicate outcomes; a missing key, destination, or verified sender is not configured, while resolved errors and the five-second provider timeout never undo a recorded vote or claim delivery. |
 | F7 | Implemented / local verified | Results retain stale data, expose retry/manual refresh, and clear recoverable errors; the transient-refresh browser case passes. |
 | F8 | Implemented / local verified | Pure count/tie helpers, proportional bars, and neutral ballot numbering replace fake winners, minimum widths, and medals; unit/browser results pass. |
-| F9 | Implemented / local verified | Redis/Resend initialize lazily; production code owns the test-gated adapter; non-Vercel production and unsafe E2E configurations fail closed. |
+| F9 | Implemented / exact-head CI pending | Redis/Resend initialize lazily; production owns the test-gated adapter; non-Vercel production and unsafe E2E configurations fail closed. A standard `REDIS_URL` protocol adapter now takes precedence over stale Upstash settings and has local lifecycle/mapping proof. The adapter workflow also passed against real Preview Redis; exact-head CI must run the complete 14-case file non-skipping. The non-persistent free resource is Preview-only. |
 | F10 | Implemented / local verified | The 16 KiB JSON reader, exact identifiers, unknown-input validation, normalization, and stable status mapping have route and validation coverage. |
 | F11 | Implemented / CI Redis proof pending | Trusted identity resolution and atomic IP/poll/capacity buckets are always enforced in production; reaching 250 returns a stable terminal code that closes the ballot; unit coverage passes and Redis 7 CI remains mandatory. |
 | F12 | Implemented / local verified | Raw results tokens remain in URL fragments and POST bodies only; stored hashes, no-store/no-referrer/noindex headers, disabled prefetch, and link-free email are covered. |
@@ -77,8 +77,8 @@ Vercel evidence still required by `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`.
 | F17 | Implemented / local verified | Designed global error and not-found pages are present; the not-found axe flow passes. |
 | F18 | Implemented / local verified | README now matches Node/tooling, Redis receipts, retention, privacy, terminology, detailed link-free notification behavior, and the active plan. |
 | F19 | Remote evidence pending | All 28 original threads survived retargeting and remain deliberately unresolved until the exact candidate CI/Preview proof is green; each will receive an evidence-specific reply before resolution. |
-| F20 | Implemented / remote evidence pending | Third-party actions are immutable-SHA pinned; build, Redis 7, and full browser jobs each have a hard ten-minute ceiling; both exact-head event suites must still pass with Redis reporting 13 passed and zero skipped. |
-| F21 | Remote evidence pending | The temporary incomplete-branch deployment guard is verified. PR #4 Preview and final staged Production deployment/alias/log proof occur only after candidate pushes and guarded merges; promotion and rollback are asynchronous, status/alias-polled operations that never race after a CLI timeout. |
+| F20 | Implemented / remote evidence pending | Third-party actions are immutable-SHA pinned; build, Redis 7, and full browser jobs each have a hard ten-minute ceiling; both exact-head event suites must still pass with Redis reporting 14 passed and zero skipped. |
+| F21 | Preview evidence pending / Production owner-blocked | The dead Upstash incident is recorded, and the standard-Redis repair permits empty Preview verification for PR #4 and PR #5. No default merge or Production promotion is authorized until the owner selects persistent storage and its exact Production deployment passes the guarded sentinel and release proof. |
 
 ## Explicit deferrals
 
