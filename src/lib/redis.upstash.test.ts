@@ -116,6 +116,7 @@ describe('durable Upstash adapter', () => {
   it.each([
     [['appended', 'response-1', 2], { status: 'appended', responseId: 'response-1', responseCount: 2 }],
     [['duplicate', 'response-1', 2], { status: 'duplicate', responseId: 'response-1', responseCount: 2 }],
+    [['idempotency_conflict'], { status: 'idempotency_conflict' }],
     [['not_found'], { status: 'not_found' }],
     [['expired'], { status: 'expired' }],
     [['identity_unavailable'], { status: 'identity_unavailable' }],
@@ -127,6 +128,7 @@ describe('durable Upstash adapter', () => {
     await expect(appendVoteAtomically({
       pollId: 'poll123456',
       submissionId: 'submission',
+      submissionDigest: 'digest:submission',
       responseId: 'response-1',
       response: { safe: true },
       clientIp: '203.0.113.2',
@@ -134,7 +136,8 @@ describe('durable Upstash adapter', () => {
     })).resolves.toEqual(expected)
     expect(upstash.client.eval.mock.calls[0][0]).toBe(APPEND_VOTE_LUA_SCRIPT)
     expect(upstash.client.eval.mock.calls[0][1]).toContain('ratelimit:vote:ip:203.0.113.2')
-    expect(upstash.client.eval.mock.calls[0][2].at(-1)).toBe(1)
+    expect(upstash.client.eval.mock.calls[0][2].at(-2)).toBe(1)
+    expect(upstash.client.eval.mock.calls[0][2].at(-1)).toBe('digest:submission')
   })
 
   it('passes identity loss into Lua and rejects malformed Redis replies', async () => {
@@ -142,16 +145,18 @@ describe('durable Upstash adapter', () => {
     await appendVoteAtomically({
       pollId: 'poll123456',
       submissionId: 'submission',
+      submissionDigest: 'digest:submission',
       responseId: 'response-1',
       response: {},
       clientIp: null,
       now: 1,
     })
-    expect(upstash.client.eval.mock.calls[0][2].at(-1)).toBe(0)
+    expect(upstash.client.eval.mock.calls[0][2].at(-2)).toBe(0)
 
     upstash.client.eval.mockResolvedValueOnce(['corrupt'])
     await expect(appendVoteAtomically({
-      pollId: 'poll123456', submissionId: 'a', responseId: 'b', response: {}, clientIp: '203.0.113.2',
+      pollId: 'poll123456', submissionId: 'a', submissionDigest: 'digest:a',
+      responseId: 'b', response: {}, clientIp: '203.0.113.2',
     })).rejects.toThrow('Stored poll is corrupt')
 
     upstash.client.eval.mockResolvedValueOnce('not-an-array')

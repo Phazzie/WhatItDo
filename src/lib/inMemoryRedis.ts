@@ -27,6 +27,7 @@ export interface InMemoryAppendInput {
   ipRateKey: string
   pollRateKey: string
   submissionId: string
+  submissionDigest: string
   responseId: string
   responseJson: string
   now: number
@@ -42,6 +43,7 @@ export interface InMemoryAppendInput {
 export type InMemoryAppendResult =
   | ['appended', string, number]
   | ['duplicate', string, number]
+  | ['idempotency_conflict']
   | ['not_found']
   | ['expired']
   | ['identity_unavailable']
@@ -98,6 +100,20 @@ export class InMemoryRedis {
     list.push(...values)
     this.lists.set(key, list)
     return list.length
+  }
+
+  async hset(key: string, field: string, value: string): Promise<number> {
+    this.purgeExpired(key)
+    const hash = this.hashes.get(key) ?? new Map<string, string>()
+    const isNew = hash.has(field) ? 0 : 1
+    hash.set(field, value)
+    this.hashes.set(key, hash)
+    return isNew
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    this.purgeExpired(key)
+    return this.hashes.get(key)?.get(field) ?? null
   }
 
   async lrange(key: string, start: number, stop: number): Promise<string[]> {
@@ -173,8 +189,26 @@ export class InMemoryRedis {
     this.purgeExpired(input.submissionsKey)
     const existing = this.hashes.get(input.submissionsKey)?.get(input.submissionId)
     if (existing) {
+      let receipt: unknown
+      try {
+        receipt = JSON.parse(existing)
+      } catch {
+        return ['idempotency_conflict']
+      }
+      if (
+        typeof receipt !== 'object' || receipt === null ||
+        typeof (receipt as { responseId?: unknown }).responseId !== 'string' ||
+        typeof (receipt as { digest?: unknown }).digest !== 'string' ||
+        (receipt as { digest: string }).digest !== input.submissionDigest
+      ) {
+        return ['idempotency_conflict']
+      }
       this.purgeExpired(input.responsesKey)
-      return ['duplicate', existing, (this.lists.get(input.responsesKey) ?? []).length]
+      return [
+        'duplicate',
+        (receipt as { responseId: string }).responseId,
+        (this.lists.get(input.responsesKey) ?? []).length,
+      ]
     }
 
     if (!input.clientIdentityAvailable) return ['identity_unavailable']
@@ -193,7 +227,10 @@ export class InMemoryRedis {
     responses.push(input.responseJson)
     this.lists.set(input.responsesKey, responses)
     const submissions = this.hashes.get(input.submissionsKey) ?? new Map<string, string>()
-    submissions.set(input.submissionId, input.responseId)
+    submissions.set(input.submissionId, JSON.stringify({
+      responseId: input.responseId,
+      digest: input.submissionDigest,
+    }))
     this.hashes.set(input.submissionsKey, submissions)
 
     const ttl = Math.min(input.idleTtlSeconds, remainingSeconds)

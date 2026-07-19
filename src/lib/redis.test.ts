@@ -36,10 +36,16 @@ async function seedPoll(id = 'poll123456', createdAt = now, expiresAt?: number) 
   )
 }
 
-function append(id: string, submissionId: string, clientIp: string | null = '192.0.2.1') {
+function append(
+  id: string,
+  submissionId: string,
+  clientIp: string | null = '192.0.2.1',
+  submissionDigest = `digest:${submissionId}`
+) {
   return appendVoteAtomically({
     pollId: id,
     submissionId,
+    submissionDigest,
     responseId: `response-${submissionId}`,
     response: { id: `response-${submissionId}` },
     clientIp,
@@ -126,6 +132,35 @@ describe('atomic vote append', () => {
       status: 'duplicate',
       responseId: 'response-original',
     })
+  })
+
+  it('rejects changed ballot reuse before identity and rate checks', async () => {
+    await seedPoll()
+    expect((await append('poll123456', 'original', '192.0.2.1', 'digest:one')).status).toBe('appended')
+    for (let index = 1; index < 20; index += 1) {
+      expect((await append('poll123456', `unique-${index}`)).status).toBe('appended')
+    }
+
+    expect((await append('poll123456', 'blocked')).status).toBe('rate_limited')
+    expect((await append('poll123456', 'original', null, 'digest:changed')).status)
+      .toBe('idempotency_conflict')
+    expect(await inMemoryRedis.lrange('poll:poll123456:responses', 0, -1)).toHaveLength(20)
+    expect(JSON.parse(
+      await inMemoryRedis.hget('poll:poll123456:submissions', 'original') as string
+    )).toEqual({ responseId: 'response-original', digest: 'digest:one' })
+  })
+
+  it('fails a legacy plain submission receipt closed', async () => {
+    await seedPoll()
+    await inMemoryRedis.hset(
+      'poll:poll123456:submissions',
+      'legacy-submission',
+      'legacy-response-id'
+    )
+
+    expect((await append('poll123456', 'legacy-submission', null)).status)
+      .toBe('idempotency_conflict')
+    expect(await inMemoryRedis.lrange('poll:poll123456:responses', 0, -1)).toEqual([])
   })
 
   it('enforces the independent 100-per-hour poll bucket across many client IPs', async () => {

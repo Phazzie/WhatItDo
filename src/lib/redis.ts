@@ -29,6 +29,7 @@ export type CreatePollResult =
 export type AppendVoteResult =
   | { status: 'appended'; responseId: string; responseCount: number }
   | { status: 'duplicate'; responseId: string; responseCount: number }
+  | { status: 'idempotency_conflict' }
   | { status: 'not_found' }
   | { status: 'expired' }
   | { status: 'identity_unavailable' }
@@ -38,6 +39,7 @@ export type AppendVoteResult =
 export interface AppendVoteInput {
   pollId: string
   submissionId: string
+  submissionDigest: string
   responseId: string
   response: unknown
   clientIp: string | null
@@ -167,7 +169,15 @@ if remaining < 1 then
 end
 
 local existing = redis.call('HGET', KEYS[3], ARGV[1])
-if existing then return {'duplicate', existing, redis.call('LLEN', KEYS[2])} end
+if existing then
+  local decodedReceipt, receipt = pcall(cjson.decode, existing)
+  if not decodedReceipt or type(receipt) ~= 'table' or
+     type(receipt.responseId) ~= 'string' or type(receipt.digest) ~= 'string' or
+     receipt.digest ~= ARGV[12] then
+    return {'idempotency_conflict'}
+  end
+  return {'duplicate', receipt.responseId, redis.call('LLEN', KEYS[2])}
+end
 
 if ARGV[11] ~= '1' then return {'identity_unavailable'} end
 
@@ -197,7 +207,8 @@ pollCount = redis.call('INCR', KEYS[5])
 if pollCount == 1 then redis.call('EXPIRE', KEYS[5], window) end
 
 responseCount = redis.call('RPUSH', KEYS[2], ARGV[3])
-redis.call('HSET', KEYS[3], ARGV[1], ARGV[2])
+local receipt = cjson.encode({responseId = ARGV[2], digest = ARGV[12]})
+redis.call('HSET', KEYS[3], ARGV[1], receipt)
 local ttl = math.min(idleTtl, remaining)
 redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('EXPIRE', KEYS[2], ttl)
@@ -267,6 +278,8 @@ function parseAppendVoteResult(raw: unknown): AppendVoteResult {
       return { status: 'appended', responseId: String(raw[1]), responseCount: Number(raw[2]) }
     case 'duplicate':
       return { status: 'duplicate', responseId: String(raw[1]), responseCount: Number(raw[2]) }
+    case 'idempotency_conflict':
+      return { status: 'idempotency_conflict' }
     case 'not_found':
       return { status: 'not_found' }
     case 'expired':
@@ -308,6 +321,7 @@ export async function appendVoteAtomically(input: AppendVoteInput): Promise<Appe
       ipRateKey: keys[3],
       pollRateKey: keys[4],
       submissionId: input.submissionId,
+      submissionDigest: input.submissionDigest,
       responseId: input.responseId,
       responseJson,
       now,
@@ -332,6 +346,7 @@ export async function appendVoteAtomically(input: AppendVoteInput): Promise<Appe
       VOTE_POLL_RATE_LIMIT,
       MAX_POLL_RESPONSES,
       input.clientIp === null ? 0 : 1,
+      input.submissionDigest,
     ])
   }
   return parseAppendVoteResult(raw)

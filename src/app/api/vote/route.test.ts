@@ -85,6 +85,57 @@ describe('POST /api/vote', () => {
     expect(sendMock).toHaveBeenCalledTimes(1)
   })
 
+  it('treats a normalization-equivalent retry as the same ballot', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    const { POST } = await import('./route')
+
+    expect(await (await POST(request({
+      voterName: ' Alice ',
+      votes: [{ text: ' Pizza ', vote: 'yes', comment: ' Fine ' }],
+      counterProposal: ' Tacos ',
+    }))).json()).toMatchObject({ notification: 'sent' })
+    expect(await (await POST(request({
+      voterName: 'Alice',
+      votes: [{ text: 'Pizza', vote: 'yes', comment: 'Fine' }],
+      counterProposal: 'Tacos',
+    }))).json()).toEqual({ success: true, notification: 'duplicate' })
+    expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects reuse of a submission ID for a changed ballot without mutation or email', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key')
+    vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')
+    const { POST } = await import('./route')
+    expect((await POST(request())).status).toBe(200)
+
+    const conflict = await POST(request({
+      voterName: 'Edited voter',
+      votes: [{ text: 'Pizza', vote: 'no', comment: 'Changed' }],
+    }))
+
+    expect(conflict.status).toBe(409)
+    expect(await conflict.json()).toEqual({
+      error: 'Submission ID was already used for a different ballot',
+    })
+    expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toHaveLength(1)
+    expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails legacy plain receipts closed before identity checks, mutation, or email', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL', '')
+    vi.stubEnv('TRUST_PROXY', '')
+    await inMemoryRedis.hset(`poll:${pollId}:submissions`, submissionId, 'legacy-response-id')
+    const { POST } = await import('./route')
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(409)
+    expect(await inMemoryRedis.lrange(`poll:${pollId}:responses`, 0, -1)).toEqual([])
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
   it('keeps notification email free of poll and voter details and sets provider idempotency', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test-key')
     vi.stubEnv('POLL_CREATOR_EMAIL', 'owner@example.com')

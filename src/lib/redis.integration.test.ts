@@ -71,7 +71,7 @@ describeRedis('Redis 7 Lua integration', () => {
     keys: AppendKeys,
     submissionId: string,
     responseId: string,
-    options?: { identityAvailable?: boolean; now?: number }
+    options?: { identityAvailable?: boolean; now?: number; submissionDigest?: string }
   ): Promise<unknown[]> {
     return client.eval(APPEND_VOTE_LUA_SCRIPT, {
       keys,
@@ -87,6 +87,7 @@ describeRedis('Redis 7 Lua integration', () => {
         String(VOTE_POLL_RATE_LIMIT),
         String(MAX_POLL_RESPONSES),
         options?.identityAvailable === false ? '0' : '1',
+        options?.submissionDigest ?? `digest:${submissionId}`,
       ],
     }) as Promise<unknown[]>
   }
@@ -165,6 +166,33 @@ describeRedis('Redis 7 Lua integration', () => {
       identityAvailable: false,
     })
     expect(retry.slice(0, 2)).toEqual(['duplicate', 'stored-response'])
+  })
+
+  it('rejects changed ballot reuse and legacy receipts before identity or rate mutation', async () => {
+    const keys = await createPoll()
+    expect((await append(keys, 'submission-a', 'response-a', {
+      submissionDigest: 'digest:one',
+    }))[0]).toBe('appended')
+
+    expect(await append(keys, 'submission-a', 'different-response', {
+      identityAvailable: false,
+      submissionDigest: 'digest:changed',
+    })).toEqual(['idempotency_conflict'])
+    expect(await client.lLen(keys[1])).toBe(1)
+    expect(Number(await client.get(keys[3]))).toBe(1)
+    expect(JSON.parse(await client.hGet(keys[2], 'submission-a') as string)).toEqual({
+      responseId: 'response-a',
+      digest: 'digest:one',
+    })
+
+    const legacyKeys = await createPoll({ pollId: randomUUID(), ip: 'legacy-ip' })
+    await client.hSet(legacyKeys[2], 'legacy-submission', 'legacy-response-id')
+    expect(await append(legacyKeys, 'legacy-submission', 'never-stored', {
+      identityAvailable: false,
+    })).toEqual(['idempotency_conflict'])
+    expect(await client.lLen(legacyKeys[1])).toBe(0)
+    expect(await client.exists(legacyKeys[3])).toBe(0)
+    expect(await client.exists(legacyKeys[4])).toBe(0)
   })
 
   it('enforces the per-IP append limit without recording the rejected vote', async () => {

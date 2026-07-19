@@ -1,6 +1,7 @@
 import * as storageModule from '@/lib/redis'
 import { sanitizeHeaderValue } from '@/lib/escapeHtml'
 import { readJsonBody } from '@/lib/requestBody'
+import { createSubmissionDigest } from '@/lib/submissionDigest'
 import type { NotificationStatus, StoredPoll, StoredPollResponse } from '@/lib/types'
 import { isValidPollId, parseVoteInput } from '@/lib/validation'
 import { nanoid } from 'nanoid'
@@ -9,7 +10,7 @@ import { Resend } from 'resend'
 
 type RedisReader = { get<T = unknown>(key: string): Promise<T | null> }
 type AppendResult = {
-  status: 'appended' | 'duplicate' | 'not_found' | 'expired' | 'identity_unavailable' | 'capacity_reached' | 'rate_limited'
+  status: 'appended' | 'duplicate' | 'idempotency_conflict' | 'not_found' | 'expired' | 'identity_unavailable' | 'capacity_reached' | 'rate_limited'
   responseId?: string
   responseCount?: number
   retryAfterSeconds?: number
@@ -23,6 +24,7 @@ type StorageContract = {
   appendVoteAtomically(input: {
     pollId: string
     submissionId: string
+    submissionDigest: string
     responseId: string
     response: unknown
     clientIp: string | null
@@ -93,6 +95,11 @@ export async function POST(request: NextRequest) {
 
     const parsed = parseVoteInput(candidate, poll)
     if (!parsed.ok) return errorResponse(parsed.error, 400)
+    const submissionDigest = createSubmissionDigest({
+      voterName: parsed.data.voterName,
+      votes: parsed.data.votes,
+      ...(parsed.data.counterProposal ? { counterProposal: parsed.data.counterProposal } : {}),
+    })
     const response: StoredPollResponse = {
       id: nanoid(12),
       voterName: parsed.data.voterName,
@@ -105,6 +112,7 @@ export async function POST(request: NextRequest) {
     const appended = await storage.appendVoteAtomically({
       pollId,
       submissionId: parsed.data.submissionId,
+      submissionDigest,
       responseId: response.id,
       clientIp: identity.status === 'resolved'
         ? identity.ip
@@ -115,6 +123,9 @@ export async function POST(request: NextRequest) {
 
     if (appended.status === 'duplicate') {
       return NextResponse.json({ success: true, notification: 'duplicate' satisfies NotificationStatus })
+    }
+    if (appended.status === 'idempotency_conflict') {
+      return errorResponse('Submission ID was already used for a different ballot', 409)
     }
     if (appended.status === 'not_found' || appended.status === 'expired') {
       return errorResponse('Poll not found', 404)
