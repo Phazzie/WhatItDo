@@ -11,18 +11,29 @@ const SANDBOX_CHROMIUM = '/opt/pw-browsers/chromium'
 const executablePath = fs.existsSync(SANDBOX_CHROMIUM) ? SANDBOX_CHROMIUM : undefined
 
 const PORT = 3100
+const skipBuild = process.env.E2E_SKIP_BUILD === '1'
 
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
+  workers: process.env.CI ? undefined : 1,
   retries: 0,
   reporter: 'list',
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
+    extraHTTPHeaders: {
+      // The production server intentionally rejects requests without a trusted
+      // client identity. This header is accepted only because the local test
+      // server opts into TRUST_PROXY below.
+      'x-forwarded-for': '127.0.0.1',
+    },
     trace: 'retain-on-failure',
-    ...(executablePath ? { launchOptions: { executablePath } } : {}),
+    launchOptions: {
+      ...(executablePath ? { executablePath } : {}),
+      ...(process.platform === 'darwin' ? { args: ['--disable-gpu'] } : {}),
+    },
   },
   projects: [
     {
@@ -31,20 +42,22 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // `next dev` recompiles route bundles on demand as different pages are
-    // first visited; in this app that on-demand recompile has been observed
-    // to reset the in-process `USE_MOCK_REDIS` singleton mid-run (a poll
-    // created via the create page 404s once the vote page's bundle first
-    // compiles). A production build + `next start` has one stable bundle for
-    // the whole run, so state survives navigation across routes.
-    command: `npm run build && npm run start -- --port ${PORT}`,
+    // Use a production build so the in-process E2E store survives navigation
+    // across route bundles. The application permits this store only for an
+    // explicit loopback E2E run with no deployment marker.
+    command: skipBuild
+      ? `npm run start -- --port ${PORT}`
+      : `npm run build && npm run start -- --port ${PORT}`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 540_000,
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
-      USE_MOCK_REDIS: '1',
+      USE_IN_MEMORY_REDIS: '1',
+      E2E_TEST: '1',
+      E2E_BASE_URL: `http://127.0.0.1:${PORT}`,
+      TRUST_PROXY: '1',
     },
   },
 })

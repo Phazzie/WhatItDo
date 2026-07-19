@@ -1,240 +1,119 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { mockRedis } from '@/test/mockRedis'
+import { inMemoryRedis } from '@/lib/inMemoryRedis'
+import * as redis from '@/lib/redis'
+import { POLL_IDLE_TTL_SECONDS, resetRedisForTests } from '@/lib/redis'
 
-const THIRTY_DAYS_SECONDS_MOCK = 60 * 60 * 24 * 30
-
-// Reimplements the small redis.ts helpers against this test's `mockRedis`
-// instance (rather than partially mocking the real module) so route tests
-// exercise the same sliding-window-log logic without depending on module
-// load order / env vars for the real Upstash client.
-vi.mock('@/lib/redis', () => ({
-  redis: mockRedis,
-  POLL_TTL_SECONDS: THIRTY_DAYS_SECONDS_MOCK,
-  checkRateLimit: async (key: string, limit: number, windowSeconds: number) => {
-    const now = Date.now()
-    const raw = await mockRedis.get<string>(key)
-    const timestamps: number[] = raw ? JSON.parse(raw) : []
-    const windowStart = now - windowSeconds * 1000
-    const recent = timestamps.filter((t) => t > windowStart)
-    if (recent.length >= limit) return false
-    recent.push(now)
-    await mockRedis.set(key, JSON.stringify(recent), { ex: windowSeconds })
-    return true
-  },
-  getClientIp: (request: { headers: { get(name: string): string | null } }) => {
-    const forwardedFor = request.headers.get('x-forwarded-for')
-    if (forwardedFor) return forwardedFor.split(',')[0].trim()
-    return 'unknown'
-  },
-}))
-
-function postRequest(body: unknown, headers: Record<string, string> = {}) {
+function post(body: unknown) {
   return new NextRequest('http://localhost/api/poll', {
     method: 'POST',
     body: typeof body === 'string' ? body : JSON.stringify(body),
-    headers: { 'content-type': 'application/json', ...headers },
+    headers: { 'content-type': 'application/json' },
   })
 }
 
-describe('POST /api/poll validation (2.1, C3/H3)', () => {
+describe('/api/poll public privacy contract', () => {
   beforeEach(() => {
-    mockRedis.reset()
-    vi.resetModules()
-  })
-
-  it('rejects more than 3 suggestions', async () => {
-    const { POST } = await import('./route')
-    const suggestions = Array.from({ length: 50 }, (_, i) => `Option ${i}`)
-    const response = await POST(postRequest({ title: 'Big poll', suggestions }))
-    const json = await response.json()
-
-    expect(response.status).toBe(400)
-    expect(json.error).toBeTruthy()
-  })
-
-  it('rejects a malformed JSON body with 400, not 500', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(postRequest('{not json'))
-    expect(response.status).toBe(400)
-  })
-
-  it('accepts a valid poll', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(postRequest({ title: 'Dinner', suggestions: ['Pizza', 'Tacos'] }))
-    const json = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(json.id).toBeTruthy()
-  })
-})
-
-const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30
-
-describe('POST /api/poll TTL (2.5, H2)', () => {
-  beforeEach(() => {
-    mockRedis.reset()
-  })
-
-  it('sets a 30-day TTL on the poll key', async () => {
-    const { POST } = await import('./route')
-    const response = await POST(postRequest({ title: 'Dinner', suggestions: ['Pizza', 'Tacos'] }))
-    const json = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(mockRedis.getTtl(`poll:${json.id}`)).toBe(THIRTY_DAYS_SECONDS)
-  })
-})
-
-describe('POST /api/poll rate limiting (2.5, C5)', () => {
-  const originalEnv = process.env.RATE_LIMIT_ENABLED
-
-  beforeEach(() => {
-    mockRedis.reset()
-    vi.resetModules()
-  })
-
-  afterEach(() => {
-    process.env.RATE_LIMIT_ENABLED = originalEnv
-  })
-
-  it('passes through with no limiting when RATE_LIMIT_ENABLED is unset (dev/test default)', async () => {
-    delete process.env.RATE_LIMIT_ENABLED
-    const { POST } = await import('./route')
-
-    for (let i = 0; i < 15; i++) {
-      const response = await POST(
-        postRequest(
-          { title: 'Dinner', suggestions: ['Pizza'] },
-          { 'x-forwarded-for': '10.0.0.1' }
-        )
-      )
-      expect(response.status).toBe(200)
-    }
-  })
-
-  it('returns 429 after the poll limit (10/hr) is exceeded when enabled', async () => {
-    process.env.RATE_LIMIT_ENABLED = '1'
-    const { POST } = await import('./route')
-
-    const statuses: number[] = []
-    for (let i = 0; i < 12; i++) {
-      const response = await POST(
-        postRequest(
-          { title: 'Dinner', suggestions: ['Pizza'] },
-          { 'x-forwarded-for': '10.0.0.2' }
-        )
-      )
-      statuses.push(response.status)
-    }
-
-    expect(statuses.filter((s) => s === 200).length).toBe(10)
-    expect(statuses.filter((s) => s === 429).length).toBe(2)
-  })
-})
-
-describe('GET /api/poll merges the responses list (2.2, C1)', () => {
-  beforeEach(() => {
-    mockRedis.reset()
-  })
-
-  it('merges poll:{id}:responses into the returned poll', async () => {
-    const { GET } = await import('./route')
-
-    const poll = {
-      id: 'poll-merge',
-      title: 'Dinner',
-      suggestions: ['Pizza', 'Tacos'],
-      creatorEmail: 'creator@example.com',
-      createdAt: Date.now(),
-      responses: [],
-      mode: 'normal',
-    }
-    await mockRedis.set(`poll:${poll.id}`, JSON.stringify(poll))
-    await mockRedis.rpush(
-      `poll:${poll.id}:responses`,
-      JSON.stringify({ id: 'r1', voterName: 'Alice', votes: [], submittedAt: Date.now() }),
-      JSON.stringify({ id: 'r2', voterName: 'Bob', votes: [], submittedAt: Date.now() })
-    )
-
-    const request = new NextRequest(`http://localhost/api/poll?id=${poll.id}`)
-    const response = await GET(request)
-    const json = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(json.poll.responses).toHaveLength(2)
-    expect(json.poll.responses[0].voterName).toBe('Alice')
-  })
-
-  it('returns 404, not a crash, for an id crafted to collide with the responses list key (self-review)', async () => {
-    const { GET } = await import('./route')
-
-    await mockRedis.rpush(
-      'poll:real-poll:responses',
-      JSON.stringify({ id: 'r1', voterName: 'Alice', votes: [], submittedAt: Date.now() })
-    )
-
-    const request = new NextRequest('http://localhost/api/poll?id=real-poll:responses')
-    const response = await GET(request)
-
-    expect(response.status).toBe(404)
-  })
-})
-
-describe('creatorEmail is never exposed to clients (Codex review)', () => {
-  beforeEach(() => {
-    mockRedis.reset()
     vi.unstubAllEnvs()
-    vi.stubEnv('POLL_CREATOR_EMAIL', 'secret-owner@example.com')
+    vi.restoreAllMocks()
+    resetRedisForTests()
   })
 
-  it('POST /api/poll response omits creatorEmail', async () => {
+  it('creates a poll with an independent token but exposes exactly the PublicPoll keys', async () => {
     const { POST } = await import('./route')
-    const res = await POST(postRequest({ suggestions: ['A'], mode: 'normal' }))
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(JSON.stringify(data)).not.toContain('secret-owner@example.com')
-    expect(data.poll).not.toHaveProperty('creatorEmail')
+    const response = await POST(post({ title: ' Dinner? ', suggestions: [' Pizza ', 'Tacos'], mode: 'normal' }))
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json.id).toMatch(/^[A-Za-z0-9_-]{10}$/)
+    expect(json.resultsToken).toMatch(/^[A-Za-z0-9_-]{24}$/)
+    expect(Object.keys(json.poll).sort()).toEqual(['mode', 'suggestions', 'title'])
+    expect(json.poll).toEqual({ title: 'Dinner?', mode: 'normal', suggestions: ['Pizza', 'Tacos'] })
+
+    const storedRaw = await inMemoryRedis.get<string>(`poll:${json.id}`)
+    const stored = JSON.parse(storedRaw as string)
+    expect(stored.resultsTokenHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(stored.resultsTokenHash).not.toBe(json.resultsToken)
+    expect(stored).not.toHaveProperty('creatorEmail')
+    expect(stored).not.toHaveProperty('responses')
+    expect(inMemoryRedis.getTtl(`poll:${json.id}`)).toBeLessThanOrEqual(POLL_IDLE_TTL_SECONDS)
+    expect(response.headers.get('cache-control')).toBe('private, no-store, max-age=0')
   })
 
-  it('GET /api/poll response omits creatorEmail', async () => {
-    const { POST, GET } = await import('./route')
-    const createRes = await POST(postRequest({ suggestions: ['A'], mode: 'normal' }))
-    const { id } = await createRes.json()
-    const res = await GET(new NextRequest(`http://localhost/api/poll?id=${id}`))
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(JSON.stringify(data)).not.toContain('secret-owner@example.com')
-    expect(data.poll).not.toHaveProperty('creatorEmail')
-  })
-})
+  it('charges the create rate once and retries a colliding namespace with fresh credentials', async () => {
+    const rateSpy = vi.spyOn(redis, 'checkPollCreateRateLimit')
+    const createSpy = vi.spyOn(redis, 'createPollAtomically')
+      .mockResolvedValueOnce({ status: 'namespace_conflict' })
+      .mockResolvedValueOnce({ status: 'created' })
+    const { POST } = await import('./route')
 
-describe('legacy polls with embedded responses (Codex review)', () => {
-  beforeEach(() => {
-    mockRedis.reset()
-    vi.unstubAllEnvs()
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+    const json = await response.json()
+    const attemptedPolls = createSpy.mock.calls.map(([poll]) => poll)
+
+    expect(response.status).toBe(200)
+    expect(rateSpy).toHaveBeenCalledTimes(1)
+    expect(createSpy).toHaveBeenCalledTimes(2)
+    expect(attemptedPolls[0].id).not.toBe(attemptedPolls[1].id)
+    expect(attemptedPolls[0].resultsTokenHash).not.toBe(attemptedPolls[1].resultsTokenHash)
+    expect(json.id).toBe(attemptedPolls[1].id)
   })
 
-  it('GET falls back to responses embedded in the poll object when the list key is empty', async () => {
+  it('stops after three namespace collisions without spending another rate attempt', async () => {
+    const rateSpy = vi.spyOn(redis, 'checkPollCreateRateLimit')
+    const createSpy = vi.spyOn(redis, 'createPollAtomically')
+      .mockResolvedValue({ status: 'namespace_conflict' })
+    const { POST } = await import('./route')
+
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Failed to create poll' })
+    expect(rateSpy).toHaveBeenCalledTimes(1)
+    expect(createSpy).toHaveBeenCalledTimes(3)
+    const attemptedPolls = createSpy.mock.calls.map(([poll]) => poll)
+    expect(new Set(attemptedPolls.map((poll) => poll.id)).size).toBe(3)
+    expect(new Set(attemptedPolls.map((poll) => poll.resultsTokenHash)).size).toBe(3)
+  })
+
+  it('GET returns exactly title/mode/suggestions with no-store', async () => {
+    const { GET, POST } = await import('./route')
+    const created = await (await POST(post({ suggestions: ['A'], mode: 'dubious' }))).json()
+    const response = await GET(new NextRequest(`http://localhost/api/poll?id=${created.id}`))
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(Object.keys(json.poll).sort()).toEqual(['mode', 'suggestions', 'title'])
+    expect(JSON.stringify(json)).not.toContain(created.id)
+    expect(JSON.stringify(json)).not.toContain(created.resultsToken)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('retires tokenless legacy polls with 410 instead of exposing embedded responses', async () => {
     const { GET } = await import('./route')
-    const legacyPoll = {
-      id: 'legacy1',
-      title: 'Old poll',
-      suggestions: ['A'],
-      creatorEmail: '',
-      createdAt: Date.now(),
-      mode: 'normal',
-      responses: [
-        { id: 'r1', voterName: 'OldVoter', votes: [{ text: 'A', vote: 'yes', comment: '' }], submittedAt: Date.now() },
-      ],
-    }
-    await mockRedis.set('poll:legacy1', JSON.stringify(legacyPoll))
-    // No poll:legacy1:responses list exists — pre-migration data layout.
+    await inMemoryRedis.set('poll:legacy0001', JSON.stringify({
+      id: 'legacy0001', title: 'Old', suggestions: ['A'], mode: 'normal', createdAt: Date.now(),
+      responses: [{ id: 'secret', voterName: 'Private person' }],
+    }))
+    const response = await GET(new NextRequest('http://localhost/api/poll?id=legacy0001'))
+    expect(response.status).toBe(410)
+    expect(JSON.stringify(await response.json())).not.toContain('Private person')
+  })
 
-    const res = await GET(new NextRequest('http://localhost/api/poll?id=legacy1'))
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data.poll.responses).toHaveLength(1)
-    expect(data.poll.responses[0].voterName).toBe('OldVoter')
+  it('rejects malformed and oversized requests without a 500', async () => {
+    const { POST } = await import('./route')
+    expect((await POST(post('{not-json'))).status).toBe(400)
+    expect((await POST(post('x'.repeat(16 * 1024 + 1)))).status).toBe(413)
+  })
+
+  it('rejects no-CORS-compatible text bodies before creating a poll', async () => {
+    const { POST } = await import('./route')
+    const response = await POST(new NextRequest('http://localhost/api/poll', {
+      method: 'POST',
+      body: JSON.stringify({ suggestions: ['Orphan me'], mode: 'normal' }),
+      headers: { 'content-type': 'text/plain' },
+    }))
+    expect(response.status).toBe(415)
+    expect(await response.json()).toEqual({ error: 'Content-Type must be application/json' })
   })
 })
