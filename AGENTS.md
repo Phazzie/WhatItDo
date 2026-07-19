@@ -1,8 +1,9 @@
 # WhatItDo Agent Guide
 
 This repository is a small public polling application built with the Next.js App Router. The active
-completion plan is `docs/FINISH_EXEC_PLAN.md`; read it and `docs/FINISH_AUDIT.md` before making a
-product or architecture change.
+PR #4 repair and release plan is `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`; read it and
+`docs/FINISH_AUDIT.md` before making a product or architecture change. The older
+`docs/FINISH_EXEC_PLAN.md` remains historical context for the implementation already on the branch.
 
 ## Product invariants
 
@@ -45,7 +46,9 @@ product or architecture change.
 ## Working agreement
 
 - Preserve unrelated user changes. Check `git status --short --branch` before and after each slice.
-- Work on the PR #4 branch, `claude/repo-audit-completion-plan-uau7sr`, until this plan is complete.
+- Keep implementation and PR #4 review cleanup on
+  `claude/repo-audit-completion-plan-uau7sr`. Root may use `pr4-audit-prerequisites` only for the
+  stack, inner-merge evidence, and release operations explicitly named by the active ExecPlan.
 - Keep commits focused and reviewable. Do not rewrite published history.
 - Use subagents for bounded audits, test design, and review. One agent owns a file at a time; the root
   agent integrates changes and runs repository-wide gates.

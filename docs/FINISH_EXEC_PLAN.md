@@ -3,6 +3,11 @@
 This ExecPlan follows `.agent/PLANS.md`. It is a living document and must remain usable without the
 conversation that created it.
 
+> **Current execution note (2026-07-19):** This document records the implementation that produced
+> the existing PR #4 candidate. `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md` now governs the remaining PR #4
+> repair, review cleanup, PR stacking, and release. Preserve the decisions here unless the active
+> plan or `AGENTS.md` explicitly supersedes them.
+
 ## Purpose / Big Picture
 
 Finish WhatItDo as a secure, reliable, distinctive polling app. A creator can make a Classic or
