@@ -666,13 +666,8 @@ user data. On recovery, reuse/edit the existing evidence comment rather than cre
       --repo "$WHATITDO_REPO" --body "$WHATITDO_EVIDENCE_TEXT")
     WHATITDO_CURRENT_BODY=$(gh pr view "$WHATITDO_PROOF_PR" \
       --repo "$WHATITDO_REPO" --json body -q .body)
-    WHATITDO_UPDATED_BODY=$(python3 -c '
-import sys
-body, url = sys.argv[1], sys.argv[2]
-marker = "## Release evidence"
-prefix = body.split(marker, 1)[0].rstrip()
-print(f"{prefix}\n\n{marker}\n\n{url}\n")
-' "$WHATITDO_CURRENT_BODY" "$WHATITDO_EVIDENCE_COMMENT_URL")
+    WHATITDO_UPDATED_BODY=$(python3 -c 'import sys; body,url=sys.argv[1:3]; marker="## Release evidence"; prefix=body.split(marker,1)[0].rstrip(); print(f"{prefix}\n\n{marker}\n\n{url}\n")' \
+      "$WHATITDO_CURRENT_BODY" "$WHATITDO_EVIDENCE_COMMENT_URL")
     gh api "repos/$WHATITDO_REPO/pulls/$WHATITDO_PROOF_PR" -X PATCH \
       -f body="$WHATITDO_UPDATED_BODY" \
       | jq -e --arg url "$WHATITDO_EVIDENCE_COMMENT_URL" '.body | contains($url)'
