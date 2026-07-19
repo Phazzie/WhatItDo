@@ -12,6 +12,13 @@ Stack snapshot on 2026-07-19:
 - The complete paginated GraphQL refetch returned the same 28 unresolved thread IDs: 0 current and
   28 outdated after retargeting. Retargeting did not resolve or discard any thread.
 - No effective approval or change-request review exists; the latest bot reviews are comments only.
+- The unpublished repaired code tip is `5f0bf28`: five planned repair commits plus application and
+  CI hostile-review follow-up. The pre-push documentation commit follows this tip and must receive a
+  literal exact-head re-review before the first push.
+- Node 22 final local proof is green: lint, typecheck, build, zero-vulnerability audit, 125 unit
+  cases, 17 full-browser cases, and coverage of 91.27% statements, 85.71% branches, 97.61% functions,
+  and 94.47% lines. Redis 7 remains intentionally remote-only: all 13 cases skip locally without
+  `REDIS_URL` and must report 13 passed/zero skipped in CI.
 
 Update this ledger after each push. A thread moves to `resolved` only after its required evidence is
 green and a concise reply has been posted. The final GraphQL fetch must report zero unresolved.
@@ -55,7 +62,8 @@ the green workflow run in the PR conversation.
 
 ## Final proof
 
-- Latest head: pending
+- Latest remote head: `de8af4a` (candidate not pushed yet)
+- Latest local code head: `5f0bf28` (pre-push documentation commit pending)
 - Thread fetch command/date: pending
 - Unresolved current: 0
 - Unresolved outdated: 28

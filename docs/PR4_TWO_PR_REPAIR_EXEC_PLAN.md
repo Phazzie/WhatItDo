@@ -38,12 +38,22 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - [x] (2026-07-19) C-02 Installed/read back the temporary Vercel guard, pushed the exact first-16
   ref, opened draft PR #5, and retargeted PR #4. The new stack is `75f432d <- PR #5 @ 02f73ef <-
   PR #4 @ de8af4a`; all 28 review threads remain unresolved and are now outdated.
-- [ ] C-03 Commit the three existing CI test corrections.
-- [ ] C-04 Implement atomic/private poll creation.
-- [ ] C-05 Bind submission IDs to normalized ballot digests.
-- [ ] C-06 Make notification email detailed, escaped, provider-idempotent, and time-bounded.
-- [ ] C-07 Restore forced-colors keyboard focus.
-- [ ] C-08 Run the integrated local gate and exact-head adversarial reviews.
+- [x] (2026-07-19) C-03 Committed the three existing CI test corrections as `4123668`; Node
+  22.23.1 `npm run typecheck` passed.
+- [x] (2026-07-19) C-04 Implemented atomic/private poll creation as `cb45d3c`; 42 focused
+  route/storage cases, typecheck, and focused lint passed. The Redis 7 file skipped locally as
+  expected and remains a non-skipping CI gate.
+- [x] (2026-07-19) C-05 Bound submission IDs to normalized ballot digests as `0b883e6`; 56 focused
+  digest/route/storage cases, typecheck, and focused lint passed. All 13 Redis 7 cases are present
+  and locally skipped without `REDIS_URL`.
+- [x] (2026-07-19) C-06 Made notification email detailed, escaped, provider-idempotent, and
+  time-bounded as `bc09e29`; 16 focused route/timeout cases, typecheck, and focused lint passed.
+- [x] (2026-07-19) C-07 Restored forced-colors keyboard focus as `3b014dc`; typecheck, focused lint,
+  and the two-case forced-colors/ambiguous-retry production-browser proof passed.
+- [ ] C-08 Run the integrated local gate and exact-head adversarial reviews. The first complete local
+  gate was green. Three hostile lanes found no blocker in application/history, two high release-
+  runbook gaps, and ten useful medium findings; app follow-up is `2164293`, CI job bounds are
+  `5f0bf28`. The post-review full local gate is green; only the literal final-SHA re-review remains.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
   evidence-only closeout; record its final exact-head proof in PR #4.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, and launch PR-A's final gate.
@@ -81,14 +91,26 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   prior deployment is terminal `ERROR`, and GitHub reports no deployment for the new ref. This is the
   safe deduplication case in the guard proof. See
   `https://vercel.com/docs/project-configuration/project-settings#ignored-build-step`.
+- The three initial implementation-agent turns produced no file artifacts before their bounded
+  cutoff, so root integrated the planned packets locally. A later focused accessibility review was
+  productive: it caught a runbook/test-name mismatch and replaced brittle fixed Tab counts with
+  bounded keyboard traversal before C-07 was committed.
+- The first final-head hostile pass found no blocker and no high application/history defect. It did
+  catch two high release-process defects: GitHub/provider waits were not uniformly bounded, and a
+  Vercel CLI promotion timeout could race an immediate rollback even though Vercel continues the
+  timed-out operation. It also caught bearer-link copy, repeated accessible labels, partial email
+  configuration, terminal ballot states, literal exact-head review ordering, missing push/parent
+  guards, Redis skip proof, Preview target binding, and log-window precision before any candidate
+  push. See `https://vercel.com/docs/cli/promote` and `https://vercel.com/docs/cli/rollback`.
 
 ## Decision Log
 
 - Decision (2026-07-18): Use two PRs and preserve published history. Rationale: this is the smallest
   review stack that isolates `de8af4a` without cherry-picking, squashing, or rebuilding its parent.
-- Decision (2026-07-19): Use five coherent repair commits for six behavioral outcomes. Cache privacy
-  and atomic poll creation share one route/storage boundary and belong together. Commit count is not
-  used as a test boundary.
+- Decision (2026-07-19): Start with five coherent repair commits for six planned behavioral outcomes.
+  Cache privacy and atomic poll creation share one route/storage boundary and belong together.
+  Hostile review produced two transparent follow-up commits rather than rewriting already reviewed
+  local commits. Commit count is not used as a test boundary.
 - Decision (2026-07-19): Use a validation ladder. Agents run focused proofs; root runs typecheck at
   the backend handoff and the complete local gate once on the integrated PR #4 head. Remote full CI
   runs on PR #4, the completed PR-A head, and final default. Rationale: repeated full gates after
@@ -114,13 +136,17 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   repository SHA exist, so their canonical durable record is the relevant PR body and linked final
   comment. This avoids circular evidence commits, a third PR, or a docs-only commit that would
   silently change the released SHA.
+- Decision (2026-07-19): Request promotion/rollback asynchronously and poll provider status plus the
+  exact alias binding. A CLI timeout never authorizes a competing mutation because official Vercel
+  behavior continues the original operation after the client stops waiting.
 
 ## Outcomes & Retrospective
 
 Planning outcome: the executable unit is a coherent behavior packet, not an arbitrary line count or
-one-file microticket. The run has five repair commits, two implementation waves, one integrated local
-gate, and one intentional code-candidate push. Evidence-only commits are allowed where remote proof
-cannot exist earlier. Update this section through the C-10 inner merge in Git; append final
+one-file microticket. The run has five planned repair commits plus explicit hostile-review follow-up,
+two implementation waves, a final integrated local gate, and one intentional code-candidate push.
+Evidence-only commits are allowed where remote proof cannot exist earlier. Update this section
+through the C-10 inner merge in Git; append final
 exact-head CI, C-11/C-12 SHAs, URLs, checks, thread count, deployment ID, and retrospective to the
 relevant PR's durable release-evidence record.
 
@@ -302,7 +328,7 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [x] Vercel Preview is protected but shares secret targets with Production, requiring the branch
   guard.
 - [x] Node 22.23.1 checksum and executable version were verified.
-- [ ] Before every focused or full gate, select Node 22 and assert both direct Node and npm's child
+- [x] Before the integrated full gate, select Node 22 and assert both direct Node and npm's child
   process resolve to `v22.23.1`:
 
       export WHATITDO_NODE22_BIN=/private/tmp/whatitdo-node22.NCpP5f/node-v22.23.1-darwin-x64/bin
@@ -310,7 +336,8 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
       test "$(node -p 'process.version')" = v22.23.1
       test "$(npm exec -- node -p 'process.version')" = v22.23.1
 
-- [ ] If that temporary runtime is missing, reproduce it without changing system Node:
+- [x] The temporary runtime remained present, so no fallback download was needed. If it is missing
+  on resume, reproduce it without changing system Node:
 
       WHATITDO_NODE22_DIR=$(mktemp -d /private/tmp/whatitdo-node22.XXXXXX)
       curl -fsSLo "$WHATITDO_NODE22_DIR/node-v22.23.1-darwin-x64.tar.gz" \
@@ -337,18 +364,18 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
 - [x] Verify no usable Vercel deployment exists for that branch.
 - [x] Open PR-A as draft PR #5 against the default branch and record its number/URL.
 - [x] Export PR #4 thread state, retarget PR #4 to `pr4-audit-prerequisites`, and verify OIDs/diff.
-- [ ] Commit C-03 with only the two existing test files.
+- [x] Commit C-03 with only the two existing test files.
 
 ### C. Implementation and local validation
 
-- [ ] Create isolated worktrees/branches for storage, timeout, and accessibility at the C-03 head.
-- [ ] Dispatch C-04/C-05, C-06a, and C-07 with exclusive ownership and a ten-minute turn limit.
-- [ ] Integrate C-04 and run poll/Redis focused tests.
-- [ ] Integrate C-05 and run digest/vote/Redis focused tests plus typecheck.
-- [ ] Start C-06b from the C-05 head; integrate it and update README.
-- [ ] Integrate C-07 and run the forced-colors and ambiguous-retry browser cases.
-- [ ] Run `git diff --check` and inspect the complete diff for secrets and unrelated files.
-- [ ] Under Node 22 run:
+- [x] Create isolated worktrees/branches for storage, timeout, and accessibility at the C-03 head.
+- [x] Dispatch C-04/C-05, C-06a, and C-07 with exclusive ownership and a ten-minute turn limit.
+- [x] Integrate C-04 and run poll/Redis focused tests.
+- [x] Integrate C-05 and run digest/vote/Redis focused tests plus typecheck.
+- [x] Start C-06b from the C-05 head; integrate it and update README.
+- [x] Integrate C-07 and run the forced-colors and ambiguous-retry browser cases.
+- [x] Run `git diff --check` and inspect the complete diff for secrets and unrelated files.
+- [x] Under Node 22 run:
 
       npm run lint
       npm run typecheck
@@ -358,7 +385,11 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
       npm run build
       npm audit --audit-level=high
 
-- [ ] Record local totals and the allowed local Redis skip; CI must later show zero Redis skips.
+- [x] Record local totals and the allowed local Redis skip; CI must later show zero Redis skips.
+  Lint, typecheck, build, and audit passed; audit found zero vulnerabilities; Vitest reported 125
+  passed and 13 Redis-only skips; the explicit integration run reported all 13 cases skipped without
+  `REDIS_URL`; Playwright reported 17/17 passed. Coverage passed at 91.27% statements, 85.71%
+  branches, 97.61% functions, and 94.47% lines.
 - [ ] Obtain final exact-head history, application/security, and CI reviews.
 
 ### D. PR #4 proof and cleanup
@@ -523,12 +554,42 @@ changing only `WHATITDO_PROOF_PR`; do not depend on a plugin-cache path or branc
 
 ### Exact-head GitHub proof and thread disposition
 
-For a candidate SHA, `gh pr checks --watch` must finish successfully. Then independently require one
-successful completed `CI` run for each event and require all three named jobs in each run.
+For each PR #4 candidate—the code candidate and the later evidence-only closeout—push exactly the
+current head, read the remote ref back, and reset `WHATITDO_CANDIDATE_SHA`. Poll checks every 15
+seconds with a hard ten-minute deadline; never use an unbounded `gh pr checks --watch`. Then
+independently require one successful completed `CI` run for each event, all three named jobs, and a
+Redis reporter total of 13 passed with no skipped tests in each run.
 
     export WHATITDO_PROOF_PR=4
     export WHATITDO_CANDIDATE_SHA=$(git rev-parse HEAD)
-    gh pr checks "$WHATITDO_PROOF_PR" --repo "$WHATITDO_REPO" --watch --fail-fast
+    git push origin "HEAD:refs/heads/$WHATITDO_PR4_BRANCH"
+    test "$(git ls-remote origin "refs/heads/$WHATITDO_PR4_BRANCH" | cut -f1)" = \
+      "$WHATITDO_CANDIDATE_SHA"
+    wait_for_pr_checks() {
+      WHATITDO_CHECK_PR=$1
+      WHATITDO_CHECK_DEADLINE=$(( $(date +%s) + 600 ))
+      while :; do
+        if ! WHATITDO_CHECKS=$(gh pr checks "$WHATITDO_CHECK_PR" \
+          --repo "$WHATITDO_REPO" --json name,bucket,link); then
+          WHATITDO_CHECKS='[]'
+        fi
+        if jq -e 'length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")' \
+          <<<"$WHATITDO_CHECKS" >/dev/null; then
+          break
+        fi
+        if jq -e 'any(.[]; .bucket == "fail" or .bucket == "cancel")' \
+          <<<"$WHATITDO_CHECKS" >/dev/null; then
+          jq '[.[] | {name, bucket, link}]' <<<"$WHATITDO_CHECKS"
+          return 1
+        fi
+        if [ "$(date +%s)" -ge "$WHATITDO_CHECK_DEADLINE" ]; then
+          jq '[.[] | {name, bucket, link}]' <<<"$WHATITDO_CHECKS"
+          return 124
+        fi
+        sleep 15
+      done
+    }
+    wait_for_pr_checks "$WHATITDO_PROOF_PR"
     WHATITDO_RUNS=$(gh api --method GET \
       "repos/$WHATITDO_REPO/actions/runs" \
       -f head_sha="$WHATITDO_CANDIDATE_SHA" -f per_page=100)
@@ -539,14 +600,24 @@ successful completed `CI` run for each event and require all three named jobs in
                 .status == "completed" and .conclusion == "success")] |
         first | .id
       ' <<<"$WHATITDO_RUNS")
-      gh run view "$WHATITDO_RUN_ID" --repo "$WHATITDO_REPO" --json headSha,jobs \
-        | jq -e --arg sha "$WHATITDO_CANDIDATE_SHA" '
+      WHATITDO_RUN_VIEW=$(gh run view "$WHATITDO_RUN_ID" \
+        --repo "$WHATITDO_REPO" --json headSha,jobs)
+      jq -e --arg sha "$WHATITDO_CANDIDATE_SHA" '
             .headSha == $sha and
             ([.jobs[] | {name, conclusion}] | sort_by(.name)) ==
             ([{"name":"build","conclusion":"success"},
               {"name":"e2e","conclusion":"success"},
               {"name":"redis-integration","conclusion":"success"}] |
-             sort_by(.name))'
+             sort_by(.name))' <<<"$WHATITDO_RUN_VIEW"
+      WHATITDO_REDIS_JOB_ID=$(jq -er \
+        '.jobs[] | select(.name == "redis-integration") | .databaseId' \
+        <<<"$WHATITDO_RUN_VIEW")
+      WHATITDO_REDIS_LOG=$(gh run view "$WHATITDO_RUN_ID" \
+        --repo "$WHATITDO_REPO" --job "$WHATITDO_REDIS_JOB_ID" --log)
+      grep -Eq '13 passed \(13\)' <<<"$WHATITDO_REDIS_LOG"
+      if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_REDIS_LOG"; then
+        exit 1
+      fi
       if [ "$WHATITDO_EVENT" = push ]; then
         export WHATITDO_PUSH_RUN_ID=$WHATITDO_RUN_ID
       else
@@ -617,15 +688,18 @@ a redirect.
         "/v6/deployments?projectId=$WHATITDO_PROJECT_ID&limit=100" \
         --scope "$WHATITDO_VERCEL_SCOPE" --raw
     )
-    export WHATITDO_DEPLOYMENT_ID=$(jq -er --arg sha "$WHATITDO_CANDIDATE_SHA" '
+    export WHATITDO_DEPLOYMENT_ID=$(jq -er \
+      --arg sha "$WHATITDO_CANDIDATE_SHA" --arg project "$WHATITDO_PROJECT_ID" '
       [.deployments[] |
-       select(.meta.githubCommitSha == $sha and .readyState == "READY")] |
-      if length == 1 then .[0].uid else error("expected exactly one READY deployment") end
+       select(.meta.githubCommitSha == $sha and .projectId == $project and
+              .target != "production" and .readyState == "READY")] |
+      if length == 1 then .[0].uid
+      else error("expected exactly one READY Preview deployment for this project") end
     ' <<<"$WHATITDO_DEPLOYMENTS")
     WHATITDO_PROBE=$(
       "$WHATITDO_VERCEL" curl '/api/poll?id=AAAAAAAAAA' \
         --deployment "$WHATITDO_DEPLOYMENT_ID" --scope "$WHATITDO_VERCEL_SCOPE" -- \
-        --silent --show-error --max-redirs 0 \
+        --silent --show-error --max-time 15 --max-redirs 0 \
         --write-out $'\n__STATUS__%{http_code}\n__REDIRECT__%{redirect_url}'
     )
     test "$(sed -n 's/^__STATUS__//p' <<<"$WHATITDO_PROBE")" = 404
@@ -663,6 +737,8 @@ only at the reviewed SHA, fetch PR-A, and prove the merge contains that SHA with
     export WHATITDO_INNER_MERGE=$(gh pr view 4 --repo "$WHATITDO_REPO" --json mergeCommit -q .mergeCommit.oid)
     git fetch origin --prune
     test "$(git rev-parse "origin/$WHATITDO_PR_A_BRANCH")" = "$WHATITDO_INNER_MERGE"
+    test "$(git rev-parse "$WHATITDO_INNER_MERGE^1")" = "$WHATITDO_LIVE_PR_A"
+    test "$(git rev-parse "$WHATITDO_INNER_MERGE^2")" = "$WHATITDO_PR4_HEAD"
     test "$(git merge-base "$WHATITDO_PR4_HEAD" "origin/$WHATITDO_PR_A_BRANCH")" = \
       "$WHATITDO_PR4_HEAD"
     test "$(git rev-parse "$WHATITDO_PR4_HEAD^{tree}")" = \
@@ -683,7 +759,9 @@ proof with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`.
     git push origin "HEAD:refs/heads/$WHATITDO_PR_A_BRANCH"
     export WHATITDO_PROOF_PR=$WHATITDO_PR_A
     export WHATITDO_CANDIDATE_SHA=$(git rev-parse HEAD)
-    gh pr checks "$WHATITDO_PROOF_PR" --repo "$WHATITDO_REPO" --watch --fail-fast
+    test "$(git ls-remote origin "refs/heads/$WHATITDO_PR_A_BRANCH" | cut -f1)" = \
+      "$WHATITDO_CANDIDATE_SHA"
+    wait_for_pr_checks "$WHATITDO_PROOF_PR"
 
 After committing C-10 evidence on PR-A and its exact-head gates pass, mark it ready and protect the
 final merge with a readback SHA. Stop if the default tip has moved until it is merged into PR-A and
@@ -737,8 +815,12 @@ merge. This keeps public aliases on the proven deployment until the new generate
       --json mergeCommit -q .mergeCommit.oid)
     git fetch origin --prune
     test "$(git rev-parse "origin/$WHATITDO_DEFAULT_BRANCH")" = "$WHATITDO_FINAL_MERGE"
+    test "$(git rev-parse "$WHATITDO_FINAL_MERGE^1")" = "$WHATITDO_LIVE_DEFAULT"
+    test "$(git rev-parse "$WHATITDO_FINAL_MERGE^2")" = "$WHATITDO_FINAL_HEAD"
     test "$(git merge-base "$WHATITDO_FINAL_HEAD" "$WHATITDO_FINAL_MERGE")" = \
       "$WHATITDO_FINAL_HEAD"
+    test "$(git rev-parse "$WHATITDO_FINAL_MERGE^{tree}")" = \
+      "$(git rev-parse "$WHATITDO_FINAL_HEAD^{tree}")"
 
 Wait in communicated intervals of no more than 60 seconds for the exact default-branch `push` CI and
 a single `target=production`, `READY` deployment whose Git SHA is `WHATITDO_FINAL_MERGE`. Query fresh
@@ -746,76 +828,200 @@ state on every interval; never reuse the pre-merge deployment JSON. Require all 
 the deployment by ID, then promote and verify the public domain. Restore automatic domain assignment
 after promotion.
 
-    WHATITDO_RUNS=$(gh api --method GET \
-      "repos/$WHATITDO_REPO/actions/runs" \
-      -f head_sha="$WHATITDO_FINAL_MERGE" -f per_page=100)
-    export WHATITDO_DEFAULT_RUN_ID=$(jq -er '
-      [.workflow_runs[] |
-       select(.name == "CI" and .event == "push" and
-              .status == "completed" and .conclusion == "success")] |
-      first | .id
-    ' <<<"$WHATITDO_RUNS")
-    gh run view "$WHATITDO_DEFAULT_RUN_ID" --repo "$WHATITDO_REPO" --json headSha,jobs \
-      | jq -e --arg sha "$WHATITDO_FINAL_MERGE" '
-          .headSha == $sha and
-          ([.jobs[] | select(.conclusion == "success") | .name] | sort) ==
-          (["build","e2e","redis-integration"] | sort)'
-    WHATITDO_DEPLOYMENTS=$(
-      "$WHATITDO_VERCEL" api \
+    WHATITDO_FINAL_GATE_DEADLINE=$(( $(date +%s) + 600 ))
+    while :; do
+      WHATITDO_RUNS=$(gh api --method GET \
+        "repos/$WHATITDO_REPO/actions/runs" \
+        -f head_sha="$WHATITDO_FINAL_MERGE" -f per_page=100)
+      WHATITDO_DEFAULT_RUN=$(jq -c '
+        [.workflow_runs[] |
+         select(.name == "CI" and .event == "push")] |
+        sort_by(.created_at) | last // {}
+      ' <<<"$WHATITDO_RUNS")
+      WHATITDO_DEFAULT_RUN_ID=$(jq -r '
+        select(.status == "completed" and .conclusion == "success") | .id // empty
+      ' <<<"$WHATITDO_DEFAULT_RUN")
+      if jq -e '.status == "completed" and .conclusion != "success"' \
+        <<<"$WHATITDO_DEFAULT_RUN" >/dev/null; then
+        exit 1
+      fi
+      WHATITDO_DEPLOYMENTS=$("$WHATITDO_VERCEL" api \
         "/v6/deployments?projectId=$WHATITDO_PROJECT_ID&limit=100" \
-        --scope "$WHATITDO_VERCEL_SCOPE" --raw
-    )
-    export WHATITDO_FINAL_DEPLOYMENT_ID=$(jq -er --arg sha "$WHATITDO_FINAL_MERGE" '
-      [.deployments[] |
-       select(.meta.githubCommitSha == $sha and
-              .target == "production" and .readyState == "READY")] |
-      if length == 1 then .[0].uid else error("final deployment not uniquely READY") end
-    ' <<<"$WHATITDO_DEPLOYMENTS")
+        --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+      WHATITDO_FINAL_DEPLOYMENT_ID=$(jq -r \
+        --arg sha "$WHATITDO_FINAL_MERGE" --arg project "$WHATITDO_PROJECT_ID" '
+        [.deployments[] |
+         select(.meta.githubCommitSha == $sha and .projectId == $project and
+                .target == "production" and .readyState == "READY")] |
+        if length == 1 then .[0].uid else empty end
+      ' <<<"$WHATITDO_DEPLOYMENTS")
+      if [ -n "$WHATITDO_DEFAULT_RUN_ID" ] && \
+         [ -n "$WHATITDO_FINAL_DEPLOYMENT_ID" ]; then
+        export WHATITDO_DEFAULT_RUN_ID WHATITDO_FINAL_DEPLOYMENT_ID
+        break
+      fi
+      if [ "$(date +%s)" -ge "$WHATITDO_FINAL_GATE_DEADLINE" ]; then
+        exit 124
+      fi
+      sleep 15
+    done
+    WHATITDO_DEFAULT_RUN_VIEW=$(gh run view "$WHATITDO_DEFAULT_RUN_ID" \
+      --repo "$WHATITDO_REPO" --json headSha,jobs)
+    jq -e --arg sha "$WHATITDO_FINAL_MERGE" '
+      .headSha == $sha and
+      ([.jobs[] | select(.conclusion == "success") | .name] | sort) ==
+      (["build","e2e","redis-integration"] | sort)' <<<"$WHATITDO_DEFAULT_RUN_VIEW"
+    WHATITDO_DEFAULT_REDIS_JOB_ID=$(jq -er \
+      '.jobs[] | select(.name == "redis-integration") | .databaseId' \
+      <<<"$WHATITDO_DEFAULT_RUN_VIEW")
+    WHATITDO_DEFAULT_REDIS_LOG=$(gh run view "$WHATITDO_DEFAULT_RUN_ID" \
+      --repo "$WHATITDO_REPO" --job "$WHATITDO_DEFAULT_REDIS_JOB_ID" --log)
+    grep -Eq '13 passed \(13\)' <<<"$WHATITDO_DEFAULT_REDIS_LOG"
+    if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_DEFAULT_REDIS_LOG"; then
+      exit 1
+    fi
     WHATITDO_FINAL_PROBE=$(
       "$WHATITDO_VERCEL" curl '/api/poll?id=AAAAAAAAAA' \
         --deployment "$WHATITDO_FINAL_DEPLOYMENT_ID" --scope "$WHATITDO_VERCEL_SCOPE" -- \
-        --silent --show-error --max-redirs 0 \
+        --silent --show-error --max-time 15 --max-redirs 0 \
         --write-out $'\n__STATUS__%{http_code}\n__REDIRECT__%{redirect_url}'
     )
-    test "$(sed -n 's/^__STATUS__//p' <<<"$WHATITDO_FINAL_PROBE")" = 404
-    test -z "$(sed -n 's/^__REDIRECT__//p' <<<"$WHATITDO_FINAL_PROBE")"
-    sed '/^__STATUS__/,$d' <<<"$WHATITDO_FINAL_PROBE" \
-      | jq -e '.error == "Poll not found"'
-    "$WHATITDO_VERCEL" promote "$WHATITDO_FINAL_DEPLOYMENT_ID" \
-      --scope "$WHATITDO_VERCEL_SCOPE" --yes --timeout 3m
-    WHATITDO_ALIAS_AFTER=$("$WHATITDO_VERCEL" api \
-      /v4/aliases/www.whatitdo.xyz --scope "$WHATITDO_VERCEL_SCOPE" --raw)
-    jq -e --arg deployment "$WHATITDO_FINAL_DEPLOYMENT_ID" \
-      --arg project "$WHATITDO_PROJECT_ID" '
-        .alias == "www.whatitdo.xyz" and
-        .deploymentId == $deployment and .projectId == $project
-    ' <<<"$WHATITDO_ALIAS_AFTER"
-    DEPLOYMENT_URL=https://www.whatitdo.xyz node --input-type=module -e \
-      'const r=await fetch(new URL("/api/poll?id=AAAAAAAAAA",process.env.DEPLOYMENT_URL),{redirect:"manual"});const b=await r.json().catch(()=>null);if(r.status!==404||r.headers.has("location")||b?.error!=="Poll not found")throw new Error("production sentinel failed");console.log("production sentinel passed")'
+    if test "$(sed -n 's/^__STATUS__//p' <<<"$WHATITDO_FINAL_PROBE")" = 404 && \
+       test -z "$(sed -n 's/^__REDIRECT__//p' <<<"$WHATITDO_FINAL_PROBE")" && \
+       sed '/^__STATUS__/,$d' <<<"$WHATITDO_FINAL_PROBE" \
+         | jq -e '.error == "Poll not found"' >/dev/null; then
+      :
+    else
+      WHATITDO_ABORT_ALIAS=$("$WHATITDO_VERCEL" api \
+        /v4/aliases/www.whatitdo.xyz --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+      jq -e --arg deployment "$WHATITDO_ROLLBACK_ID" \
+        --arg project "$WHATITDO_PROJECT_ID" '
+        .alias == "www.whatitdo.xyz" and .projectId == $project and
+        .deploymentId == $deployment
+      ' <<<"$WHATITDO_ABORT_ALIAS"
+      "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH \
+        -F autoAssignCustomDomains=true --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+        | jq -e '.autoAssignCustomDomains == true'
+      exit 1
+    fi
+    export WHATITDO_PROMOTION_REQUESTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    if ! "$WHATITDO_VERCEL" promote "$WHATITDO_FINAL_DEPLOYMENT_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --yes --timeout 0; then
+      echo 'Promotion request returned nonzero; polling because Vercel timeouts do not cancel it.' >&2
+    fi
+    WHATITDO_PROMOTION_DEADLINE=$(( $(date +%s) + 600 ))
+    WHATITDO_NO_PENDING_PROMOTION=0
+    while :; do
+      WHATITDO_ALIAS_AFTER=$("$WHATITDO_VERCEL" api \
+        /v4/aliases/www.whatitdo.xyz --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+      WHATITDO_BOUND_DEPLOYMENT=$(jq -er --arg project "$WHATITDO_PROJECT_ID" '
+        select(.alias == "www.whatitdo.xyz" and .projectId == $project) | .deploymentId
+      ' <<<"$WHATITDO_ALIAS_AFTER")
+      if [ "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_FINAL_DEPLOYMENT_ID" ]; then
+        break
+      fi
+      test "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_ROLLBACK_ID"
+      if WHATITDO_PROMOTION_STATUS=$("$WHATITDO_VERCEL" promote status \
+        "$WHATITDO_PROJECT_ID" --timeout 15s --scope "$WHATITDO_VERCEL_SCOPE" --no-color); then
+        if grep -Fq 'No deployment promotion in progress' <<<"$WHATITDO_PROMOTION_STATUS"; then
+          WHATITDO_NO_PENDING_PROMOTION=$(( WHATITDO_NO_PENDING_PROMOTION + 1 ))
+        else
+          WHATITDO_NO_PENDING_PROMOTION=0
+        fi
+      else
+        WHATITDO_NO_PENDING_PROMOTION=0
+      fi
+      if [ "$WHATITDO_NO_PENDING_PROMOTION" -ge 2 ]; then
+        "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH \
+          -F autoAssignCustomDomains=true --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+          | jq -e '.autoAssignCustomDomains == true'
+        echo 'Promotion ended without binding the target; prior Production remains live.' >&2
+        exit 1
+      fi
+      if [ "$(date +%s)" -ge "$WHATITDO_PROMOTION_DEADLINE" ]; then
+        echo 'Promotion is still indeterminate; do not issue a competing rollback.' >&2
+        exit 124
+      fi
+      sleep 15
+    done
+    DEPLOYMENT_URL=https://www.whatitdo.xyz node --input-type=module -e '
+      const base = new URL(process.env.DEPLOYMENT_URL)
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15_000)
+      try {
+        const response = await fetch(new URL("/api/poll?id=AAAAAAAAAA", base), {
+          redirect: "manual",
+          signal: controller.signal,
+        })
+        const body = await response.json().catch(() => null)
+        if (response.status !== 404 || response.headers.has("location") ||
+            body?.error !== "Poll not found") throw new Error("production sentinel failed")
+        console.log("production sentinel passed")
+      } finally {
+        clearTimeout(timer)
+      }'
     "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH \
       -F autoAssignCustomDomains=true --scope "$WHATITDO_VERCEL_SCOPE" --raw \
       | jq -e '.autoAssignCustomDomains == true'
 
-If the generated-host sentinel, promotion, alias readback, or public sentinel fails, stop new writes
-and roll back to the recorded deployment. Never improvise a different target.
+Vercel documents that a CLI timeout does not cancel promotion or rollback. Therefore never issue a
+rollback merely because the promotion command or ten-minute poll timed out. A pre-promotion
+generated-host failure leaves the recorded prior alias untouched: verify that binding, restore the
+project setting, and stop without calling rollback. If the public sentinel fails only after the
+alias is conclusively bound to the new deployment, request the recorded rollback asynchronously and
+poll both rollback status and alias binding. Do not issue a second promotion or rollback while the
+first mutation is pending.
 
-    "$WHATITDO_VERCEL" rollback "$WHATITDO_ROLLBACK_ID" \
-      --scope "$WHATITDO_VERCEL_SCOPE" --yes --timeout 3m
-    WHATITDO_ALIAS_ROLLED_BACK=$("$WHATITDO_VERCEL" api \
-      /v4/aliases/www.whatitdo.xyz --scope "$WHATITDO_VERCEL_SCOPE" --raw)
-    jq -e --arg deployment "$WHATITDO_ROLLBACK_ID" '
-      .alias == "www.whatitdo.xyz" and .deploymentId == $deployment
-    ' <<<"$WHATITDO_ALIAS_ROLLED_BACK"
+    if ! "$WHATITDO_VERCEL" rollback "$WHATITDO_ROLLBACK_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --yes --timeout 0; then
+      echo 'Rollback request returned nonzero; polling because Vercel timeouts do not cancel it.' >&2
+    fi
+    WHATITDO_ROLLBACK_DEADLINE=$(( $(date +%s) + 600 ))
+    WHATITDO_NO_PENDING_ROLLBACK=0
+    while :; do
+      WHATITDO_ALIAS_ROLLED_BACK=$("$WHATITDO_VERCEL" api \
+        /v4/aliases/www.whatitdo.xyz --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+      WHATITDO_BOUND_DEPLOYMENT=$(jq -er --arg project "$WHATITDO_PROJECT_ID" '
+        select(.alias == "www.whatitdo.xyz" and .projectId == $project) | .deploymentId
+      ' <<<"$WHATITDO_ALIAS_ROLLED_BACK")
+      if [ "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_ROLLBACK_ID" ]; then
+        break
+      fi
+      test "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_FINAL_DEPLOYMENT_ID"
+      if WHATITDO_ROLLBACK_STATUS=$("$WHATITDO_VERCEL" rollback status \
+        "$WHATITDO_PROJECT_ID" --timeout 15s --scope "$WHATITDO_VERCEL_SCOPE" --no-color); then
+        if grep -Fq 'No deployment rollback in progress' <<<"$WHATITDO_ROLLBACK_STATUS"; then
+          WHATITDO_NO_PENDING_ROLLBACK=$(( WHATITDO_NO_PENDING_ROLLBACK + 1 ))
+        else
+          WHATITDO_NO_PENDING_ROLLBACK=0
+        fi
+      else
+        WHATITDO_NO_PENDING_ROLLBACK=0
+      fi
+      if [ "$WHATITDO_NO_PENDING_ROLLBACK" -ge 2 ]; then
+        echo 'Rollback ended without restoring the recorded deployment.' >&2
+        exit 1
+      fi
+      if [ "$(date +%s)" -ge "$WHATITDO_ROLLBACK_DEADLINE" ]; then
+        echo 'Rollback is still indeterminate; do not issue a competing mutation.' >&2
+        exit 124
+      fi
+      sleep 15
+    done
     "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH \
       -F autoAssignCustomDomains=true --scope "$WHATITDO_VERCEL_SCOPE" --raw \
       | jq -e '.autoAssignCustomDomains == true'
 
-After at least one hour of availability, query only error/fatal logs for the exact deployment. Empty
-JSONL output is the expected clean result; inspect and redact any user data before recording a real
-error excerpt.
+After at least one hour of availability, query both error and fatal logs for the exact deployment
+from the recorded promotion-request timestamp through the observation time. Empty JSONL output is
+the expected clean result; inspect and redact any user data before recording a real error excerpt.
 
-    "$WHATITDO_VERCEL" logs "$WHATITDO_FINAL_DEPLOYMENT_ID" --no-follow --json \
-      --level error --since 1h --limit 1000 --scope "$WHATITDO_VERCEL_SCOPE"
+    export WHATITDO_LOG_UNTIL=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    for WHATITDO_LOG_LEVEL in error fatal; do
+      "$WHATITDO_VERCEL" logs "$WHATITDO_FINAL_DEPLOYMENT_ID" --no-follow --json \
+        --level "$WHATITDO_LOG_LEVEL" --since "$WHATITDO_PROMOTION_REQUESTED_AT" \
+        --until "$WHATITDO_LOG_UNTIL" --limit 1000 --scope "$WHATITDO_VERCEL_SCOPE"
+    done
 
 ## Validation and Acceptance
 
@@ -826,7 +1032,8 @@ Focused commands, selected by changed packet:
     npx vitest run src/lib/submissionDigest.test.ts src/app/api/vote/route.test.ts
     npx vitest run src/lib/withTimeout.test.ts src/lib/escapeHtml.test.ts src/app/api/vote/route.test.ts
     REDIS_URL=redis://127.0.0.1:6379 npx vitest run src/lib/redis.integration.test.ts
-    CI=1 npx playwright test e2e/poll-flows.spec.ts --grep "ambiguous vote retry|forced-colors focus"
+    CI=1 npx playwright test e2e/poll-flows.spec.ts \
+      --grep "ambiguous vote retry|forced-colors focus|ballot closes"
 
 The candidate is acceptable only when:
 
@@ -836,7 +1043,8 @@ The candidate is acceptable only when:
 - Equal submission retries produce one response and one provider-idempotent email attempt. Changed
   payload reuse and legacy receipts return 409 before rate/mutation/email.
 - Email contains escaped vote details; its subject/body contain no private credential, link, ID, or
-  destination address. Only the provider wait is capped at five seconds.
+  destination address. Missing key, destination, or verified sender is `not_configured`. Only the
+  provider wait is capped at five seconds.
 - Classic, Dubious, unauthorized results, notification truth, retry, 375 px, accessibility, and
   forced-colors cases pass.
 - Lint, typecheck, unit tests, Redis 7 integration, E2E, build, and high-severity audit are green on
