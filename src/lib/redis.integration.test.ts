@@ -36,7 +36,7 @@ describeRedis('Redis 7 Lua integration', () => {
     if (client.isOpen) await client.quit()
   })
 
-  function keysFor(pollId: string, ip = randomUUID()): AppendKeys {
+  function keysFor(pollId: string, ip: string = randomUUID()): AppendKeys {
     const keys: AppendKeys = [
       `integration:${runId}:poll:${pollId}`,
       `integration:${runId}:poll:${pollId}:responses`,
@@ -170,7 +170,7 @@ describeRedis('Redis 7 Lua integration', () => {
     const rejected = await append(keys, 'submission-251', 'response-251')
     expect(rejected).toEqual(['capacity_reached'])
     expect(await client.lLen(keys[1])).toBe(MAX_POLL_RESPONSES)
-    expect(await client.hExists(keys[2], 'submission-251')).toBe(false)
+    expect(await client.hExists(keys[2], 'submission-251')).toBe(0)
     expect(Number(await client.get(keys[3]))).toBe(1)
   })
 

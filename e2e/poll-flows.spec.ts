@@ -305,7 +305,7 @@ test('an ambiguous vote retry reuses the exact payload and receipt', async ({ pa
   await choose(page, suggestion, 'Yes')
   await page.getByLabel(/Your alias/i).fill('Original Voter')
   await page.getByRole('button', { name: /Seal my ballot/i }).click()
-  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(appAlert(page)).toBeVisible()
 
   await choose(page, suggestion, 'Nope')
   await page.getByLabel(/Your alias/i).fill('Edited Voter')
