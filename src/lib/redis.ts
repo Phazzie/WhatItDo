@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis'
 import { isIP } from 'node:net'
+import { createClient } from 'redis'
 import { InMemoryRedis, inMemoryRedis } from './inMemoryRedis'
 import type { StoredPoll } from './types'
 
@@ -90,6 +91,98 @@ export function isInMemoryRedisAllowed(): boolean {
 }
 
 let selectedRedis: RedisLike | InMemoryRedis | null = null
+const PROTOCOL_REDIS_CONNECT_TIMEOUT_MS = 5_000
+const PROTOCOL_REDIS_MAX_RECONNECT_ATTEMPTS = 2
+
+function createProtocolRedisClient(url: string) {
+  return createClient({
+    url,
+    disableOfflineQueue: true,
+    socket: {
+      connectTimeout: PROTOCOL_REDIS_CONNECT_TIMEOUT_MS,
+      reconnectStrategy: (retries) =>
+        retries >= PROTOCOL_REDIS_MAX_RECONNECT_ATTEMPTS
+          ? false
+          : Math.min(100 * 2 ** retries, 1_000),
+    },
+  })
+}
+
+type ProtocolRedisClient = ReturnType<typeof createProtocolRedisClient>
+let protocolRedisClient: ProtocolRedisClient | null = null
+let protocolRedisConnection: Promise<ProtocolRedisClient> | null = null
+
+function clearProtocolRedisClient(client: ProtocolRedisClient): void {
+  if (protocolRedisClient === client) {
+    protocolRedisClient = null
+    protocolRedisConnection = null
+  }
+}
+
+function redisUrlFromEnvironment(): string | null {
+  const value = process.env.REDIS_URL?.trim()
+  if (!value) return null
+
+  let protocol: string
+  try {
+    protocol = new URL(value).protocol
+  } catch {
+    throw new Error('Redis is not configured. REDIS_URL must be a valid redis:// or rediss:// URL.')
+  }
+  if (protocol !== 'redis:' && protocol !== 'rediss:') {
+    throw new Error('Redis is not configured. REDIS_URL must use redis:// or rediss://.')
+  }
+  return value
+}
+
+function connectProtocolRedis(url: string): Promise<ProtocolRedisClient> {
+  if (protocolRedisConnection) return protocolRedisConnection
+
+  const client = createProtocolRedisClient(url)
+  protocolRedisClient = client
+  client.on('error', () => {
+    console.error('[whatitdo] redis_client_error')
+    queueMicrotask(() => {
+      if (!client.isOpen) clearProtocolRedisClient(client)
+    })
+  })
+  client.on('end', () => clearProtocolRedisClient(client))
+
+  const connection = client.connect()
+    .then(() => client)
+    .catch((error: unknown) => {
+      clearProtocolRedisClient(client)
+      try {
+        if (client.isOpen) client.destroy()
+      } catch {
+        // Cleanup must not replace the connection failure that callers need to diagnose.
+      }
+      throw error
+    })
+  protocolRedisConnection = connection
+  return connection
+}
+
+function createProtocolRedis(url: string): RedisLike {
+  return {
+    get: async <T = unknown>(key: string) =>
+      (await (await connectProtocolRedis(url)).get(key)) as T | null,
+    set: async (key, value, options) => {
+      const client = await connectProtocolRedis(url)
+      const storedValue = String(value)
+      return options?.ex === undefined
+        ? client.set(key, storedValue)
+        : client.set(key, storedValue, { expiration: { type: 'EX', value: options.ex } })
+    },
+    lrange: async (key, start, stop) =>
+      (await connectProtocolRedis(url)).lRange(key, start, stop),
+    eval: async <T = unknown>(script: string, keys: string[], args: (string | number)[]) =>
+      (await connectProtocolRedis(url)).eval(script, {
+        keys,
+        arguments: args.map(String),
+      }) as Promise<T>,
+  }
+}
 
 function createUpstashRedis(): RedisLike {
   const url = process.env.UPSTASH_REDIS_REST_URL
@@ -121,7 +214,12 @@ function createUpstashRedis(): RedisLike {
 /** Lazily select storage on first request; importing this module is build-safe. */
 export function getRedis(): RedisLike | InMemoryRedis {
   if (!selectedRedis) {
-    selectedRedis = isInMemoryRedisAllowed() ? inMemoryRedis : createUpstashRedis()
+    if (isInMemoryRedisAllowed()) {
+      selectedRedis = inMemoryRedis
+    } else {
+      const redisUrl = redisUrlFromEnvironment()
+      selectedRedis = redisUrl ? createProtocolRedis(redisUrl) : createUpstashRedis()
+    }
   }
   return selectedRedis
 }
@@ -378,6 +476,9 @@ export function resolveClientIp(request: {
 
 /** Reset the selected client and process-local data between configuration tests. */
 export function resetRedisForTests(): void {
+  if (protocolRedisClient?.isOpen) protocolRedisClient.destroy()
+  protocolRedisClient = null
+  protocolRedisConnection = null
   selectedRedis = null
   inMemoryRedis.reset()
 }

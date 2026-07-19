@@ -90,9 +90,17 @@ describe('Redis selection', () => {
   it('fails with a direct message when durable Redis is unconfigured', () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('E2E_TEST', '')
+    vi.stubEnv('REDIS_URL', '')
     vi.stubEnv('UPSTASH_REDIS_REST_URL', '')
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '')
     expect(() => getRedis()).toThrow(/UPSTASH_REDIS_REST_URL.*UPSTASH_REDIS_REST_TOKEN/)
+  })
+
+  it.each(['not a URL', 'https://redis.example.test'])('rejects an invalid REDIS_URL without exposing it', (url) => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('E2E_TEST', '')
+    vi.stubEnv('REDIS_URL', url)
+    expect(() => getRedis()).toThrow(/REDIS_URL must (be a valid|use redis)/)
   })
 })
 

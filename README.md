@@ -38,7 +38,8 @@ new ones.
 
 - Node.js `^20.19.0`, `^22.13.0`, or `>=24.0.0` (CI uses Node 22)
 - npm
-- An Upstash Redis REST database for normal runtime use
+- An external Redis database for normal runtime use, configured through either `REDIS_URL` or the
+  Upstash REST variables
 - Optional: a Resend API key and notification address
 
 ## Local setup
@@ -51,14 +52,19 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open <http://localhost:3000>. Normal development requests use Upstash; the in-memory implementation
-is intentionally restricted to unit tests and explicit loopback E2E runs.
+Open <http://localhost:3000>. Normal development requests use the configured external Redis
+provider; the in-memory implementation is intentionally restricted to unit tests and explicit
+loopback E2E runs.
 
 ### Environment variables
 
 ```dotenv
-UPSTASH_REDIS_REST_URL=https://example.upstash.io
-UPSTASH_REDIS_REST_TOKEN=replace_me
+# Option A: standard Redis, including the official Vercel Redis integration
+REDIS_URL=rediss://default:replace_me@redis.example.com:6379
+
+# Option B: Upstash REST (used only when REDIS_URL is empty)
+# UPSTASH_REDIS_REST_URL=https://example.upstash.io
+# UPSTASH_REDIS_REST_TOKEN=replace_me
 
 # Optional vote-email notification
 RESEND_API_KEY=re_replace_me
@@ -69,6 +75,13 @@ EMAIL_FROM=What It Do <notifications@example.com>
 # Vercel uses its own trusted request headers automatically.
 TRUST_PROXY=1
 ```
+
+`REDIS_URL` takes precedence when both provider configurations exist. The protocol connection is
+opened lazily on the first storage command, reused within a warm server process, and bounded so a
+dead provider fails the request instead of enabling process-local production storage. The official
+Redis Cloud free plan has no disk persistence or high availability; choose a persistent provider
+plan for Production so recorded votes and the documented 30/90-day retention contract survive a
+provider restart. A non-persistent free database is suitable only for empty Preview verification.
 
 `POLL_CREATOR_EMAIL` is one deployment-owned notification address; the app does not collect or store
 creator email addresses per poll. Alerts include the normalized poll title, voter name, choices,

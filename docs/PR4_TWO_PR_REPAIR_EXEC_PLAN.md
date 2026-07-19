@@ -53,7 +53,9 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - [ ] C-08 Run the integrated local gate and exact-head adversarial reviews. The first complete local
   gate was green. Three hostile lanes found no blocker in application/history, two high release-
   runbook gaps, and ten useful medium findings; app follow-up is `2164293`, CI job bounds are
-  `5f0bf28`. The post-review full local gate is green; only the literal final-SHA re-review remains.
+  `5f0bf28`. The post-review full local gate is green. Exact-head CI was also green at `222fc6d`, but
+  its authenticated Preview sentinel exposed the dead deployed Redis resource. Recover the durable
+  provider path, rerun the complete local gate, and repeat literal final-SHA review before C-08 closes.
 - [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
   evidence-only closeout; record its final exact-head proof in PR #4.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, and launch PR-A's final gate.
@@ -102,6 +104,22 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   configuration, terminal ballot states, literal exact-head review ordering, missing push/parent
   guards, Redis skip proof, Preview target binding, and log-window precision before any candidate
   push. See `https://vercel.com/docs/cli/promote` and `https://vercel.com/docs/cli/rollback`.
+- Both exact-head GitHub event suites passed at `222fc6d` (`29686383707` and `29686384879`), and each
+  Redis job ran all 13 cases with zero skips. The exact Preview deployment
+  `dpl_9adBbEwJcbszEJPvEy92kyrd2V87` was `READY`, but the valid-ID storage sentinel returned 500.
+  The currently promoted Production deployment returns the same 500, so this is a pre-existing
+  provider incident rather than a repair regression.
+- The deployed Upstash REST hostname fails DNS resolution with `ENOTFOUND`. Vercel still held the
+  218-day-old encrypted variables, but Marketplace inspection shows the only linked Redis resource,
+  `redis-pink-door`, as `Uninstalled`. A new Upstash resource was not created because the team has
+  not accepted that provider's Marketplace terms; this run must not accept legal terms for the owner.
+- The already-authorized official Redis Marketplace provider offers a zero-cost 30 MB plan with a
+  `REDIS_URL`, 100 operations/second, and no persistence or high availability. It is the only
+  no-cost provider repair this run may provision autonomously. Hostile review correctly rejected it
+  as Production storage: no persistence contradicts the recorded-vote and 30/90-day retention
+  invariants, and 30 connections is unsafe for unconstrained serverless scale. It is scoped to
+  Preview only while empty and may prove the PR, but Production promotion requires an owner-approved
+  persistent provider or an explicit product-invariant change.
 
 ## Decision Log
 
@@ -139,6 +157,13 @@ default branch never points at the incomplete `02f73ef` tree by itself.
 - Decision (2026-07-19): Request promotion/rollback asynchronously and poll provider status plus the
   exact alias binding. A CLI timeout never authorizes a competing mutation because official Vercel
   behavior continues the original operation after the client stops waiting.
+- Decision (2026-07-19): Recover the pre-existing storage outage without weakening fail-closed
+  behavior. Add a lazy Redis-protocol adapter selected by `REDIS_URL` and preserve the existing
+  Upstash REST adapter as a fallback. `REDIS_URL` wins when both configurations exist so stale
+  orphaned Upstash variables cannot mask a healthy linked resource. Connection attempts are bounded
+  and retryable; Lua and DTO semantics remain provider-independent. Use the already-authorized
+  official Redis free plan only for empty Preview verification. It is not Production authorization;
+  a paid persistent plan, new-provider terms, or weakened durability invariant requires the owner.
 
 ## Outcomes & Retrospective
 
@@ -258,6 +283,30 @@ merges, and operates provider settings.
 - Focused proof: Playwright emulates forced colors, focuses controls by keyboard, and asserts
   computed outline style and width.
 - Stop: do not alter ordinary color design or use color alone as the focus indicator.
+
+#### C-08a — Recover the dead deployed Redis provider path
+
+- Owner: root for existing files; one test agent owns only new `src/lib/redis.protocol.test.ts`.
+- Paths: `src/lib/redis.ts`, `src/lib/redis.protocol.test.ts`, `src/lib/redis.test.ts`,
+  `package.json`, `package-lock.json`, `.env.example`, `README.md`, this plan, and the audit/ledger
+  only when recording final evidence.
+- Runtime behavior: keep test-only in-memory selection unchanged. In all other processes, prefer a
+  non-empty `REDIS_URL` and adapt node-redis to the existing four-command `RedisLike` boundary;
+  otherwise use the existing Upstash REST URL/token pair. Construct clients lazily, connect only on
+  the first command, reuse one successful connection, bound connection/reconnect behavior, attach a
+  credential-free error listener, and clear a rejected connection promise so a later request can
+  retry. Preserve `SET` expiration, `LRANGE`, and Lua key/argument semantics exactly.
+- Provider behavior: provision only the already-authorized official Redis `$0` plan, never select a
+  paid tier, bind its credential to Preview only while the database is empty, and verify the
+  project/environment names without printing values. Existing deployments retain old environment
+  snapshots, so require a fresh exact-SHA Preview after the provider connection exists. Never expose
+  a Preview-tested credential to Production; persistent Production storage remains an owner gate.
+- Proof: focused Redis selection/protocol/Upstash/unit tests; typecheck and lint; complete local gate;
+  both exact-head GitHub event suites with all 13 Redis 7 cases and zero skips; exact Preview
+  metadata equality; valid-ID read-only sentinel returns 404 with `Poll not found` and no redirect.
+- Stop: no production in-memory fallback, no credential output, no acceptance of new provider terms,
+  no paid plan, no weakening the valid-ID sentinel, no merge while Preview returns 500, and no final
+  default merge or Production promotion until a persistent provider is owner-approved and verified.
 
 #### C-06a — Build the timeout primitive
 
@@ -390,6 +439,15 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
   passed and 13 Redis-only skips; the explicit integration run reported all 13 cases skipped without
   `REDIS_URL`; Playwright reported 17/17 passed. Coverage passed at 91.27% statements, 85.71%
   branches, 97.61% functions, and 94.47% lines.
+- [x] Implement C-08a dual-provider selection and focused protocol-adapter proof. The protocol,
+  Upstash, and core Redis files pass 48 focused tests and the adapter passes TypeScript validation.
+- [x] Provision/connect only the already-authorized official Redis free plan; its direct read passed
+  and `REDIS_URL` is bound to Preview only without displaying its value.
+- [x] Rerun the complete local gate after C-08a. Under Node 22, lint, typecheck, build, and audit
+  passed; audit found zero vulnerabilities; Vitest reported 135 passed and the permitted 13 local
+  Redis skips; the explicit integration run reported the same 13 skips without `REDIS_URL`;
+  Playwright reported 17/17 passed. Coverage passed at 91.69% statements, 85.97% branches, 96.96%
+  functions, and 94.95% lines.
 - [ ] Obtain final exact-head history, application/security, and CI reviews.
 
 ### D. PR #4 proof and cleanup
@@ -614,7 +672,7 @@ Redis reporter total of 13 passed with no skipped tests in each run.
         <<<"$WHATITDO_RUN_VIEW")
       WHATITDO_REDIS_LOG=$(gh run view "$WHATITDO_RUN_ID" \
         --repo "$WHATITDO_REPO" --job "$WHATITDO_REDIS_JOB_ID" --log)
-      grep -Eq '13 passed \(13\)' <<<"$WHATITDO_REDIS_LOG"
+      grep -Eq '13 passed.*\(13\)' <<<"$WHATITDO_REDIS_LOG"
       if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_REDIS_LOG"; then
         exit 1
       fi
@@ -871,7 +929,7 @@ after promotion.
       <<<"$WHATITDO_DEFAULT_RUN_VIEW")
     WHATITDO_DEFAULT_REDIS_LOG=$(gh run view "$WHATITDO_DEFAULT_RUN_ID" \
       --repo "$WHATITDO_REPO" --job "$WHATITDO_DEFAULT_REDIS_JOB_ID" --log)
-    grep -Eq '13 passed \(13\)' <<<"$WHATITDO_DEFAULT_REDIS_LOG"
+    grep -Eq '13 passed.*\(13\)' <<<"$WHATITDO_DEFAULT_REDIS_LOG"
     if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_DEFAULT_REDIS_LOG"; then
       exit 1
     fi
@@ -1133,5 +1191,7 @@ New interfaces:
 
     withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T>
 
-Runtime dependencies remain Next.js/React, Upstash Redis, Nano ID, and Resend. Do not add a queue,
-database, UI library, HMAC secret, or deployment platform dependency.
+Runtime dependencies are Next.js/React, the Upstash REST and node-redis clients, Nano ID, and Resend.
+The two Redis clients implement one existing storage boundary; this incident repair does not add a
+second logical database. Do not add a queue, another database, UI library, HMAC secret, or deployment
+platform dependency.

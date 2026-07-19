@@ -33,6 +33,7 @@ describe('durable Upstash adapter', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('E2E_TEST', '')
+    vi.stubEnv('REDIS_URL', '')
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io')
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token')
     resetRedisForTests()
