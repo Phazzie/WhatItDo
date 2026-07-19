@@ -912,10 +912,10 @@ after promotion.
       WHATITDO_BOUND_DEPLOYMENT=$(jq -er --arg project "$WHATITDO_PROJECT_ID" '
         select(.alias == "www.whatitdo.xyz" and .projectId == $project) | .deploymentId
       ' <<<"$WHATITDO_ALIAS_AFTER")
-      if [ "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_FINAL_DEPLOYMENT_ID" ]; then
-        break
+      if [ "$WHATITDO_BOUND_DEPLOYMENT" != "$WHATITDO_FINAL_DEPLOYMENT_ID" ] && \
+         [ "$WHATITDO_BOUND_DEPLOYMENT" != "$WHATITDO_ROLLBACK_ID" ]; then
+        exit 1
       fi
-      test "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_ROLLBACK_ID"
       if WHATITDO_PROMOTION_STATUS=$("$WHATITDO_VERCEL" promote status \
         "$WHATITDO_PROJECT_ID" --timeout 15s --scope "$WHATITDO_VERCEL_SCOPE" --no-color); then
         if grep -Fq 'No deployment promotion in progress' <<<"$WHATITDO_PROMOTION_STATUS"; then
@@ -927,6 +927,9 @@ after promotion.
         WHATITDO_NO_PENDING_PROMOTION=0
       fi
       if [ "$WHATITDO_NO_PENDING_PROMOTION" -ge 2 ]; then
+        if [ "$WHATITDO_BOUND_DEPLOYMENT" = "$WHATITDO_FINAL_DEPLOYMENT_ID" ]; then
+          break
+        fi
         "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH \
           -F autoAssignCustomDomains=true --scope "$WHATITDO_VERCEL_SCOPE" --raw \
           | jq -e '.autoAssignCustomDomains == true'
