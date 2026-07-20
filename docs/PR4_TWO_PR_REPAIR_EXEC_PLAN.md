@@ -101,6 +101,11 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   Production runbook with the owner-authorized provider/fallback/release sequence. Application,
   test, scope, and thread-disposition reviews are clear. Local Node gates hit the separately recorded
   kernel-I/O non-start; exact-head GitHub CI remains mandatory.
+- [ ] (2026-07-20) The first exact-head CI attempt at `61f7d99` passed lint, typecheck, install/audit,
+  and both Redis 7 jobs, but both build jobs rejected the new real-SDK test fixture: Upstash's
+  auto-pipelined `GET` expects an array of command results and the fixture returned one object. The
+  production adapter and single-fetch proof were unaffected. One focused repair changes the mock
+  body to `[{ result: null }]`; its exact-head remote gate is pending.
 - [ ] C-11 Provision the isolated provider, prove fresh Production-only credentials with a direct
   fake-data adapter probe, create a healthy hidden production-target fallback from the exact PR #5
   tree, then merge, verify, and promote without moving aliases early.

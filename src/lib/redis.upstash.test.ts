@@ -118,7 +118,7 @@ describe('durable Upstash adapter', () => {
       .fn()
       .mockRejectedValueOnce(new TypeError('simulated network failure'))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ result: null }), {
+        new Response(JSON.stringify([{ result: null }]), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
