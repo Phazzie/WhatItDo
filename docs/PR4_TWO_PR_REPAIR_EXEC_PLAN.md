@@ -1,9 +1,9 @@
 # Finish PR #4 with a Two-PR Repair Stack
 
 This ExecPlan follows `.agent/PLANS.md`. It is the execution checklist for the owner-authorized
-2026-07-19 repair run through PR-A's exact-head Preview proof. Keep it current after every commit,
-push, merge, or stopping point. Production is a separate owner-gated run because the provider
-incident introduced a paid/terms/credential decision that the original authorization did not cover.
+2026-07-19 repair run and the owner-authorized 2026-07-20 production completion run. Keep it current
+after every commit, push, merge, or stopping point. The owner selected Upstash Free for Production,
+accepted its free-tier durability/availability limits, and authorized the staged release below.
 A fresh agent must be able to resume from this file and the repository without chat history.
 
 ## Purpose / Big Picture
@@ -59,33 +59,51 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   complete local gate was green. Three hostile lanes found no blocker in application/history, two
   high release-runbook gaps, and ten useful medium findings; app follow-up is `2164293`, CI job
   bounds are `5f0bf28`. The post-review full local gate is green. Exact-head CI was also green at
-  `222fc6d`, but its authenticated Preview sentinel exposed the dead deployed Redis resource. That required the
-  standard Redis adapter and Preview provider path, another complete local gate, and literal final-
-  SHA review before C-08 could close. The first Redis-repair review caught a healthy-idle socket
+  `222fc6d`, but its authenticated Preview sentinel exposed the dead deployed Redis resource. That
+  required the standard Redis adapter and Preview provider path, another complete local gate, and
+  literal final-SHA review before C-08 could close. The first Redis-repair review caught a healthy-idle socket
   churn defect; the command-scoped replacement and its full local gate are green, and three exact-
-  head lanes cleared `b2b3ea4`. A new current client/server import-boundary thread arrived after that push, so its small
-  follow-up passed focused tests, lint, typecheck, build, emitted-client scan, coverage, 17/17
-  browser proof, three exact-head reviews, both CI event suites, and exact Preview proof. The final
+  head lanes cleared `b2b3ea4`. A new current client/server import-boundary thread arrived after
+  that push, so its small follow-up passed focused tests, lint, typecheck, build, emitted-client
+  scan, coverage, 17/17 browser proof, three exact-head reviews, both CI event suites, and exact Preview proof. The final
   thread-by-thread disposition audit then caught two deleted mock regressions: negative `LRANGE`
   stop handling and plain `SET` clearing an existing TTL. The replacement in-memory adapter is
   correct; both direct assertions and both missing browser error-propagation checks were restored.
   Their focused tests, production build, lint, typecheck, 149-case coverage gate, three exact-head
   reviews, both CI event suites, and exact Preview proof all pass at `2da1d00`.
-- [ ] C-09 Push the repair candidate, make it green, resolve every review thread, and push the
-  evidence-only closeout; record its final exact-head proof in PR #4. Candidate `b2b3ea4` passed
+- [x] (2026-07-19) C-09 Pushed the repair candidate, made it green, resolved every review thread,
+  and pushed the evidence-only closeout; record its final exact-head proof in PR #4. Candidate `b2b3ea4` passed
   push run `29689374588`, pull-request run `29689376387`, 14/14 Redis cases in both, and exact
   Preview `dpl_GZjJ6eYfbo3BviomvBKoKukKe8tF`. Follow-up `c12b160` passed push run `29689940711`,
   pull-request run `29689941869`, 14/14 Redis cases in both, and exact Preview
   `dpl_39BdZpasnZGjZw6ibscbDYjYtCP6`. Final code head `2da1d00` passed push run `29690493749`, pull-
   request run `29690494814`, 14/14 Redis and 19/19 browser cases in both, and exact Preview
   `dpl_DiwQyw7KexX5mT9kxA25gfXCACgk`. All 29 threads have evidence replies and are resolved; the
-  GraphQL refetch reports zero unresolved and no change-request review. Record and prove the
-  evidence-only closeout before C-09 closes.
+  GraphQL refetch reports zero unresolved and no change-request review. Evidence head `9ac0fa9`
+  then passed push run `29690851759`, pull-request run `29690852977`, 14/14 Redis and 19/19 browser
+  cases in both, exact Preview `dpl_EP7Xv212kkN8dQmeTpsVBZ9ELqat`, zero unresolved threads, and no
+  change-request review.
 - [ ] C-10 Merge PR #4 into PR-A, commit the inner-merge evidence, prove PR-A's exact head in CI and
-  Preview, leave PR #5 draft, and STOP with default and Production unchanged.
-- [ ] C-11 OWNER GATE: after separately recorded owner authorization, verify an owner-approved
-  persistent provider, fresh Production-only credentials, and the staged sentinel plan; only then
-  mark PR #5 ready, merge default, stage, verify, and promote Production.
+  Preview. The guarded inner
+  merge created `ca1d217`: first parent `02f73ef`, second parent `9ac0fa9`, with a tree identical to
+  the proven PR #4 head. The closure commit now also contains the Upstash mutation-safety fix and
+  four review corrections found before the C-10 gate; its local and remote proof remain.
+- [x] (2026-07-20) Closed stale PR #2 without merging it after recording that PR #5 fully supersedes
+  its Next.js dependency update. The branch and history were preserved.
+- [x] (2026-07-20) C-11 OWNER GATE: the owner selected Upstash Free for Production, accepted the
+  archive/manual-restore, quota, and no-SLA limitations, rejected keepalive traffic and automatic
+  paid upgrades, and approved the staged probe/fallback/promotion plan. Provider terms or MFA still
+  require the owner personally if Vercel presents an interactive checkpoint.
+- [x] (2026-07-20) Built the seven-path PR #5 closure packet. Hostile review caught that
+  `retry: false` still performs two fetch attempts in pinned Upstash 1.35.8; the code now uses
+  `retry: { retries: 0 }`, a fresh five-second signal, and a real-SDK one-fetch regression. It also
+  corrected every actionable PR #5 documentation/example inconsistency and replaced the unsafe old
+  Production runbook with the owner-authorized provider/fallback/release sequence. Application,
+  test, scope, and thread-disposition reviews are clear. Local Node gates hit the separately recorded
+  kernel-I/O non-start; exact-head GitHub CI remains mandatory.
+- [ ] C-11 Provision the isolated provider, prove fresh Production-only credentials with a direct
+  fake-data adapter probe, create a healthy hidden production-target fallback from the exact PR #5
+  tree, then merge, verify, and promote without moving aliases early.
 - [ ] C-12 After the authorized Production release, record final evidence and retrospective.
 
 ## Surprises & Discoveries
@@ -160,6 +178,25 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   the giant rewrite replaced the original mock, plus two outside-diff UI fixes that lacked direct
   browser assertions. Green aggregate gates did not reveal that evidence loss. Restoring all four
   cases before resolution raised the final unit count to 149 and browser count to 19.
+- PR #5 has 12 unresolved threads at the start of C-10 closeout: five current and seven outdated.
+  Three current comments require small repository corrections; the CI job-name and mock-credential
+  comments are evidence-backed false positives. Every thread still needs a reply and resolution.
+- `@upstash/redis` retries failed requests five times by default. Retrying a mutating Lua command can
+  repeat an indeterminate create or vote. In pinned version 1.35.8, even `retry: false` makes two
+  attempts; the Production adapter must set `retry: { retries: 0 }` and create a fresh five-second
+  abort signal for every request. A real-SDK fetch-boundary regression proves both facts.
+- The Vercel integration CLI normally connects a new Marketplace resource to Development, Preview,
+  and Production. Provision Upstash disconnected (or with `--no-connect --no-env-pull`) and attach
+  only the two REST credentials to Production after reviewing their names without printing values.
+- The five public aliases still point at old SHA `75f432d`, whose valid-ID storage sentinel is broken.
+  It is not a safe recovery target. Before merging, redeploy the exact green PR #5 Preview deployment as a
+  hidden production-target deployment, prove it `READY` and healthy, and prove aliases did not move.
+- During the 2026-07-20 C-10 closeout, Node processes entered macOS uninterruptible I/O before
+  Vitest or TypeScript printed a startup banner in both the isolated worktree and the unchanged main
+  checkout. Every wait was capped at 30 seconds and abandoned processes were signaled; this is an
+  environment non-start, not a test result. A direct real-SDK probe independently proved one fetch
+  for `retries: 0`, and three static hostile reviews cleared the code. Fresh-install exact-head
+  GitHub CI is the executable gate; the plan must not claim a local full-gate pass for this commit.
 
 ## Decision Log
 
@@ -212,33 +249,64 @@ default branch never points at the incomplete `02f73ef` tree by itself.
   CI and Preview proof pass. Leave PR #5 draft. C-11 and every command that can ready PR #5, merge
   default, change domain assignment, create a Production deployment, promote, or roll back are
   blocked until four facts are recorded: fresh owner authorization, an approved persistent provider,
-  fresh credentials scoped only to Production, and an approved staged sentinel/promotion/rollback
+  fresh credentials scoped only to Production, and an approved staged sentinel/promotion/recovery
   plan.
+- Decision (2026-07-20): Use Upstash Free as the Production store. Create
+  `whatitdo-upstash-production` in `us-east-1` with no read replica, eviction, Prod Pack, keepalive,
+  or automatic paid upgrade. Treat 400,000 monthly commands, 204.8 MB, or 8 GB bandwidth as the
+  80-percent stop/review thresholds. If the database is archived after inactivity, restore manually
+  and do not reconnect it until the application expiration invariants are re-proven.
+- Decision (2026-07-20): Combine the Upstash retry/timeout safety correction, four review
+  fixes, and C-10 evidence into one closure commit. The intended complete local gate hit the recorded
+  macOS kernel-I/O non-start; use the inherited full gate, direct pinned-SDK proof, three clean
+  hostile reviews, and one mandatory fresh-install exact-head GitHub/Preview gate. Repetition of the
+  same known-stuck local runner is ceremony, not evidence.
+- Decision (2026-07-20): Use the exact PR #5 tree to build the hidden healthy fallback before merge.
+  Disable automatic domain assignment, require aliases to remain byte-for-byte unchanged, and make
+  no competing provider mutation while a deploy or promotion is indeterminate. A hidden deployment
+  is not Instant-Rollback eligible, so recovery promotes the proven fallback once and polls it like
+  any other promotion; it never invokes Vercel rollback against the old broken deployment.
+- Decision (2026-07-20): Merge race-safely. A normal two-parent merge commit must be based on the
+  observed default tip and pushed without force; a concurrent default update must reject the push.
+  If default moves once, merge it into PR #5 and repeat the exact-head proof. A second move stops the
+  release for owner review.
+- Decision (2026-07-20): Do not repeat a local runner that enters uninterruptible I/O before test
+  startup. Preserve the earlier complete local gate on the identical inherited tree, require the
+  focused real-SDK behavior proof and clean hostile reviews for the small closure patch, then make
+  fresh-install exact-head GitHub CI mandatory before any thread resolution, provider connection,
+  ready/merge, or deployment mutation. This is an explicit evidence substitution, not a green local
+  result.
 
 ## Outcomes & Retrospective
 
 Planning outcome: the executable unit is a coherent behavior packet, not an arbitrary line count or
 one-file microticket. The run has five planned repair commits plus explicit hostile-review follow-up,
 two implementation waves, a final integrated local gate, and one intentional code-candidate push.
-Evidence-only commits are allowed where remote proof cannot exist earlier. The current run ends
-after the C-10 inner merge and PR-A's exact-head Preview proof, with PR #5 still draft and Production
-unchanged. Update this section through that stopping point in Git. Only a later owner-authorized C-11
-run may append the Production SHA, deployment, promotion, C-12 checks, and retrospective to the
-relevant PR's durable release-evidence record.
+Evidence-only commits are allowed where remote proof cannot exist earlier. The 2026-07-20 run is now
+authorized through Production using Upstash Free. Repository evidence stops at the one PR #5 closure
+commit; later CI, provider, merge, deployment, promotion, and delayed-log evidence belongs in the PR
+body and an idempotently updated release-evidence comment so documentation does not create another
+untested release SHA.
+
+Execution outcome through the inner merge: PR #4 completed at `9ac0fa9`, passed both exact-head CI
+event suites and Preview proof, received 29 evidence replies, and reached zero unresolved threads.
+GitHub merged it into draft PR #5 as `ca1d217`; the merge parents and identical tree are proven.
+Default, public aliases, Production environment metadata, automatic domain assignment, and the
+current Production deployment were unchanged at the pre-merge freeze. C-10 remains open only for
+this PR #5 evidence commit's guarded push, exact CI/Preview/review proof, and final unchanged-state
+comparison.
 
 ## Context and Orientation
 
-The working branch is `claude/repo-audit-completion-plan-uau7sr`. Its published head is giant commit
-`de8af4a`; its immediate parent `02f73ef` is the tip after the first 16 commits. The repository
-default is `claude/voting-suggestions-app-01QZyxebMi27ePup8cniRCws` at `75f432d`.
+C-01 through C-09 ran on `claude/repo-audit-completion-plan-uau7sr`; its final proven head is
+`9ac0fa9`. C-10 continues on draft branch `pr4-audit-prerequisites`, whose inner merge is `ca1d217`.
+The merge's first parent `02f73ef` is the tip after the first 16 commits. The repository default is
+`claude/voting-suggestions-app-01QZyxebMi27ePup8cniRCws` at `75f432d`.
 
-The current shared worktree begins with two intended modified tests:
-
-- `e2e/poll-flows.spec.ts`
-- `src/lib/redis.integration.test.ts`
-
-It also contains this plan and the older untracked `docs/SPARK_REPAIR_EXEC_PLAN.md`. Preserve the old
-Spark file and never stage it implicitly. Use explicit paths for every commit.
+The active isolated PR #5 worktree starts at `ca1d217` and contains exactly the seven intended closure
+paths named in C-10. The main checkout separately contains the user's untracked
+`docs/SPARK_REPAIR_EXEC_PLAN.md`; preserve it and never stage from that checkout. Use explicit paths
+for every commit.
 
 The public poll route is `src/app/api/poll/route.ts`. Redis selection, Lua, and typed storage
 boundaries live in `src/lib/redis.ts`; the test/E2E adapter is `src/lib/inMemoryRedis.ts`. Vote
@@ -411,19 +479,20 @@ merges, and operates provider settings.
   both CI event suites and the Preview sentinel again on that final exact head.
 - Restore the Vercel Ignored Build Step, merge PR #4 into PR-A with expected-head protection, prove
   tree equality/ancestry, and require the completed PR-A CI and Preview sentinel.
-- Leave PR #5 draft and STOP. Record the PR-A head, CI runs, Preview deployment, sentinel result, and
-  unresolved-thread count. Do not mark PR #5 ready or mutate default, Production credentials,
-  domains, aliases, promotion, or rollback state in this run.
+- Leave PR #5 draft at the C-10 checkpoint. Record the PR-A head, CI runs, Preview deployment,
+  sentinel result, and unresolved-thread count. Continue only through the active C-11 runbook after
+  every C-10 proof and the provider/account checkpoint pass.
 
-#### C-11 and C-12 — separately owner-gated Production release
+#### C-11 and C-12 — owner-authorized Production release
 
-- Resume only after the owner authorization record names the persistent provider, authorizes fresh
-  Production-only credentials, and approves the exact staged sentinel/promotion/rollback sequence.
-- After all owner-gate checks are recorded, mark PR #5 ready, disable automatic custom-domain
-  assignment, merge with expected-head protection, require exact default CI and a staged
+- Use the recorded Upstash Free decision, fresh Production-only credentials, and the active staged
+  sentinel/fallback/promotion sequence. Pause only for interactive provider terms or MFA.
+- After the provider probe passes, disable automatic custom-domain assignment and create/prove the
+  exact PR #5 hidden Production fallback while every alias remains unchanged. Then mark PR #5 ready,
+  push the race-safe local two-parent merge, require exact default CI and a staged
   `target=production` deployment, run the generated-host sentinel, promote, and rerun the public
   sentinel.
-- Record final SHAs, URLs, check outcomes, deployment and rollback IDs, log window, and retrospective.
+- Record final SHAs, URLs, check outcomes, deployment and fallback-recovery IDs, log window, and retrospective.
 
 ## Concrete Steps
 
@@ -537,45 +606,55 @@ Run from `/Users/hbpheonix/whatitdo` unless a disposable worktree is named.
   refetch reports zero unresolved.
 - [x] Required no current `CHANGES_REQUESTED` review. The review decision is empty and all submitted
   reviews are comments; no approval requirement was invented.
-- [ ] Record the green run IDs, Preview ID, replies, and zero-thread result in the plan/ledger; commit
-  only those evidence files and push once.
-- [ ] Require both CI event suites, no current change request, zero unresolved threads, deployment
-  SHA equality, and the Preview sentinel again on the evidence commit. This is PR #4's merge head.
+- [x] Recorded the green run IDs, Preview ID, replies, and zero-thread result in the plan/ledger;
+  committed and pushed only those evidence files as `9ac0fa9`.
+- [x] Required both CI event suites, no current change request, zero unresolved threads, deployment
+  SHA equality, and the Preview sentinel again on evidence head `9ac0fa9`. This is PR #4's merge
+  head.
 
 ### E. Permitted inner merge and owner-gated Production
 
-- [ ] Restore the prior null Vercel Ignored Build Step and verify readback.
-- [ ] Recheck PR #4 base/head OIDs and merge with `--merge --match-head-commit`.
-- [ ] Prove PR #4 repaired head is an ancestor of PR-A head and both trees are identical.
-- [ ] Update this plan through C-10 on PR-A, commit that inner-merge evidence, and push once.
-- [ ] Require completed PR-A CI, zero unresolved PR-A threads, no current change request, and the
-  exact-host Preview sentinel on that evidence head.
-- [ ] Leave PR #5 draft and STOP. Record the PR-A exact head and Preview evidence; confirm default,
-  Production credentials, domain assignment, aliases, and the current Production deployment did not
-  change during C-10.
+- [x] Restored the prior null Vercel Ignored Build Step and verified readback while automatic domain
+  assignment remained `true`.
+- [x] Rechecked PR #4 base/head OIDs and merged with `--merge --match-head-commit 9ac0fa9`.
+- [x] Proved PR #4 head `9ac0fa9` is the second parent and an ancestor of PR-A merge `ca1d217`, and
+  both trees are identical.
+- [x] Updated this plan through the inner merge in this PR-A evidence commit. Its guarded push and
+  readback are the next checklist item.
+- [ ] Push this single evidence commit with remote parent `ca1d217`, then require completed PR-A CI,
+  zero unresolved PR-A threads, no current change request, and the exact-host Preview sentinel on
+  that evidence head.
+- [ ] Leave PR #5 draft at the C-10 checkpoint. Record the PR-A exact head and Preview evidence;
+  confirm default, Production credentials, domain assignment, aliases, and the current Production
+  deployment did not change during C-10, then continue only if the active C-11 preconditions pass.
 
-The following owner gate is intentionally unchecked. None of the C-11/C-12 items or Production
-commands below are authorized by the current run.
-
-- [ ] Record fresh owner authorization to resume C-11 and identify its durable evidence location.
-- [ ] Record the owner-approved persistent Redis provider/tier and prove it satisfies the recorded-
-  vote and 30/90-day retention invariants.
+- [x] Record fresh owner authorization to resume C-11 and identify PR #5 as its durable evidence
+  location.
+- [x] Record Upstash Free as the owner-approved Production provider/tier and record its archive,
+  quota, availability, and manual-recovery limitations without claiming stronger durability.
 - [ ] Install fresh credentials scoped to Production only; prove their project/environment names
-  without printing values and prove the free Preview credential is not available to Production.
-- [ ] Record owner approval of the staged release plan: keep aliases on the prior deployment, probe
-  the exact generated host read-only, promote only after it passes, and use the recorded rollback ID
-  if the post-promotion public sentinel fails.
-- [ ] OWNER GATE COMPLETE: only after all four preceding items are checked, mark PR-A ready, read back
+  without printing values. `REDIS_URL` must be absent from Production so stale protocol credentials
+  cannot override the new REST credentials; Preview remains unchanged.
+- [x] Record owner approval of the staged release plan: keep aliases on the prior deployment, probe
+  the provider directly with unique fake data, build a hidden healthy fallback from the exact PR #5
+  tree, and promote only after both provider and generated-host sentinels pass.
+- [ ] OWNER GATE COMPLETE: after credentials and the provider probe pass, mark PR-A ready, read back
   `isDraft=false`, and recheck its exact base/head OIDs.
 - [ ] Recheck the live default OID. If it moved, merge that tip into PR-A and rerun PR-A proof.
-- [ ] Set Vercel `autoAssignCustomDomains=false`; record the prior production deployment/rollback ID.
-- [ ] Merge PR-A with `--merge --match-head-commit` and verify first-parent/ancestry/default tip.
+- [ ] Set Vercel `autoAssignCustomDomains=false`; snapshot every alias and create a hidden
+  production-target deployment from the exact PR #5 Preview deployment. Require `READY`, exact SHA,
+  exact project/target, a healthy generated-host sentinel, and unchanged aliases. This hidden
+  deployment is the recovery target because the currently promoted deployment is unhealthy.
+- [ ] Create a local two-parent merge from the observed default tip and exact PR-A head, push it to
+  default normally with no force, and verify first-parent/ancestry/default tip. A concurrent default
+  update must reject this push.
 - [ ] Require final default push CI green and locate the exact-SHA `target=production`, `READY`,
   staged deployment while public domains remain on the prior deployment.
 - [ ] Run the read-only generated-host sentinel, promote the exact deployment, verify public-domain
   binding, and rerun the sentinel on `https://www.whatitdo.xyz`.
-- [ ] Restore `autoAssignCustomDomains=true` unless recorded evidence shows its prior value changed.
-- [ ] Scan one hour of exact-deployment runtime error logs and record the result.
+- [ ] Restore `autoAssignCustomDomains` to its captured pre-release value on every determinate
+  coherent exit; preserve the freeze only for a documented mixed-alias inconsistency.
+- [ ] Scan exact-deployment runtime errors immediately and again after one hour; record both results.
 - [ ] Append the C-11/C-12 checklist disposition, exact evidence, and retrospective to PR-A's
   `Release evidence` body section and a final comment. Link the comment from the body. This merged PR
   record is the post-release extension of this ExecPlan; do not create a third deployment merely to
@@ -586,7 +665,9 @@ commands below are authorized by the current run.
 Use these task-specific variables in a fresh shell. Never put a credential in a command, plan,
 comment, or captured output.
 
+    set -euo pipefail
     export WHATITDO_REPO=Phazzie/WhatItDo
+    export WHATITDO_PR_A=5
     export WHATITDO_DEFAULT_BRANCH=claude/voting-suggestions-app-01QZyxebMi27ePup8cniRCws
     export WHATITDO_FIRST16=02f73efef6b57242073cc0573e105dd835b5009f
     export WHATITDO_PR4_BRANCH=claude/repo-audit-completion-plan-uau7sr
@@ -892,41 +973,717 @@ only at the reviewed SHA, fetch PR-A, and prove the merge contains that SHA with
     test "$(git rev-parse "$WHATITDO_PR4_HEAD^{tree}")" = \
       "$(git rev-parse "origin/$WHATITDO_PR_A_BRANCH^{tree}")"
 
-Create the C-10 evidence commit in an isolated worktree so the PR #4 worktree remains recoverable.
-Use `apply_patch` to record C-10, the inner merge SHA, and completed prior evidence in the plan and
-ledger; stage only those explicit files. Then run the same exact-head CI, thread, review, and Preview
-proof with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`.
+Create the C-10 closure commit in the existing isolated PR #5 worktree. It contains the inner-merge
+evidence, the Upstash single-attempt/fresh-timeout safety correction, and four review corrections
+discovered before the gate. Stage exactly the seven named paths. Then run the same exact-
+head CI, thread, review, and Preview proof with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`.
 
-    export WHATITDO_PR_A_WORKTREE=$(mktemp -d /private/tmp/whatitdo-pr-a.XXXXXX)
-    git worktree add --detach "$WHATITDO_PR_A_WORKTREE" "origin/$WHATITDO_PR_A_BRANCH"
-    cd "$WHATITDO_PR_A_WORKTREE"
-    # Use apply_patch here; do not edit with shell redirection.
-    git add docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md docs/PR4_REVIEW_THREADS.md
+The seven local commands below are the normal gate. On this recorded run they were attempted with
+hard startup limits and hit the macOS non-start documented in Surprises & Discoveries. Do not launch
+them again on this host until the stuck kernel-I/O condition clears. The authorized substitution is
+the inherited full local gate, direct pinned-SDK proof, three clean hostile reviews, and mandatory
+fresh-install exact-head GitHub CI before any subsequent mutation.
+
+    cd /Users/hbpheonix/.codex-worktrees/whatitdo-pr5-final
+    test "$(git rev-parse HEAD)" = ca1d217264b1f4a31fb745fbea9920368a27a544
+    test "$(git ls-remote origin refs/heads/$WHATITDO_PR_A_BRANCH | cut -f1)" = \
+      ca1d217264b1f4a31fb745fbea9920368a27a544
+    test "$(git diff --name-only | sort)" = "$(printf '%s\n' \
+      .env.example README.md docs/COMPLETION_PLAN.md docs/PR4_REVIEW_THREADS.md \
+      docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md src/lib/redis.ts \
+      src/lib/redis.upstash.test.ts | sort)"
+    test -z "$(git diff --cached --name-only)"
+    test -z "$(git ls-files --others --exclude-standard)"
+    git diff --check
+    npm run lint
+    npm run typecheck
+    npm test
+    npm run test:integration
+    npm run e2e
+    npm run build
+    npm audit --audit-level=high
+    git add .env.example README.md docs/COMPLETION_PLAN.md docs/PR4_REVIEW_THREADS.md \
+      docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md src/lib/redis.ts src/lib/redis.upstash.test.ts
     git diff --cached --check
-    git commit -m 'Record repaired PR #4 inner-merge evidence'
+    test -z "$(git diff --name-only)"
+    test "$(git diff --cached --name-only | sort)" = "$(printf '%s\n' \
+      .env.example README.md docs/COMPLETION_PLAN.md docs/PR4_REVIEW_THREADS.md \
+      docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md src/lib/redis.ts \
+      src/lib/redis.upstash.test.ts | sort)"
+    git commit -m 'Harden Upstash requests and close PR 5 review'
+    test "$(git diff-tree --no-commit-id --name-only -r HEAD | sort)" = "$(printf '%s\n' \
+      .env.example README.md docs/COMPLETION_PLAN.md docs/PR4_REVIEW_THREADS.md \
+      docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md src/lib/redis.ts \
+      src/lib/redis.upstash.test.ts | sort)"
+    test "$(git rev-parse HEAD^)" = ca1d217264b1f4a31fb745fbea9920368a27a544
+    test "$(git ls-remote origin refs/heads/$WHATITDO_PR_A_BRANCH | cut -f1)" = \
+      ca1d217264b1f4a31fb745fbea9920368a27a544
     git push origin "HEAD:refs/heads/$WHATITDO_PR_A_BRANCH"
     export WHATITDO_PROOF_PR=$WHATITDO_PR_A
     export WHATITDO_CANDIDATE_SHA=$(git rev-parse HEAD)
     test "$(git ls-remote origin "refs/heads/$WHATITDO_PR_A_BRANCH" | cut -f1)" = \
       "$WHATITDO_CANDIDATE_SHA"
+    if ! typeset -f wait_for_pr_checks >/dev/null 2>&1; then
+      wait_for_pr_checks() {
+        WHATITDO_CHECK_PR=$1
+        WHATITDO_CHECK_DEADLINE=$(( $(date +%s) + 600 ))
+        while :; do
+          WHATITDO_CHECKS=$(gh pr checks "$WHATITDO_CHECK_PR" \
+            --repo "$WHATITDO_REPO" --json name,bucket,link 2>/dev/null || printf '[]')
+          if jq -e 'length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")' \
+            <<<"$WHATITDO_CHECKS" >/dev/null; then return 0; fi
+          if jq -e 'any(.[]; .bucket == "fail" or .bucket == "cancel")' \
+            <<<"$WHATITDO_CHECKS" >/dev/null; then return 1; fi
+          if test "$(date +%s)" -ge "$WHATITDO_CHECK_DEADLINE"; then return 124; fi
+          echo 'waiting for PR checks' >&2
+          sleep 15
+        done
+      }
+    fi
     wait_for_pr_checks "$WHATITDO_PROOF_PR"
 
-After committing C-10 evidence on PR-A, repeat the exact-head CI, thread/review, deployment-metadata,
-and authenticated Preview sentinel proof above with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`. Record that
-evidence, prove PR #5 remains draft, and STOP. This is the current run endpoint; default and
-Production remain unchanged.
+After committing C-10 on PR-A, repeat the exact-head CI, thread/review, deployment-metadata, and
+authenticated Preview sentinel proof above with `WHATITDO_PROOF_PR=$WHATITDO_PR_A`. Record that
+evidence and prove PR #5 remains draft. This is a mandatory checkpoint: continue into the active
+C-11 runbook only if every gate is green and the provider/account checkpoint is available.
 
     gh pr view "$WHATITDO_PR_A" --repo "$WHATITDO_REPO" \
       --json isDraft,state,headRefOid \
       | jq -e --arg head "$WHATITDO_CANDIDATE_SHA" '
           .isDraft == true and .state == "OPEN" and .headRefOid == $head'
+    export WHATITDO_PROVEN_PR5_HEAD="$WHATITDO_CANDIDATE_SHA"
 
-### OWNER-GATED Production merge, staging, promotion, and rollback
+### Active authorized C-11/C-12 runbook
 
-Do not execute any command in this section during the current run. A future run must first check the
-four owner-gate items in Checklist E and record non-secret evidence for each. The four shell evidence
-variables below are deliberately required as a second fail-closed boundary; an agent must never set
-them merely to bypass the checklist.
+This section is authoritative for the 2026-07-20 Production run. The older provider commands below
+are retained only as historical evidence and must not be executed. Never print or capture a secret.
+
+    set -euo pipefail
+    : "${WHATITDO_PROVEN_PR5_HEAD:?complete and record the C-10 exact-head gate first}"
+    cd /Users/hbpheonix/.codex-worktrees/whatitdo-pr5-final
+    test "$(git rev-parse HEAD)" = "$WHATITDO_PROVEN_PR5_HEAD"
+    test "$(git ls-remote origin refs/heads/$WHATITDO_PR_A_BRANCH | cut -f1)" = \
+      "$WHATITDO_PROVEN_PR5_HEAD"
+    test -z "$(git status --porcelain)"
+    export WHATITDO_NODE22_BIN=/private/tmp/whatitdo-node22.NCpP5f/node-v22.23.1-darwin-x64/bin
+    test -x "$WHATITDO_NODE22_BIN/node"
+    export PATH="$WHATITDO_NODE22_BIN:$PATH"
+    test "$(/usr/bin/perl -e 'alarm shift; exec @ARGV' 15 node --version)" = v22.23.1
+
+1. Authenticate the Vercel CLI to `phazzies-projects/what-it-do`. If Upstash presents terms, plan
+   selection, payment, or MFA, stop for the owner to complete that screen. Create exactly one Free
+   database named `whatitdo-upstash-production`, primary region `us-east-1`, disconnected from the
+   project. Select no read region, eviction, Prod Pack, keepalive, or automatic paid upgrade.
+2. Remove Production from every stale `REDIS_URL`, `UPSTASH_REDIS_REST_URL`, and
+   `UPSTASH_REDIS_REST_TOKEN` record. Delete a record only when Production is its sole target;
+   otherwise patch its target list to preserve Preview/Development without reading its value. Prove
+   Preview metadata is unchanged and Production has zero Redis credentials, then add only the fresh
+   Upstash URL/token to Production. Require exactly one effective pair there.
+3. Run a direct probe under Production environment variables. It must use the application adapter
+   for rate limiting, atomic create, atomic append, and duplicate append. Use one random ten-
+   character poll ID and unique synthetic IP/submission/response values, require `created`,
+   `appended`, then `duplicate`, and delete only the three poll namespace keys and three probe rate-limit keys in
+   `finally` through a separately constructed Upstash client. Never use `KEYS` or `FLUSHDB`.
+4. Require the recorded inherited full gate, direct pinned-SDK proof, three clean hostile reviews,
+   green exact-head push and PR CI, 14/14 Redis tests with zero skips, 19/19 browser tests, a `READY`
+   exact-SHA Preview sentinel, zero unresolved threads in two identical snapshots 60 seconds apart,
+   and no current change request. Do not describe the closure patch as locally green.
+5. Snapshot the project setting and all five alias-to-deployment bindings. Set
+   `autoAssignCustomDomains=false` and read it back. Redeploy the exact PR #5 Preview deployment as
+   a hidden Production target, without waiting in the mutation command. Poll to one determinate
+   `READY` deployment and require exact project ID, exact PR #5 Git SHA, `target=production`, a green
+   generated-host sentinel, and byte-for-byte unchanged aliases. Record this healthy hidden
+   deployment as `WHATITDO_FALLBACK_ID`; the old promoted deployment is never a recovery target.
+6. Mark PR #5 ready and read back its exact head/base. Fetch default and create a normal local merge
+   commit whose first parent is that observed default and second parent is the exact PR #5 head.
+   Push it normally to default with no force. A concurrent update must reject the push. If default
+   moved once, merge the new default into PR #5, rerun step 4, rebuild/reprove the hidden fallback in
+   step 5 from that new head, and retry with the new fallback ID. A second move stops.
+7. Require final-default CI green and exactly one exact-merge-SHA Production deployment to become
+   `READY`. Probe its generated host while aliases remain unchanged, then promote that exact ID.
+   Poll promotion and all five aliases to a determinate result. A timeout is indeterminate: freeze
+   mutations and query status only. After binding, run the public sentinel. On failure, request
+   promote `WHATITDO_FALLBACK_ID` once as the recovery deployment and poll to a determinate binding.
+8. Restore `autoAssignCustomDomains` to the captured value on every determinate coherent
+   success/failure exit. A mixed alias map after two no-pending reads is classified as externally
+   inconsistent rather than coherent; keep assignment disabled and require manual/status-only
+   recovery. Scan exact-deployment `error` and `fatal` logs immediately and again one hour after the
+   promotion request. Update one idempotent PR #5 release-evidence comment; do not create another
+   commit or deployment merely to record remote facts.
+
+Capture environment metadata before provisioning. The API response is filtered before shell capture,
+so values never enter the variable or terminal. Preview metadata must remain byte-for-byte unchanged.
+Vercel's official `PATCH /v9/projects/{idOrName}/env/{id}` contract declares `target` and `value` as
+independently optional, so a target-only patch preserves the encrypted value. If that call or its
+metadata readback disagrees, strict mode stops before fresh credentials are added. Reference:
+`https://vercel.com/docs/rest-api/projects/edit-an-environment-variable`.
+
+    WHATITDO_ENV_META_BEFORE=$("$WHATITDO_VERCEL" api \
+      "/v9/projects/$WHATITDO_PROJECT_ID/env" --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -c '[.envs[] | {id,key,target:(if (.target|type) == "array" then
+          (.target|sort) else [.target] end),gitBranch,type}] | sort_by(.id)')
+    WHATITDO_PREVIEW_ENV_BEFORE=$(jq -c \
+      '[.[] | select(.target | index("preview")) |
+        {id,key,gitBranch,type}] | sort_by(.id)' <<<"$WHATITDO_ENV_META_BEFORE")
+
+Safe setup/readback commands follow. Interactive credential values are entered only at Vercel
+prompts. Provision the Marketplace resource disconnected; if the CLI cannot honor both isolation
+flags, use the Upstash/Vercel dashboard and do not click Connect.
+
+    "$WHATITDO_VERCEL" whoami --scope "$WHATITDO_VERCEL_SCOPE"
+    "$WHATITDO_VERCEL" link --yes --project what-it-do --scope "$WHATITDO_VERCEL_SCOPE"
+    "$WHATITDO_VERCEL" integration add upstash --name whatitdo-upstash-production \
+      --no-connect --no-env-pull --scope "$WHATITDO_VERCEL_SCOPE"
+    # Mandatory dashboard readback before continuing: provider=Upstash, resource name exactly
+    # whatitdo-upstash-production, tier=Free, primary region=us-east-1, read regions=0,
+    # project connections=0, eviction=off, Prod Pack=off, auto-upgrade=off. Record the non-secret
+    # readback in PR #5. Any mismatch or unavailable field is a hard stop.
+    jq -c '.[] | select(
+      (.key == "REDIS_URL" or .key == "UPSTASH_REDIS_REST_URL" or
+       .key == "UPSTASH_REDIS_REST_TOKEN") and (.target | index("production"))) |
+      {id, remainingTargets:(.target - ["production"])}' <<<"$WHATITDO_ENV_META_BEFORE" \
+      | while IFS= read -r record; do
+          id=$(jq -er '.id' <<<"$record")
+          remaining=$(jq -c '.remainingTargets' <<<"$record")
+          if test "$(jq 'length' <<<"$remaining")" = 0; then
+            "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID/env/$id" -X DELETE \
+              --scope "$WHATITDO_VERCEL_SCOPE" --raw >/dev/null
+          else
+            jq -cn --argjson target "$remaining" '{target:$target}' \
+              | "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID/env/$id" \
+                  -X PATCH --input - --scope "$WHATITDO_VERCEL_SCOPE" --raw >/dev/null
+          fi
+        done
+    WHATITDO_ENV_META_ISOLATED=$("$WHATITDO_VERCEL" api \
+      "/v9/projects/$WHATITDO_PROJECT_ID/env" --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -c '[.envs[] | {id,key,target:(if (.target|type) == "array" then
+          (.target|sort) else [.target] end),gitBranch,type}] | sort_by(.id)')
+    jq -e '[.[] | select(
+      (.key == "REDIS_URL" or .key == "UPSTASH_REDIS_REST_URL" or
+       .key == "UPSTASH_REDIS_REST_TOKEN") and
+      (.target | index("production")))] | length == 0' <<<"$WHATITDO_ENV_META_ISOLATED"
+    WHATITDO_PREVIEW_ENV_ISOLATED=$(jq -c \
+      '[.[] | select(.target | index("preview")) |
+        {id,key,gitBranch,type}] | sort_by(.id)' <<<"$WHATITDO_ENV_META_ISOLATED")
+    test "$WHATITDO_PREVIEW_ENV_ISOLATED" = "$WHATITDO_PREVIEW_ENV_BEFORE"
+    "$WHATITDO_VERCEL" env add UPSTASH_REDIS_REST_URL production --sensitive \
+      --scope "$WHATITDO_VERCEL_SCOPE"
+    "$WHATITDO_VERCEL" env add UPSTASH_REDIS_REST_TOKEN production --sensitive \
+      --scope "$WHATITDO_VERCEL_SCOPE"
+    "$WHATITDO_VERCEL" env ls production --scope "$WHATITDO_VERCEL_SCOPE"
+
+Read back only names, targets, branch scopes, and secret types. Require one Production REST URL,
+one Production REST token, no Production `REDIS_URL`, and an unchanged Preview environment.
+
+    WHATITDO_ENV_META_AFTER=$("$WHATITDO_VERCEL" api \
+      "/v9/projects/$WHATITDO_PROJECT_ID/env" --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -c '[.envs[] | {id,key,target:(if (.target|type) == "array" then
+          (.target|sort) else [.target] end),gitBranch,type}] | sort_by(.id)')
+    jq -e '
+      ([.[] | select(
+        (.key == "UPSTASH_REDIS_REST_URL" or .key == "UPSTASH_REDIS_REST_TOKEN") and
+        (.target | index("production")))] | length) == 2 and
+      (all(.[]; if (.key == "UPSTASH_REDIS_REST_URL" or
+                    .key == "UPSTASH_REDIS_REST_TOKEN") and
+                   (.target | index("production"))
+                then .target == ["production"] and .gitBranch == null and
+                     .type == "sensitive"
+                else true end)) and
+      ([.[] | select(.key == "REDIS_URL" and
+                      (.target | index("production")))] | length) == 0
+    ' <<<"$WHATITDO_ENV_META_AFTER"
+    WHATITDO_PREVIEW_ENV_AFTER=$(jq -c \
+      '[.[] | select(.target | index("preview")) |
+        {id,key,gitBranch,type}] | sort_by(.id)' <<<"$WHATITDO_ENV_META_AFTER")
+    test "$WHATITDO_PREVIEW_ENV_AFTER" = "$WHATITDO_PREVIEW_ENV_BEFORE"
+
+Install the exact probe runner outside the Production-secret process, verify its package version,
+then run the adapter probe from the PR #5 worktree with Production variables. The separate raw
+client is used only for exact cleanup. The script prints one generic success line and never prints
+credentials, raw provider errors, or synthetic ballot contents.
+
+    export WHATITDO_PROBE_TOOLS=$(mktemp -d /private/tmp/whatitdo-probe-tools.XXXXXX)
+    whatitdo_cleanup_probe_tools() {
+      case "$WHATITDO_PROBE_TOOLS" in
+        /private/tmp/whatitdo-probe-tools.*) rm -rf -- "$WHATITDO_PROBE_TOOLS" ;;
+        *) return 1 ;;
+      esac
+    }
+    trap whatitdo_cleanup_probe_tools EXIT
+    /usr/bin/perl -e 'alarm shift; exec @ARGV' 300 npm install \
+      --prefix "$WHATITDO_PROBE_TOOLS" --ignore-scripts --no-save \
+      --package-lock=false tsx@4.20.3
+    test "$(/usr/bin/perl -e 'alarm shift; exec @ARGV' 15 node -p \
+      "require('$WHATITDO_PROBE_TOOLS/node_modules/tsx/package.json').version")" = 4.20.3
+    /usr/bin/perl -e 'alarm shift; exec @ARGV' 120 \
+      "$WHATITDO_VERCEL" env run -e production --scope "$WHATITDO_VERCEL_SCOPE" -- \
+        "$WHATITDO_PROBE_TOOLS/node_modules/.bin/tsx" --eval '
+      import { createHash, randomBytes } from "node:crypto";
+      import { Redis } from "@upstash/redis";
+      import {
+        appendVoteAtomically, checkPollCreateRateLimit, createPollAtomically,
+      } from "./src/lib/redis";
+      const id = randomBytes(8).toString("hex").slice(0, 10);
+      const marker = randomBytes(8).toString("hex");
+      const ip = `2001:db8:${marker.slice(0, 4)}:${marker.slice(4, 8)}::1`;
+      const submissionId = `probe-${marker}`;
+      const responseId = `response-${marker}`;
+      const now = Date.now();
+      const keys = [
+        `poll:${id}`, `poll:${id}:responses`, `poll:${id}:submissions`,
+        `ratelimit:poll:${ip}`, `ratelimit:vote:ip:${ip}`, `ratelimit:vote:poll:${id}`,
+      ];
+      const url = process.env.UPSTASH_REDIS_REST_URL;
+      const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+      if (!url || !token || process.env.REDIS_URL) throw new Error("probe configuration failed");
+      const cleanup = new Redis({
+        url, token, retry: { retries: 0 }, signal: () => AbortSignal.timeout(5_000),
+      });
+      let failed = false;
+      let cleanupFailed = false;
+      let deleted = 0;
+      try {
+        const rate = await checkPollCreateRateLimit(ip);
+        if (!rate.allowed) throw new Error("probe rate limit failed");
+        const created = await createPollAtomically({
+          id, title: "Synthetic provider probe", mode: "normal", suggestions: ["Probe"],
+          createdAt: now, expiresAt: now + 90 * 24 * 60 * 60 * 1_000,
+          resultsTokenHash: createHash("sha256").update(marker).digest("hex"),
+        });
+        if (created.status !== "created") throw new Error("probe create failed");
+        const input = {
+          pollId: id, submissionId,
+          submissionDigest: createHash("sha256").update(`digest:${marker}`).digest("hex"),
+          responseId, clientIp: ip, now,
+          response: {
+            id: responseId, voterName: "Synthetic probe",
+            votes: [{ text: "Probe", vote: "yes", comment: "" }], submittedAt: now,
+          },
+        } as const;
+        const appended = await appendVoteAtomically(input);
+        const duplicate = await appendVoteAtomically(input);
+        if (appended.status !== "appended" || duplicate.status !== "duplicate") {
+          throw new Error("probe append failed");
+        }
+      } catch { failed = true; }
+      finally {
+        try { deleted = await cleanup.del(...keys); } catch { cleanupFailed = true; }
+      }
+      if (failed || cleanupFailed || deleted !== keys.length) {
+        throw new Error("provider probe failed");
+      }
+      console.log("provider probe passed and synthetic keys removed");
+    '
+    whatitdo_cleanup_probe_tools
+    trap - EXIT
+
+Before any deployment mutation, capture the complete alias map and setting. The alias list is fixed
+for this release; any addition, deletion, or changed deployment before promotion is a hard stop.
+
+    export WHATITDO_PROJECT_BEFORE=$("$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+    export WHATITDO_AUTO_ASSIGN_BEFORE=$(jq -r '.autoAssignCustomDomains' \
+      <<<"$WHATITDO_PROJECT_BEFORE")
+    test "$WHATITDO_AUTO_ASSIGN_BEFORE" = true || \
+      test "$WHATITDO_AUTO_ASSIGN_BEFORE" = false
+    WHATITDO_PRIMARY_ALIAS_BEFORE=$("$WHATITDO_VERCEL" api \
+      /v4/aliases/www.whatitdo.xyz --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+    export WHATITDO_PUBLIC_DEPLOYMENT_BEFORE=$(jq -er \
+      --arg project "$WHATITDO_PROJECT_ID" '
+        select(.alias == "www.whatitdo.xyz" and .projectId == $project) | .deploymentId
+      ' <<<"$WHATITDO_PRIMARY_ALIAS_BEFORE")
+    WHATITDO_ALIAS_MAP_BEFORE=$("$WHATITDO_VERCEL" api \
+      "/v4/aliases?projectId=$WHATITDO_PROJECT_ID&limit=100" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -c --arg deployment "$WHATITDO_PUBLIC_DEPLOYMENT_BEFORE" '
+          [.aliases[] | select(.deploymentId == $deployment) |
+            {alias, deploymentId, projectId}] | sort_by(.alias)')
+    jq -e --arg project "$WHATITDO_PROJECT_ID" \
+      'length == 5 and all(.projectId == $project)' <<<"$WHATITDO_ALIAS_MAP_BEFORE"
+    export WHATITDO_ALIAS_NAMES_BEFORE=$(jq -c '[.[] | .alias]' \
+      <<<"$WHATITDO_ALIAS_MAP_BEFORE")
+    export WHATITDO_RELEASE_INDETERMINATE=0
+    whatitdo_restore_setting() {
+      if test "$WHATITDO_RELEASE_INDETERMINATE" = 1; then
+        echo 'provider mutation is indeterminate; aliases stay frozen and recovery is status-only' >&2
+        return 0
+      fi
+      jq -cn --argjson value "$WHATITDO_AUTO_ASSIGN_BEFORE" \
+        '{autoAssignCustomDomains:$value}' \
+        | "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH --input - \
+            --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+        | jq -e --argjson value "$WHATITDO_AUTO_ASSIGN_BEFORE" \
+            '.autoAssignCustomDomains == $value'
+    }
+    whatitdo_release_exit() {
+      status=$?
+      if ! whatitdo_restore_setting; then
+        test "$status" -ne 0 || status=1
+      fi
+      trap - EXIT
+      exit "$status"
+    }
+    trap whatitdo_release_exit EXIT
+    "$WHATITDO_VERCEL" api "/v9/projects/$WHATITDO_PROJECT_ID" -X PATCH \
+      -F autoAssignCustomDomains=false --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -e '.autoAssignCustomDomains == false'
+
+Create the hidden fallback from the already-proven PR #5 Preview deployment. Poll with fresh reads;
+do not infer success from the mutation command returning zero.
+
+    export WHATITDO_FINAL_HEAD=$(gh pr view "$WHATITDO_PR_A" --repo "$WHATITDO_REPO" \
+      --json headRefOid -q .headRefOid)
+    test "$WHATITDO_FINAL_HEAD" = "$WHATITDO_PROVEN_PR5_HEAD"
+    WHATITDO_PR5_PREVIEW_DEPLOYMENT_ID=$("$WHATITDO_VERCEL" api \
+      "/v6/deployments?projectId=$WHATITDO_PROJECT_ID&limit=100" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -er --arg sha "$WHATITDO_FINAL_HEAD" '
+          [.deployments[] | select(.meta.githubCommitSha == $sha and
+            .target != "production" and .readyState == "READY")] |
+          sort_by(.createdAt) | last | .uid')
+    WHATITDO_PR5_PREVIEW=$("$WHATITDO_VERCEL" api \
+      "/v13/deployments/$WHATITDO_PR5_PREVIEW_DEPLOYMENT_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+    jq -e --arg id "$WHATITDO_PR5_PREVIEW_DEPLOYMENT_ID" \
+      --arg project "$WHATITDO_PROJECT_ID" --arg sha "$WHATITDO_FINAL_HEAD" '
+        .id == $id and .projectId == $project and .readyState == "READY" and
+        .target != "production" and .meta.githubCommitSha == $sha
+      ' <<<"$WHATITDO_PR5_PREVIEW"
+    export WHATITDO_FALLBACK_REQUESTED_MS=$(( $(date +%s) * 1000 ))
+    export WHATITDO_RELEASE_INDETERMINATE=1
+    "$WHATITDO_VERCEL" redeploy "$WHATITDO_PR5_PREVIEW_DEPLOYMENT_ID" --target=production \
+      --no-wait --scope "$WHATITDO_VERCEL_SCOPE"
+    WHATITDO_FALLBACK_DEADLINE=$(( $(date +%s) + 600 ))
+    while :; do
+      WHATITDO_FALLBACK_MATCHES=$("$WHATITDO_VERCEL" api \
+        "/v6/deployments?projectId=$WHATITDO_PROJECT_ID&limit=100&target=production" \
+        --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+        | jq -c --arg sha "$WHATITDO_FINAL_HEAD" \
+          --argjson since "$WHATITDO_FALLBACK_REQUESTED_MS" '
+            [.deployments[] | select(.meta.githubCommitSha == $sha and
+              .target == "production" and .createdAt >= $since)]')
+      if jq -e 'any(.readyState == "ERROR" or .readyState == "CANCELED")' \
+        <<<"$WHATITDO_FALLBACK_MATCHES" >/dev/null; then
+        export WHATITDO_RELEASE_INDETERMINATE=0
+        exit 1
+      fi
+      WHATITDO_HIDDEN_DEPLOYMENT_ID=$(jq -r \
+        'select(length == 1 and .[0].readyState == "READY") | .[0].uid // empty' \
+        <<<"$WHATITDO_FALLBACK_MATCHES")
+      test -z "$WHATITDO_HIDDEN_DEPLOYMENT_ID" || break
+      test "$(date +%s)" -lt "$WHATITDO_FALLBACK_DEADLINE"
+      echo 'waiting for hidden fallback deployment' >&2
+      sleep 15
+    done
+    export WHATITDO_RELEASE_INDETERMINATE=0
+    WHATITDO_HIDDEN_DEPLOYMENT=$("$WHATITDO_VERCEL" api \
+      "/v13/deployments/$WHATITDO_HIDDEN_DEPLOYMENT_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+    jq -e --arg id "$WHATITDO_HIDDEN_DEPLOYMENT_ID" \
+      --arg project "$WHATITDO_PROJECT_ID" --arg sha "$WHATITDO_FINAL_HEAD" '
+        .id == $id and .projectId == $project and .readyState == "READY" and
+        .target == "production" and .meta.githubCommitSha == $sha
+      ' <<<"$WHATITDO_HIDDEN_DEPLOYMENT"
+    WHATITDO_FALLBACK_PROBE=$("$WHATITDO_VERCEL" curl '/api/poll?id=AAAAAAAAAA' \
+      --deployment "$WHATITDO_HIDDEN_DEPLOYMENT_ID" --scope "$WHATITDO_VERCEL_SCOPE" -- \
+      --silent --show-error --max-time 15 --max-redirs 0 \
+      --write-out $'\n__STATUS__%{http_code}\n__REDIRECT__%{redirect_url}')
+    test "$(sed -n 's/^__STATUS__//p' <<<"$WHATITDO_FALLBACK_PROBE")" = 404
+    test -z "$(sed -n 's/^__REDIRECT__//p' <<<"$WHATITDO_FALLBACK_PROBE")"
+    sed '/^__STATUS__/,$d' <<<"$WHATITDO_FALLBACK_PROBE" \
+      | jq -e '.error == "Poll not found"'
+    WHATITDO_ALIAS_MAP_AFTER=$("$WHATITDO_VERCEL" api \
+      "/v4/aliases?projectId=$WHATITDO_PROJECT_ID&limit=100" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -c --argjson names "$WHATITDO_ALIAS_NAMES_BEFORE" '
+          [.aliases[] | select(.alias as $alias | $names | index($alias)) |
+            {alias, deploymentId, projectId}] | sort_by(.alias)')
+    test "$WHATITDO_ALIAS_MAP_AFTER" = "$WHATITDO_ALIAS_MAP_BEFORE"
+    export WHATITDO_FALLBACK_ID="$WHATITDO_HIDDEN_DEPLOYMENT_ID"
+
+Create and push the race-safe merge. The explicit refspec makes a concurrent default move reject
+the push rather than silently merging an unproven base.
+
+    git fetch origin --prune
+    export WHATITDO_LIVE_DEFAULT=$(git rev-parse "origin/$WHATITDO_DEFAULT_BRANCH")
+    gh pr ready "$WHATITDO_PR_A" --repo "$WHATITDO_REPO"
+    gh pr view "$WHATITDO_PR_A" --repo "$WHATITDO_REPO" \
+      --json state,isDraft,headRefOid,baseRefName,baseRefOid \
+      | jq -e --arg head "$WHATITDO_FINAL_HEAD" --arg base "$WHATITDO_DEFAULT_BRANCH" \
+          --arg base_oid "$WHATITDO_LIVE_DEFAULT" '
+          .state == "OPEN" and .isDraft == false and
+          .headRefOid == $head and .baseRefName == $base and .baseRefOid == $base_oid'
+    git fetch origin --prune
+    test "$(git rev-parse "origin/$WHATITDO_DEFAULT_BRANCH")" = "$WHATITDO_LIVE_DEFAULT"
+    test "$(git rev-parse "origin/$WHATITDO_PR_A_BRANCH")" = "$WHATITDO_FINAL_HEAD"
+    export WHATITDO_MERGE_WORKTREE=$(mktemp -d /private/tmp/whatitdo-final-merge.XXXXXX)
+    git worktree add --detach "$WHATITDO_MERGE_WORKTREE" "$WHATITDO_LIVE_DEFAULT"
+    git -C "$WHATITDO_MERGE_WORKTREE" merge --no-ff --no-edit "$WHATITDO_FINAL_HEAD"
+    export WHATITDO_FINAL_MERGE=$(git -C "$WHATITDO_MERGE_WORKTREE" rev-parse HEAD)
+    test "$(git rev-parse "$WHATITDO_FINAL_MERGE^1")" = "$WHATITDO_LIVE_DEFAULT"
+    test "$(git rev-parse "$WHATITDO_FINAL_MERGE^2")" = "$WHATITDO_FINAL_HEAD"
+    export WHATITDO_FINAL_PUSH_MS=$(( $(date +%s) * 1000 ))
+    export WHATITDO_RELEASE_INDETERMINATE=1
+    if ! git -C "$WHATITDO_MERGE_WORKTREE" push origin \
+      "$WHATITDO_FINAL_MERGE:refs/heads/$WHATITDO_DEFAULT_BRANCH"; then
+      git fetch origin "$WHATITDO_DEFAULT_BRANCH"
+      WHATITDO_DEFAULT_AFTER_REJECT=$(git rev-parse "origin/$WHATITDO_DEFAULT_BRANCH")
+      if ! git merge-base --is-ancestor "$WHATITDO_FINAL_MERGE" \
+        "$WHATITDO_DEFAULT_AFTER_REJECT"; then
+        export WHATITDO_RELEASE_INDETERMINATE=0
+        git worktree remove "$WHATITDO_MERGE_WORKTREE"
+        echo 'default moved before push: restore setting, sync PR #5 once, rerun exact-head proof and hidden fallback' >&2
+        exit 75
+      fi
+      echo 'push outcome may have deployed the merge; keep aliases frozen and query status only' >&2
+      exit 124
+    fi
+    test "$(git ls-remote origin refs/heads/$WHATITDO_DEFAULT_BRANCH | cut -f1)" = \
+      "$WHATITDO_FINAL_MERGE"
+    git worktree remove "$WHATITDO_MERGE_WORKTREE"
+    WHATITDO_PR_CLOSE_DEADLINE=$(( $(date +%s) + 60 ))
+    while :; do
+      WHATITDO_PR_AFTER_MERGE=$(gh pr view "$WHATITDO_PR_A" --repo "$WHATITDO_REPO" \
+        --json state,mergedAt,mergeCommit)
+      if jq -e --arg merge "$WHATITDO_FINAL_MERGE" '
+        .state == "MERGED" and .mergedAt != null and .mergeCommit.oid == $merge
+      ' <<<"$WHATITDO_PR_AFTER_MERGE" >/dev/null; then break; fi
+      test "$(date +%s)" -lt "$WHATITDO_PR_CLOSE_DEADLINE"
+      echo 'waiting for GitHub to record PR #5 merged' >&2
+      sleep 5
+    done
+    test "$(gh pr list --repo "$WHATITDO_REPO" --state open --json number | jq 'length')" = 0
+
+Poll exact default CI and the exact final Production deployment. Each loop prints a status line and
+has a ten-minute ceiling. A failed terminal CI/deployment exits immediately.
+
+    WHATITDO_FINAL_DEADLINE=$(( $(date +%s) + 600 ))
+    while :; do
+      WHATITDO_FINAL_RUN=$(gh api --method GET "repos/$WHATITDO_REPO/actions/runs" \
+        -f head_sha="$WHATITDO_FINAL_MERGE" -f per_page=100 \
+        | jq -c '[.workflow_runs[] | select(.name == "CI" and .event == "push")] |
+          sort_by(.created_at) | last // {}')
+      WHATITDO_FINAL_RUN_ID=$(jq -r \
+        'select(.status == "completed" and .conclusion == "success") | .id // empty' \
+        <<<"$WHATITDO_FINAL_RUN")
+      WHATITDO_FINAL_DEPLOYS=$("$WHATITDO_VERCEL" api \
+        "/v6/deployments?projectId=$WHATITDO_PROJECT_ID&limit=100&target=production" \
+        --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+        | jq -c --arg sha "$WHATITDO_FINAL_MERGE" --argjson since "$WHATITDO_FINAL_PUSH_MS" '
+            [.deployments[] | select(.meta.githubCommitSha == $sha and
+              .target == "production" and .createdAt >= $since)]')
+      if jq -e '.status == "completed" and .conclusion != "success"' \
+        <<<"$WHATITDO_FINAL_RUN" >/dev/null ||
+        jq -e 'any(.readyState == "ERROR" or .readyState == "CANCELED")' \
+          <<<"$WHATITDO_FINAL_DEPLOYS" >/dev/null; then
+        if jq -e 'length > 0 and all(.readyState == "READY" or .readyState == "ERROR" or
+          .readyState == "CANCELED")' <<<"$WHATITDO_FINAL_DEPLOYS" >/dev/null; then
+          export WHATITDO_RELEASE_INDETERMINATE=0
+        fi
+        exit 1
+      fi
+      WHATITDO_FINAL_DEPLOYMENT_ID=$(jq -r \
+        'select(length == 1 and .[0].readyState == "READY") | .[0].uid // empty' \
+        <<<"$WHATITDO_FINAL_DEPLOYS")
+      if test -n "$WHATITDO_FINAL_RUN_ID" && test -n "$WHATITDO_FINAL_DEPLOYMENT_ID"; then break; fi
+      test "$(date +%s)" -lt "$WHATITDO_FINAL_DEADLINE"
+      echo 'waiting for exact default CI and Production deployment' >&2
+      sleep 15
+    done
+    export WHATITDO_RELEASE_INDETERMINATE=0
+    WHATITDO_FINAL_RUN_VIEW=$(gh run view "$WHATITDO_FINAL_RUN_ID" --repo "$WHATITDO_REPO" \
+      --json headSha,jobs)
+    jq -e --arg sha "$WHATITDO_FINAL_MERGE" '
+      .headSha == $sha and
+      ([.jobs[] | select(.conclusion == "success") | .name] | sort) ==
+      (["build","e2e","redis-integration"] | sort)
+    ' <<<"$WHATITDO_FINAL_RUN_VIEW"
+    WHATITDO_FINAL_REDIS_JOB=$(jq -er \
+      '.jobs[] | select(.name == "redis-integration") | .databaseId' \
+      <<<"$WHATITDO_FINAL_RUN_VIEW")
+    WHATITDO_FINAL_E2E_JOB=$(jq -er \
+      '.jobs[] | select(.name == "e2e") | .databaseId' <<<"$WHATITDO_FINAL_RUN_VIEW")
+    WHATITDO_FINAL_REDIS_LOG=$(gh run view "$WHATITDO_FINAL_RUN_ID" \
+      --repo "$WHATITDO_REPO" --job "$WHATITDO_FINAL_REDIS_JOB" --log)
+    WHATITDO_FINAL_E2E_LOG=$(gh run view "$WHATITDO_FINAL_RUN_ID" \
+      --repo "$WHATITDO_REPO" --job "$WHATITDO_FINAL_E2E_JOB" --log)
+    grep -Eq '14 passed.*\(14\)' <<<"$WHATITDO_FINAL_REDIS_LOG"
+    grep -Eq '19 passed' <<<"$WHATITDO_FINAL_E2E_LOG"
+    if grep -Eq 'Tests.*skipped' <<<"$WHATITDO_FINAL_REDIS_LOG"; then exit 1; fi
+    WHATITDO_FINAL_DEPLOYMENT=$("$WHATITDO_VERCEL" api \
+      "/v13/deployments/$WHATITDO_FINAL_DEPLOYMENT_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw)
+    jq -e --arg id "$WHATITDO_FINAL_DEPLOYMENT_ID" \
+      --arg project "$WHATITDO_PROJECT_ID" --arg sha "$WHATITDO_FINAL_MERGE" '
+        .id == $id and .projectId == $project and .readyState == "READY" and
+        .target == "production" and .meta.githubCommitSha == $sha
+      ' <<<"$WHATITDO_FINAL_DEPLOYMENT"
+    WHATITDO_ALIAS_MAP_STAGED=$("$WHATITDO_VERCEL" api \
+      "/v4/aliases?projectId=$WHATITDO_PROJECT_ID&limit=100" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+      | jq -c --argjson names "$WHATITDO_ALIAS_NAMES_BEFORE" '
+          [.aliases[] | select(.alias as $alias | $names | index($alias)) |
+            {alias, deploymentId, projectId}] | sort_by(.alias)')
+    test "$WHATITDO_ALIAS_MAP_STAGED" = "$WHATITDO_ALIAS_MAP_BEFORE"
+    WHATITDO_FINAL_PROBE=$("$WHATITDO_VERCEL" curl '/api/poll?id=AAAAAAAAAA' \
+      --deployment "$WHATITDO_FINAL_DEPLOYMENT_ID" --scope "$WHATITDO_VERCEL_SCOPE" -- \
+      --silent --show-error --max-time 15 --max-redirs 0 \
+      --write-out $'\n__STATUS__%{http_code}\n__REDIRECT__%{redirect_url}')
+    test "$(sed -n 's/^__STATUS__//p' <<<"$WHATITDO_FINAL_PROBE")" = 404
+    test -z "$(sed -n 's/^__REDIRECT__//p' <<<"$WHATITDO_FINAL_PROBE")"
+    sed '/^__STATUS__/,$d' <<<"$WHATITDO_FINAL_PROBE" \
+      | jq -e '.error == "Poll not found"'
+
+Promote once, then poll provider status and the full alias map. Until two consecutive status reads
+say no mutation is pending, do not promote or roll back again. A timeout leaves aliases frozen and
+permits status-only recovery.
+
+    export WHATITDO_PROMOTION_REQUESTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    export WHATITDO_RELEASE_INDETERMINATE=1
+    "$WHATITDO_VERCEL" promote "$WHATITDO_FINAL_DEPLOYMENT_ID" \
+      --scope "$WHATITDO_VERCEL_SCOPE" --yes --timeout 0 || true
+    WHATITDO_PROMOTION_DEADLINE=$(( $(date +%s) + 600 ))
+    WHATITDO_STABLE_PROMOTION_READS=0
+    while :; do
+      WHATITDO_ALIAS_MAP_CURRENT=$("$WHATITDO_VERCEL" api \
+        "/v4/aliases?projectId=$WHATITDO_PROJECT_ID&limit=100" \
+        --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+        | jq -c --argjson names "$WHATITDO_ALIAS_NAMES_BEFORE" '
+            [.aliases[] | select(.alias as $alias | $names | index($alias)) |
+              {alias, deploymentId, projectId}] | sort_by(.alias)')
+      jq -e --argjson before "$WHATITDO_ALIAS_MAP_BEFORE" \
+        --arg final "$WHATITDO_FINAL_DEPLOYMENT_ID" --arg project "$WHATITDO_PROJECT_ID" '
+          ([.[] | .alias] == [$before[] | .alias]) and
+          all(.projectId == $project) and
+          all(. as $item |
+            ($before[] | select(.alias == $item.alias) | .deploymentId) as $old |
+            $item.deploymentId == $old or $item.deploymentId == $final)
+        ' <<<"$WHATITDO_ALIAS_MAP_CURRENT"
+      if WHATITDO_PROMOTION_STATUS=$("$WHATITDO_VERCEL" promote status \
+        "$WHATITDO_PROJECT_ID" --timeout 15s --scope "$WHATITDO_VERCEL_SCOPE" --no-color) &&
+        grep -Fq 'No deployment promotion in progress' <<<"$WHATITDO_PROMOTION_STATUS"; then
+        WHATITDO_STABLE_PROMOTION_READS=$(( WHATITDO_STABLE_PROMOTION_READS + 1 ))
+      else
+        WHATITDO_STABLE_PROMOTION_READS=0
+      fi
+      if test "$WHATITDO_STABLE_PROMOTION_READS" -ge 2; then
+        # A failure here means Vercel says idle while aliases are mixed. Keep the indeterminate flag
+        # set so the EXIT trap deliberately preserves the freeze for manual/status-only recovery.
+        jq -e --arg final "$WHATITDO_FINAL_DEPLOYMENT_ID" \
+          'all(.deploymentId == $final)' <<<"$WHATITDO_ALIAS_MAP_CURRENT"
+        export WHATITDO_RELEASE_INDETERMINATE=0
+        break
+      fi
+      test "$(date +%s)" -lt "$WHATITDO_PROMOTION_DEADLINE"
+      echo 'waiting for determinate promotion and five-alias binding' >&2
+      sleep 15
+    done
+    if DEPLOYMENT_URL=https://www.whatitdo.xyz \
+      /usr/bin/perl -e 'alarm shift; exec @ARGV' 30 node --input-type=module -e '
+      const url = new URL("/api/poll?id=AAAAAAAAAA", process.env.DEPLOYMENT_URL);
+      const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+      const body = await response.json().catch(() => null);
+      if (response.status !== 404 || response.headers.has("location") ||
+          body?.error !== "Poll not found") throw new Error("public sentinel failed");
+    '; then
+      echo 'public Production sentinel passed' >&2
+    else
+      export WHATITDO_RELEASE_INDETERMINATE=1
+      "$WHATITDO_VERCEL" promote "$WHATITDO_FALLBACK_ID" \
+        --scope "$WHATITDO_VERCEL_SCOPE" --yes --timeout 0 || true
+      WHATITDO_RECOVERY_DEADLINE=$(( $(date +%s) + 600 ))
+      WHATITDO_STABLE_RECOVERY_READS=0
+      while :; do
+        WHATITDO_ALIAS_MAP_RECOVERY=$("$WHATITDO_VERCEL" api \
+          "/v4/aliases?projectId=$WHATITDO_PROJECT_ID&limit=100" \
+          --scope "$WHATITDO_VERCEL_SCOPE" --raw \
+          | jq -c --argjson names "$WHATITDO_ALIAS_NAMES_BEFORE" '
+              [.aliases[] | select(.alias as $alias | $names | index($alias)) |
+                {alias, deploymentId, projectId}] | sort_by(.alias)')
+        jq -e --argjson before "$WHATITDO_ALIAS_MAP_BEFORE" \
+          --arg final "$WHATITDO_FINAL_DEPLOYMENT_ID" --arg fallback "$WHATITDO_FALLBACK_ID" \
+          --arg project "$WHATITDO_PROJECT_ID" '
+            ([.[] | .alias] == [$before[] | .alias]) and
+            all(.projectId == $project) and
+            all(.deploymentId == $final or .deploymentId == $fallback)
+          ' <<<"$WHATITDO_ALIAS_MAP_RECOVERY"
+        if WHATITDO_RECOVERY_STATUS=$("$WHATITDO_VERCEL" promote status \
+          "$WHATITDO_PROJECT_ID" --timeout 15s --scope "$WHATITDO_VERCEL_SCOPE" --no-color) &&
+          grep -Fq 'No deployment promotion in progress' <<<"$WHATITDO_RECOVERY_STATUS"; then
+          WHATITDO_STABLE_RECOVERY_READS=$(( WHATITDO_STABLE_RECOVERY_READS + 1 ))
+        else
+          WHATITDO_STABLE_RECOVERY_READS=0
+        fi
+        if test "$WHATITDO_STABLE_RECOVERY_READS" -ge 2; then
+          # A failure here is the same externally inconsistent mixed-alias state; preserve the freeze.
+          jq -e --arg fallback "$WHATITDO_FALLBACK_ID" \
+            'all(.deploymentId == $fallback)' <<<"$WHATITDO_ALIAS_MAP_RECOVERY"
+          export WHATITDO_RELEASE_INDETERMINATE=0
+          break
+        fi
+        test "$(date +%s)" -lt "$WHATITDO_RECOVERY_DEADLINE"
+        echo 'waiting for determinate fallback binding' >&2
+        sleep 15
+      done
+      DEPLOYMENT_URL=https://www.whatitdo.xyz \
+        /usr/bin/perl -e 'alarm shift; exec @ARGV' 30 node --input-type=module -e '
+        const url = new URL("/api/poll?id=AAAAAAAAAA", process.env.DEPLOYMENT_URL);
+        const response = await fetch(url, {
+          redirect: "manual", signal: AbortSignal.timeout(15000),
+        });
+        const body = await response.json().catch(() => null);
+        if (response.status !== 404 || response.headers.has("location") ||
+            body?.error !== "Poll not found") throw new Error("fallback sentinel failed");
+      '
+      echo 'public sentinel failed; healthy hidden fallback restored' >&2
+      whatitdo_restore_setting
+      trap - EXIT
+      exit 1
+    fi
+
+Restore the captured setting with JSON, not a hardcoded Boolean, after every determinate coherent
+exit. The only exception is the explicitly classified mixed-alias inconsistency above:
+
+    whatitdo_restore_setting
+    trap - EXIT
+
+Run the same exact-deployment log assertion now and after the clock is at least one hour past
+`WHATITDO_PROMOTION_REQUESTED_AT`; the second query is the C-12 delayed gate. Never print raw log
+events because they may contain user data. Any returned error/fatal event fails the gate and requires
+a redacted manual disposition before release evidence can say clean. Do not sleep in this shell; if
+the hour has not elapsed, record the resume timestamp and exit 75 for the later C-12 continuation.
+
+    whatitdo_assert_clean_logs() {
+      WHATITDO_LOG_UNTIL=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      for WHATITDO_LOG_LEVEL in error fatal; do
+        WHATITDO_LOG_JSONL=$("$WHATITDO_VERCEL" logs "$WHATITDO_FINAL_DEPLOYMENT_ID" \
+          --no-follow --json --level "$WHATITDO_LOG_LEVEL" \
+          --since "$WHATITDO_PROMOTION_REQUESTED_AT" --until "$WHATITDO_LOG_UNTIL" \
+          --limit 1000 --scope "$WHATITDO_VERCEL_SCOPE")
+        WHATITDO_LOG_COUNT=$(printf '%s\n' "$WHATITDO_LOG_JSONL" | jq -s 'length')
+        if test "$WHATITDO_LOG_COUNT" -ne 0; then
+          echo "runtime $WHATITDO_LOG_LEVEL logs require redacted disposition" >&2
+          return 1
+        fi
+      done
+    }
+    whatitdo_assert_clean_logs
+    export WHATITDO_PROMOTION_EPOCH=$(/usr/bin/perl -e 'alarm shift; exec @ARGV' 15 node -e \
+      'process.stdout.write(String(Date.parse(process.argv[1]) / 1000))' \
+      "$WHATITDO_PROMOTION_REQUESTED_AT")
+    export WHATITDO_DELAYED_LOG_NOT_BEFORE=$(( WHATITDO_PROMOTION_EPOCH + 3600 ))
+    if test "$(date +%s)" -lt "$WHATITDO_DELAYED_LOG_NOT_BEFORE"; then
+      echo "C-12 delayed log gate resumes at epoch $WHATITDO_DELAYED_LOG_NOT_BEFORE" >&2
+      exit 75
+    fi
+    whatitdo_assert_clean_logs
+
+### Historical superseded Production runbook — do not execute
+
+The commands below describe the pre-authorization design and are retained solely to explain earlier
+evidence. They select the known-broken deployment as rollback, inspect only one alias, hardcode a
+project setting, and use a race-prone server-side merge. They are explicitly superseded by the active
+runbook above and must never be copied or executed.
 
     : "${WHATITDO_OWNER_AUTHORIZATION_RECORD:?STOP: recorded owner authorization is required}"
     : "${WHATITDO_PERSISTENT_PROVIDER_RECORD:?STOP: approved persistent provider evidence is required}"
@@ -1225,11 +1982,11 @@ The candidate is acceptable only when:
   the required integrated heads; every new exact-head Redis CI job reports 14 passed and zero
   skipped.
 - Every PR #4 review thread has an evidence-backed reply and is resolved.
-- The current run is accepted at C-10 only when PR #4 is merged into PR-A, PR-A's exact head passes
-  CI and authenticated Preview proof, PR #5 remains draft, and default and Production are unchanged.
-- C-11/C-12 remain unacceptable until the four owner-gate records exist. Only the later authorized
-  run may accept that default contains the repaired PR-A head and Production serves the exact staged,
-  sentinel-verified final merge deployment with no observed post-deploy errors.
+- C-10 is accepted only when PR #4 is merged into PR-A, PR-A's exact head passes CI and authenticated
+  Preview proof, PR #5 remains draft, and default and Production are unchanged at that checkpoint.
+- C-11/C-12 are accepted only when the authorized active runbook proves the isolated provider,
+  Production-only credentials, exact-tree fallback, race-safe merge, exact final deployment,
+  five-alias promotion, setting restoration, and immediate plus delayed log checks.
 
 Use this read-only sentinel with `DEPLOYMENT_URL` set to the exact provider-attested generated URL or
 the public Production URL. A protection bypass may come only from a non-printed environment variable.

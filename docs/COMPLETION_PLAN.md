@@ -64,12 +64,12 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
   **Special info**: `creatorEmail` from `POLL_CREATOR_EMAIL` (skip email + server log when unset; remove hardcoded address); `from:` from `EMAIL_FROM` with current value as fallback; `resultsUrl` = `NEXT_PUBLIC_BASE_URL` else `request.nextUrl.origin`.
   **Red**: with `NEXT_PUBLIC_BASE_URL` unset and no origin header, email contains `undefined/results/…`.
 - [x] **2.5 TTL + rate limiting (H2, C5)** — done (hand-rolled sliding-window limiter; see decision table)
-  **Files**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `package.json` + `package-lock.json` (add `@upstash/ratelimit`), their test files
-  **Special info**: `EX` 30 days on BOTH `poll:{id}` and `poll:{id}:responses`, refreshed on vote; sliding window 10 polls/hr + 20 votes/hr per IP, env-gated off in dev/test.
+  **Files**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, and their test files; no `@upstash/ratelimit` dependency is used
+  **Special info**: atomic create conflict-checks all three namespaces and stores the poll with a 30-day idle TTL; the response and submission keys are created on the first successful vote. Every successful vote atomically refreshes all three existing keys within the 90-day absolute cap. Limiting is always exercised: 10 polls/hour per IP, plus 20 votes/hour per IP and 100 votes/hour per poll.
   **Red**: keys created with no TTL (assert via mock `expire` tracking); 25 rapid votes all succeed.
 - [x] **2.6 Test-only Redis switch + backend voteDisplay import (enables Wave 3; M2 backend half)** — done
   **Files**: `src/lib/redis.ts`, `src/app/api/vote/route.ts`
-  **Special info**: `USE_MOCK_REDIS=1` → in-memory implementation reusing `src/test/mockRedis.ts`; also swap the route's local `getVoteEmoji` for the `src/lib/voteDisplay` import once 2.7 has landed (coordinate: 2.7 merges first, else keep local copy and flag).
+  **Special info**: the final in-memory adapter is `src/lib/inMemoryRedis.ts` and is allowed only in unit tests or explicit loopback E2E with no deployment marker; production fails closed without durable Redis.
 - [x] **2.7 Shared vote-display lib (M2)** — done, commit `5b46957`
   **Files**: `src/lib/voteDisplay.ts` (new), `src/lib/voteDisplay.test.ts` (new), `src/app/vote/[id]/page.tsx`, `src/app/results/[id]/page.tsx`
   **Special info**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` exactly as-is; unit-test the pure functions (red first: tests import the not-yet-existing module).
@@ -90,17 +90,21 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 
 - [x] **3.1 E2E smoke** — done: 2 Playwright specs (both modes, YOLO + counter proposal), CI e2e job; webServer uses `next build && next start` because dev-mode on-demand compilation resets the in-process mock-Redis singleton mid-run
   **Files**: `e2e/` (new), `playwright.config.ts` (new), `package.json` + `package-lock.json` (add `@playwright/test`, `e2e` script), `.github/workflows/ci.yml` (e2e job)
-  **Special info**: run `next dev` with `USE_MOCK_REDIS=1`; one happy-path spec per mode: create → vote (incl. YOLO in dubious) → results show counts + counter proposal; CI installs via `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` — do not re-download.
+  **Special info**: run the production `next build && next start` web server with the explicit
+  loopback-only E2E in-memory store; one happy-path spec per mode covers create → vote (including
+  YOLO in Dubious mode) → results with counts and a counterproposal. CI installs Chromium with
+  `npx playwright install --with-deps chromium`; the agent environment may reuse its pre-installed
+  `/opt/pw-browsers` binary.
 - [x] **3.2 Orchestrator self-review** — done: `/code-review` (high) + `/security-review` run against the full branch diff.
   **`/code-review` (8 findings, all fixed)**:
   1. `GET /api/poll?id=<id>:responses` collided with the `poll:{id}:responses` list key → Redis WRONGTYPE → 500. Fixed with `isValidPollId` guard on both `poll` and `vote` routes.
   2. Notification email *subject* line wasn't escaped like the body (CR/LF header-injection risk). Fixed with `sanitizeHeaderValue` in `escapeHtml.ts`.
   3. Rate-limit sliding-window list grew unbounded under sustained traffic. Fixed with `LTRIM` capping in `checkRateLimit`.
-  4. Clients without `x-forwarded-for` shared one rate-limit bucket, letting one pool innocent users into the same quota. `getClientIp` now returns `null` and callers skip limiting instead of pooling into `'unknown'`.
+  4. The final implementation trusts only Vercel-owned headers or an explicitly trusted proxy; production fails closed when identity is unavailable and applies both IP and per-poll vote buckets.
   5. UI unconditionally promises an email notification that silently no-ops (console.log only) if `POLL_CREATOR_EMAIL` is unset. **Waived** — covered operationally by the 4.2 owner checklist below.
   6. `maxLength={50}` hardcoded instead of importing `VOTER_NAME_MAX`; fixed, plus the two sibling `COMMENT_MAX`/`COUNTER_PROPOSAL_MAX` caps for consistency.
-  7. `USE_MOCK_REDIS=1` had no production guardrail. Now throws if set alongside `VERCEL=1` (not `NODE_ENV`, so the e2e/CI `next build && next start` flow is unaffected).
-  8. `RATE_LIMIT_ENABLED` wasn't documented in `.env.example`; added. **Waived**: the identical rate-limit gate in both routes (2 call sites, a few lines each) is left duplicated rather than extracted into shared middleware — for 2 sites, the abstraction is more debt than the duplication.
+  7. The final guard permits in-memory Redis only for `NODE_ENV=test`, or explicit loopback E2E when no recognized deployment marker is present; every other production process fails closed.
+  8. The old `RATE_LIMIT_ENABLED` switch was removed; production limiting is always on and enforced at the atomic storage boundary.
   8 regression tests added (`isValidPollId` collision on both routes, subject sanitization, rate-limit list capping, `getClientIp` null fallback).
   **`/security-review`**: one candidate (unescaped `resultsUrl` in the email `href`) was raised and filtered out at confidence 2/10 — it requires an untrusted Host header reaching the app, which the documented Vercel deploy target normalizes away; worst case is a swapped link, not attribute-breakout XSS. No findings met the report threshold.
   Full suite green after fixes: tsc, lint, 56 unit tests, `next build`, both e2e specs.
@@ -110,7 +114,7 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 ## Wave 4 — Ship (orchestrator)
 
 - [x] **4.1** Push branch, open PR with a per-finding fixed/waived table mapped to `docs/AUDIT.md` — done: PR #4 body updated (2026-07-10).
-- [ ] **4.2** Owner manual checklist (humans only): set `POLL_CREATOR_EMAIL`, `EMAIL_FROM`, `NEXT_PUBLIC_BASE_URL` in Vercel; send a test vote to verify Resend delivery; note old-format polls will show zero responses after 2.2 (acceptable — or request a migration).
+- [ ] **4.2** Owner manual checklist: install the approved Production Redis credentials, set the email/base-URL variables, and send a synthetic test vote. Legacy polls are intentionally unavailable (410) because they lack the independent results credential; they are not shown with invented empty results.
 
 ## Follow-ups (out of scope for this pass)
 
@@ -121,7 +125,7 @@ Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one ba
 | Decision | Default |
 |---|---|
 | Poll TTL | 30 days |
-| Rate limits | 10 polls/hr, 20 votes/hr per IP |
-| Rate-limit dependency | hand-rolled sliding-window log in `src/lib/redis.ts` — `@upstash/ratelimit` is Lua-script (`eval`) based, untestable against the shared mock; swap in the package later if the mock grows `eval` support |
+| Rate limits | 10 polls/hr per IP; 20 votes/hr per IP and 100 votes/hr per poll |
+| Rate-limit dependency | The final implementation uses the hand-rolled atomic Lua boundary in `src/lib/redis.ts`; both the production clients and the in-memory test adapter implement that boundary, so `@upstash/ratelimit` is not required. |
 | Test framework | Vitest |
-| Old-format polls | not migrated |
+| Old-format polls | intentionally retired with 410; not migrated |

@@ -240,7 +240,14 @@ function createUpstashRedis(): RedisLike {
     )
   }
 
-  const client = new Redis({ url: url as string, token: token as string })
+  const client = new Redis({
+    url: url as string,
+    token: token as string,
+    // `false` is not zero retries in @upstash/redis 1.35.8: it maps to one
+    // retry. An explicit zero keeps indeterminate Lua mutations single-shot.
+    retry: { retries: 0 },
+    signal: () => AbortSignal.timeout(5_000),
+  })
   return {
     get: (key) => client.get(key),
     set: (key, value, options) =>

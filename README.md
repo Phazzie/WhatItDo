@@ -69,7 +69,7 @@ REDIS_URL=rediss://default:replace_me@redis.example.com:6379
 # Optional vote-email notification
 RESEND_API_KEY=re_replace_me
 POLL_CREATOR_EMAIL=notifications@example.com
-EMAIL_FROM=What It Do <notifications@example.com>
+EMAIL_FROM="What It Do <notifications@example.com>"
 
 # Only for a self-hosted production deployment behind a trusted proxy.
 # Vercel uses its own trusted request headers automatically.

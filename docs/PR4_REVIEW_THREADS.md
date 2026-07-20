@@ -1,21 +1,22 @@
-# PR #4 Review Thread Ledger
+# PR #4 Review, Inner-Merge, and PR #5 Closure Ledger
 
 Repository: `Phazzie/whatitdo`
 Pull request: `#4`
 Baseline head: `02f73ef`
 Baseline on 2026-07-16: 28 unresolved threads (17 current, 11 outdated)
 
-Stack snapshot on 2026-07-19 at pushed head `2da1d00`:
+Stack snapshot on 2026-07-19 at final PR #4 head `9ac0fa9` and PR #5 inner merge `ca1d217`:
 
-- Draft prerequisite PR #5 is `75f432d..02f73ef` with exactly 16 commits and 28 paths.
-- PR #4 is retargeted to `pr4-audit-prerequisites`, starts at giant commit `de8af4a`, and has exact
-  pushed head `2da1d00`.
+- Draft prerequisite PR #5 began as `75f432d..02f73ef` with exactly 16 commits and 28 paths. It now
+  contains merge `ca1d217`, whose first parent is `02f73ef` and second parent is `9ac0fa9`.
+- PR #4 merged into `pr4-audit-prerequisites` at exact head `9ac0fa9`. That head is an ancestor of
+  `ca1d217`, and the two trees are identical.
 - Before disposition, the complete paginated GraphQL refetch returned the same 29 unresolved thread
   IDs, all outdated. After distinct evidence replies and resolution, it returned zero unresolved.
 - No effective approval or change-request review exists; the latest bot reviews are comments only.
-- Exact-head CI runs `29690493749` and `29690494814` are green; each Redis 7 job reports 14 passed
+- Final PR #4 CI runs `29690851759` and `29690852977` are green; each Redis 7 job reports 14 passed
   with zero skipped and each browser job reports 19 passed. Preview deployment
-  `dpl_DiwQyw7KexX5mT9kxA25gfXCACgk` returned the intentional read-only 404 sentinel with no redirect.
+  `dpl_EP7Xv212kkN8dQmeTpsVBZ9ELqat` returned the intentional read-only 404 sentinel with no redirect.
 - A reply-by-reply proof audit found that the giant rewrite had removed the old direct regressions
   for threads 5 and 7. The replacement adapter implements both behaviors correctly, but those two
   assertions were restored and proven on the exact head before either thread was resolved.
@@ -71,13 +72,16 @@ CodeRabbit's outside-diff review requested CI hardening plus propagation of crea
 messages. All three are implemented and directly proven. The evidence disposition is posted at
 `https://github.com/Phazzie/WhatItDo/pull/4#issuecomment-5016067474`.
 
+PR #4's self-referential final merge-head proof is posted at
+`https://github.com/Phazzie/WhatItDo/pull/4#issuecomment-5016095418`.
+
 ## Final proof
 
-- Latest remote code head: `2da1d00`
-- Latest local code head: `2da1d00`; this ledger update is the pending evidence-only closeout
-- Exact-head CI: runs `29690493749` and `29690494814` green; 14 Redis tests and 19 browser tests
+- Final PR #4 head: `9ac0fa9`
+- PR #5 remote merge head: `ca1d217`; this ledger update is the pending PR #5 evidence commit
+- Final PR #4 CI: runs `29690851759` and `29690852977` green; 14 Redis tests and 19 browser tests
   passed with zero skips in each run
-- Exact-head Preview: `dpl_DiwQyw7KexX5mT9kxA25gfXCACgk`; read-only sentinel returned 404 with
+- Final PR #4 Preview: `dpl_EP7Xv212kkN8dQmeTpsVBZ9ELqat`; read-only sentinel returned 404 with
   no redirect on the exact deployment host
 - Thread fetch/date: complete paginated GraphQL refetch on 2026-07-19
 - Evidence replies posted: 29
@@ -86,3 +90,30 @@ messages. All three are implemented and directly proven. The evidence dispositio
 - Unresolved total: 0
 - Current `CHANGES_REQUESTED`: 0
 - Final zero-unresolved GraphQL proof: passed after all replies and resolutions
+
+## PR #5 closure threads
+
+Live snapshot on 2026-07-20: 12 unresolved threads, five current and seven outdated. The closure
+commit fixes the three actionable current comments. Two current comments are evidence-backed false
+positives and must receive explanations rather than churn. The seven outdated threads still require
+concise replies before resolution.
+
+| Thread ID | State at snapshot | Disposition |
+|---|---|---|
+| `PRRT_kwDOQoDeUc6SEr8u` | outdated | Quote the README `EMAIL_FROM` example and explain the superseded future-wiring wording. |
+| `PRRT_kwDOQoDeUc6SEtbs` | current | Quote the example `EMAIL_FROM` value so shell parsers preserve spaces and angle brackets. |
+| `PRRT_kwDOQoDeUc6SEtby` | outdated | Explain superseded rate-limit configuration; resolve after exact-head gate. |
+| `PRRT_kwDOQoDeUc6SEtb1` | current | Action pins are already immutable; job display names are not a correctness or security defect. |
+| `PRRT_kwDOQoDeUc6SEtb4` | current | Lazy Redis initialization is proven by the exact-head credential-free build; no mock secret is needed. |
+| `PRRT_kwDOQoDeUc6SEtb6` | current | Correct the E2E plan to the implemented production build/start server. |
+| `PRRT_kwDOQoDeUc6SEtb7` | current | Correct the plan to the implemented provider-independent atomic Lua boundary. |
+| `PRRT_kwDOQoDeUc6SEtb8` | outdated | Explain superseded duplicate README email wording. |
+| `PRRT_kwDOQoDeUc6SEtb-` | outdated | Explain that the final response-storage design supersedes the old migration comment. |
+| `PRRT_kwDOQoDeUc6SEtcA` | outdated | Link the atomic vote/TTL Lua proof; the sequential implementation no longer exists. |
+| `PRRT_kwDOQoDeUc6SEtcC` | outdated | Link the current creation-error live-region implementation and browser proof. |
+| `PRRT_kwDOQoDeUc6SEtcH` | outdated | Link the production/test Redis import boundary and fail-closed tests. |
+
+Closure is not complete until the exact PR #5 head is green, every row has a linked reply, GraphQL
+returns zero unresolved threads in two identical snapshots 60 seconds apart, and no current
+`CHANGES_REQUESTED` review exists. Final CI, Preview, reply URLs, and release evidence are recorded
+in PR #5 because those facts cannot exist before this repository commit.
