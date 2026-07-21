@@ -1,337 +1,217 @@
 # What It Do?
 
-An elegant, modern polling application that lets you create intriguing suggestions and gather votes from friends. Built with Next.js 14, TypeScript, and a sophisticated design aesthetic.
+What It Do is a small, privacy-minded group polling app for ordinary plans and delightfully
+questionable decisions. Create a poll, share the public ballot, and keep a separate private owner
+link for results. No account is required.
 
-## Features
+## What it does
 
-### 🎭 Dual Polling Modes
+- **Classic mode:** `yes`, `maybe`, or `no` for each possibility.
+- **Dubious mode:** adds the sincere-but-reckless `yolo` choice.
+- Creates one public voting link and one independent private results link.
+- Accepts names, per-option notes, and an optional counterproposal.
+- Shows exact counts, proportional percentages, ties, and individual ballots without fake rankings.
+- Keeps up to ten recent private links in the creator's browser, with a clear-history control.
+- Optionally sends an escaped, link-free ballot notification through Resend on a best-effort basis.
 
-**Classic Mode** - Standard polling for everyday suggestions
-- Traditional Yes/No/Maybe voting options
-- Perfect for group decisions and planning
-- Clean, straightforward interface
+The interface is an original midnight-zine collage: tactile paper, loud ink, playful copy, visible
+focus, reduced-motion support, mobile-safe controls, and no essential information in the artwork.
 
-**Adventurous Mode** - For more daring propositions
-- Includes a special "BOLD" voting option for the courageous
-- Anonymous voting with enigmatic presence names
-- Enhanced visual styling with rose and violet accents
-- Perfect for spontaneous adventures and intriguing suggestions
+## Privacy and lifecycle
 
-### ✨ Core Capabilities
+The voting response is deliberately minimal: it contains only `title`, `mode`, and `suggestions`.
+Names, comments, counterproposals, timestamps, results credentials, and aggregate results are never
+returned from the public endpoint.
 
-- **Multiple Suggestions**: Create polls with up to 3 different options
-- **Anonymous Voting**: Voters can remain anonymous or use custom names
-- **Mystery Identities**: In Adventurous Mode, anonymous voters receive alluring mystery names like "A Whisper in the Dark" or "The Midnight Wanderer"
-- **Comment System**: Add thoughts and context to each vote
-- **Counter Proposals**: Voters can suggest their own alternatives
-- **Real-time Results**: Live vote counting with visual progress bars
-- **Email Notifications**: Poll creators receive notifications when votes are submitted
-- **Auto-refresh**: Results page updates every 30 seconds
-- **Share Options**: Easily share via link, SMS, or email
+Each new poll receives a random 24-character results token. The browser places the raw token after
+the `#` in `/results/{pollId}#{token}`, so it is not sent in the page request, path, query string, or
+referrer. Redis stores only its SHA-256 hash. The results client reads the fragment and POSTs the
+token to a private, no-store endpoint. Anyone holding the full owner link can read the results, so
+keep it private and save it when the poll is created.
 
-### 🎨 Design Philosophy
+Poll data has a 30-day idle TTL, refreshed by successful votes, and an absolute 90-day lifetime.
+Each poll accepts at most 250 responses. Polls created before private tokens were introduced return
+HTTP 410 and no longer accept votes; this avoids exposing old responses or collecting owner-inaccessible
+new ones.
 
-The application features an elegant, sophisticated aesthetic with:
-- **Jewel-tone Color Palette**: Deep amethysts, velvet roses, sapphire blues, and champagne gold accents
-- **Subtle Animations**: Floating headers, gentle pulses, tasteful glows
-- **Glass-morphism Effects**: Frosted glass cards with elegant backdrops
-- **Iridescent Accents**: Sophisticated gradient bars and borders
-- **Responsive Design**: Beautiful on all device sizes
+## Requirements
 
-## Tech Stack
+- Node.js `^20.19.0`, `^22.13.0`, or `>=24.0.0` (CI uses Node 22)
+- npm
+- An external Redis database for normal runtime use, configured through either `REDIS_URL` or the
+  Upstash REST variables
+- Optional: a Resend API key and notification address
 
-- **Framework**: [Next.js 14](https://nextjs.org/) (App Router)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) with custom CSS
-- **Database**: [Upstash Redis](https://upstash.com/) (REST API)
-- **Email**: [Resend](https://resend.com/)
-- **ID Generation**: [nanoid](https://github.com/ai/nanoid)
+## Local setup
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm/yarn/pnpm
-- Upstash Redis account
-- Resend account for email notifications
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd WhatItDo
-```
-
-2. Install dependencies:
-```bash
-npm install
-# or
-yarn install
-# or
-pnpm install
-```
-
-3. Set up environment variables:
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your credentials:
-```env
-# Upstash Redis REST API
-UPSTASH_REDIS_REST_URL=your_upstash_redis_rest_url
-UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
-
-# Resend Email API
-RESEND_API_KEY=your_resend_api_key
-
-# Email address for poll notifications
-POLL_CREATOR_EMAIL=your_email@example.com
-```
-
-4. Run the development server:
-```bash
+git clone https://github.com/Phazzie/whatitdo.git
+cd whatitdo
+npm ci
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+Open <http://localhost:3000>. Normal development requests use the configured external Redis
+provider; the in-memory implementation is intentionally restricted to unit tests and explicit
+loopback E2E runs.
 
-## Usage Guide
+### Environment variables
 
-### Creating a Poll
+```dotenv
+# Option A: standard Redis, including the official Vercel Redis integration
+REDIS_URL=rediss://default:replace_me@redis.example.com:6379
 
-1. **Choose Your Mode**: Select between Classic or Adventurous mode
-2. **Add a Title** (optional): Give your poll a descriptive name
-3. **Enter Suggestions**: Add 1-3 options for voting (at least one required)
-4. **Create & Share**: Click the button to generate your unique poll link
+# Option B: Upstash REST (used only when REDIS_URL is empty)
+# UPSTASH_REDIS_REST_URL=https://example.upstash.io
+# UPSTASH_REDIS_REST_TOKEN=replace_me
 
-### Voting on a Poll
+# Optional vote-email notification
+RESEND_API_KEY=re_replace_me
+POLL_CREATOR_EMAIL=notifications@example.com
+EMAIL_FROM="What It Do <notifications@example.com>"
 
-1. **Open the Poll Link**: Navigate to the shared voting URL
-2. **Add Your Name** (optional): Enter a name or remain anonymous
-3. **Vote on Each Option**: Choose Yes, No, Maybe (or BOLD in Adventurous Mode)
-4. **Add Comments** (optional): Share your thoughts on each suggestion
-5. **Counter Proposal** (optional): Suggest your own alternative
-6. **Submit**: Send your votes to the poll creator
-
-### Viewing Results
-
-- Access the results page from the link provided after poll creation
-- See vote summaries with visual progress bars
-- View individual responses with names and comments
-- Check alternative suggestions from voters
-- Page auto-refreshes every 30 seconds for live updates
-
-## Project Structure
-
-```
-WhatItDo/
-├── src/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── poll/route.ts      # Poll creation & retrieval
-│   │   │   └── vote/route.ts      # Vote submission & email notifications
-│   │   ├── results/[id]/
-│   │   │   └── page.tsx           # Results viewing page
-│   │   ├── vote/[id]/
-│   │   │   └── page.tsx           # Voting interface
-│   │   ├── page.tsx               # Home/poll creation
-│   │   ├── layout.tsx             # Root layout
-│   │   └── globals.css            # Global styles & theme
-│   └── lib/
-│       ├── redis.ts               # Redis client configuration
-│       └── types.ts               # TypeScript type definitions
-├── .env.example                   # Environment variables template
-├── next.config.js                 # Next.js configuration
-├── tailwind.config.ts             # Tailwind CSS configuration
-└── tsconfig.json                  # TypeScript configuration
+# Only for a self-hosted production deployment behind a trusted proxy.
+# Vercel uses its own trusted request headers automatically.
+TRUST_PROXY=1
 ```
 
-## Color Palette
+`REDIS_URL` takes precedence when both provider configurations exist. The protocol connection is
+opened lazily on the first storage command and reused within a warm server process. Each connection
+attempt has a five-second timeout and at most two bounded reconnect attempts. Each storage command
+has a separate five-second deadline; a command timeout discards that connection and is never
+transparently retried. This makes an unavailable provider fail the request instead of enabling
+process-local production storage. The official Redis Cloud free plan has no disk persistence or
+high availability; choose a persistent provider plan for Production so recorded votes and the
+documented 30/90-day retention contract survive a provider restart. A non-persistent free database
+is suitable only for empty Preview verification.
 
-The application uses an elegant, sophisticated color scheme:
+`POLL_CREATOR_EMAIL` is one deployment-owned notification address; the app does not collect or store
+creator email addresses per poll. Alerts include the normalized poll title, voter name, choices,
+notes, and counterproposal, with every user-controlled HTML value escaped. They never include the
+private results link, results credential, notification address, or internal poll, response, or
+submission IDs. The provider wait is capped at five seconds. If the Resend key, destination address,
+or verified sender is absent, voting still succeeds and the UI says email is not configured;
+provider failures likewise never undo a recorded vote or claim that mail was sent.
 
-### CSS Variables
-```css
---velvet-rose: #d4526e        /* Warm, elegant rose */
---deep-sapphire: #2c3e95      /* Rich, deep blue */
---rich-amethyst: #8b5cf6      /* Vibrant purple */
---champagne-gold: #f4e4c1     /* Soft, luxurious gold */
---midnight-plum: #1a0f2e      /* Deep background purple */
---soft-pearl: #e8e0f5         /* Subtle light accent */
+Do not set `E2E_TEST`, `E2E_BASE_URL`, or `USE_IN_MEMORY_REDIS` in a deployed environment. In-memory
+storage is available only when `NODE_ENV=test`, or when the dedicated E2E marker uses a loopback URL
+and no recognized deployment marker exists.
+
+## Commands
+
+```bash
+npm run lint              # ESLint flat config
+npm run typecheck         # strict TypeScript check
+npm test                  # Vitest unit and route tests
+npm run test:coverage     # critical API/lib coverage gates
+npm run test:integration  # Redis 7 Lua contract; skips without REDIS_URL
+npm run build             # production Next.js build
+npm run e2e               # build + Chromium Playwright flows and axe scans
+npm run check             # lint, typecheck, unit tests, and build
+npm audit --audit-level=high
 ```
 
-### Mode-Specific Colors
+Coverage gates for API routes and critical library code are 85% for lines, functions, and statements,
+and 80% for branches. CI also runs the atomic Lua contract against Redis 7 and exercises desktop,
+mobile, privacy, Classic, Dubious, duplicate-retry, and accessibility browser flows.
 
-**Classic Mode**:
-- Primary gradient: Violet → Purple → Cyan
-- Accent: Violet tones
-
-**Adventurous Mode**:
-- Primary gradient: Rose → Purple → Violet
-- Accent: Rose and violet tones
-
-### Vote Colors
-- **YES**: Green (#4ade80)
-- **NO**: Red (#f87171)
-- **MAYBE**: Yellow (#facc15)
-- **BOLD**: Violet (#a78bfa)
-
-## API Routes
+## API contract
 
 ### `POST /api/poll`
-Create a new poll
-```typescript
-Request: {
-  title: string
-  suggestions: string[]
-  mode: 'normal' | 'dubious'
-}
 
-Response: {
-  id: string
+Request:
+
+```json
+{ "title": "Friday?", "suggestions": ["Dumplings", "Stargazing"], "mode": "normal" }
+```
+
+Response:
+
+```json
+{
+  "id": "10-char-id",
+  "resultsToken": "24-character-secret",
+  "poll": { "title": "Friday?", "suggestions": ["Dumplings", "Stargazing"], "mode": "normal" }
 }
 ```
 
 ### `GET /api/poll?id={pollId}`
-Retrieve poll data
-```typescript
-Response: {
-  poll: {
-    id: string
-    title: string
-    suggestions: string[]
-    mode: 'normal' | 'dubious'
-    responses: Response[]
-  }
-}
+
+Returns exactly:
+
+```json
+{ "poll": { "title": "Friday?", "suggestions": ["Dumplings", "Stargazing"], "mode": "normal" } }
 ```
 
 ### `POST /api/vote`
-Submit votes for a poll
-```typescript
-Request: {
-  pollId: string
-  voterName: string
-  votes: {
-    text: string
-    vote: 'yes' | 'no' | 'maybe' | 'yolo'
-    comment: string
-  }[]
-  counterProposal?: string
-}
 
-Response: {
-  success: boolean
+```json
+{
+  "pollId": "10-char-id",
+  "submissionId": "550e8400-e29b-41d4-a716-446655440000",
+  "voterName": "Erin",
+  "votes": [
+    { "text": "Dumplings", "vote": "yes", "comment": "Obviously" },
+    { "text": "Stargazing", "vote": "maybe", "comment": "Cloud check first" }
+  ],
+  "counterProposal": "Both"
 }
 ```
 
-## Data Models
+The UUIDv4 submission ID stays stable across a browser retry. Repeating that ID with the same
+normalized ballot is a successful duplicate; reusing it with a changed ballot returns HTTP 409 and
+does not mutate storage or send another email. The response is
+`{ "success": true, "notification": "sent" | "not_configured" | "failed" | "duplicate" }`.
+A duplicate means only that the vote was already recorded; it makes no claim about an earlier email.
 
-### Poll Type
-```typescript
-type PollMode = 'normal' | 'dubious'
+### `POST /api/results`
 
-interface Poll {
-  id: string
-  title: string
-  suggestions: string[]
-  mode: PollMode
-  responses: Response[]
-  createdAt: string
-}
+```json
+{ "pollId": "10-char-id", "resultsToken": "24-character-secret" }
 ```
 
-### Response Type
-```typescript
-type VoteOption = 'yes' | 'no' | 'maybe' | 'yolo'
+An authorized response contains public poll fields, `createdAt`, `expiresAt`, and bounded responses.
+It never contains a poll ID, response ID, token/hash, or email address. Responses set
+`Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, and `X-Robots-Tag: noindex, nofollow`.
+All pages also deny framing with both CSP `frame-ancestors 'none'` and `X-Frame-Options: DENY`.
 
-interface Vote {
-  text: string
-  vote: VoteOption
-  comment: string
-}
+All mutation endpoints require `Content-Type: application/json`; JSON request bodies are capped at
+16 KiB. Production applies poll-creation and vote rate limits
+using trusted client identity; unique votes are limited to 20/hour/IP and 100/hour/poll.
 
-interface Response {
-  id: string
-  voterName: string
-  votes: Vote[]
-  counterProposal?: string
-  submittedAt: string
-}
+## Storage model
+
+```text
+poll:{id}                    stored poll metadata and results-token hash
+poll:{id}:responses          append-only, bounded response list
+poll:{id}:submissions        submission UUID -> response ID + normalized-ballot digest receipt
+ratelimit:poll:{ip}          poll-creation fixed window
+ratelimit:vote:ip:{ip}       vote fixed window by client
+ratelimit:vote:poll:{id}     vote fixed window by poll
 ```
 
-## Email Notifications
+A single Redis Lua operation checks poll existence and expiry, resolves matching digest receipts
+before capacity or rate limits, rejects changed or legacy receipts before mutation, enforces both
+vote buckets and the lifetime cap, appends the response, records the submission receipt, and
+refreshes all poll-owned TTLs. Resend receives that same submission UUID as its provider idempotency
+key. Missing durable Redis configuration fails clearly on a request rather than during a Next.js
+build.
 
-When a vote is submitted, the poll creator receives an email containing:
-- Voter's name (or mystery identity)
-- All votes with comments
-- Counter proposal (if provided)
-- Special indicator if any BOLD votes were cast
+## Project map
 
-## Customization
-
-### Modifying Colors
-
-Edit `src/app/globals.css` to change the color scheme:
-```css
-:root {
-  --velvet-rose: #your-color;
-  --deep-sapphire: #your-color;
-  /* etc. */
-}
+```text
+src/app/api/poll/route.ts       create and public read
+src/app/api/vote/route.ts       validate, atomically append, optionally notify
+src/app/api/results/route.ts    authorized private results read
+src/app/page.tsx                create/share and recent private links
+src/app/vote/[id]/page.tsx      public ballot
+src/app/results/[id]/page.tsx   fragment-token owner results
+src/lib/redis.ts                storage selection, Lua, limits, trusted IP
+src/lib/validation.ts           normalized bounded request contracts
+e2e/poll-flows.spec.ts          privacy, product, mobile, and axe flows
 ```
 
-### Adding Mystery Names
-
-Edit the `MYSTERIOUS_NAMES` array in `src/app/vote/[id]/page.tsx`:
-```typescript
-const MYSTERIOUS_NAMES = [
-  'Your Custom Name 1',
-  'Your Custom Name 2',
-  // Add more...
-]
-```
-
-### Email Templates
-
-Customize email content in `src/app/api/vote/route.ts`
-
-## Performance Optimizations
-
-- Server-side rendering for SEO and fast initial loads
-- Automatic code splitting via Next.js
-- Image optimization (if images are added)
-- Redis for fast data storage and retrieval
-- Auto-refresh with efficient polling intervals
-
-## Browser Support
-
-The application works best on modern browsers:
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## License
-
-[Add your license here]
-
-## Acknowledgments
-
-- Design inspiration from modern glass-morphism and elegant UI trends
-- Color palette inspired by jewel tones and sophisticated aesthetics
-- Built with love for creating intriguing connections
-
----
-
-Made with elegance and a touch of mystery ✨
+Repository-specific agent guardrails are in `AGENTS.md`; the active completion record is
+`docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`. Transitive dependency license notes are documented in
+`docs/THIRD_PARTY_LICENSES.md`.

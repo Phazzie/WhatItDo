@@ -1,120 +1,131 @@
-# WhatItDo — Completion Plan (parallel sub-agent execution)
+# WhatItDo — Completion Checklist (parallel sub-agent execution)
+
+> **Historical record (completed July 2026).** This checklist describes the former Next.js 14
+> implementation and deleted test scaffolding. Do not use it as current operating guidance. See
+> [`FINISH_EXEC_PLAN.md`](./FINISH_EXEC_PLAN.md) and the repository-root [`AGENTS.md`](../AGENTS.md).
 
 Companion to `docs/AUDIT.md` (finding IDs C1–C5, H1–H5, M1–M6 referenced below).
+Each unchecked box is one dispatchable sub-agent task. Items in the same wave with disjoint
+**Files** lists may run in parallel; items sharing a file must run in the listed order.
 
-## Orchestration model
+## Standard briefing (prepended to every sub-agent prompt)
 
-- **Orchestrator**: Opus (or the coordinating session). Spawns agents, merges waves, resolves conflicts, runs the final self-review and verification gate.
-- **Sonnet 5**: anything touching API logic, the Redis data model, or test design.
-- **Haiku**: docs, env files, mechanical frontend cleanups.
-- Agents within a wave own **disjoint files** so they can run in parallel with no merge conflicts. A wave merges only when every agent in it is green.
+Every sub-agent receives this block verbatim, plus its task-specific info:
 
-## Exploration still needed (non-blocking)
-
-The codebase (13 source files) has been fully read and the build verified — no further code exploration is required. Two small look-ups happen inside the waves that own them:
-
-1. Agent A confirms current Vitest + `next` route-handler testing setup (mocking `@upstash/redis`).
-2. Agent D confirms `@upstash/ratelimit` API before wiring rate limiting.
-
-## Red-green discipline (applies to every code agent)
-
-1. **Red**: write the failing test that reproduces the finding first; run it; confirm it fails for the expected reason.
-2. **Green**: implement the minimal fix; confirm the test passes.
-3. **Regression**: run the full suite + `tsc --noEmit` + `next lint` before reporting done.
-4. Each agent's report must include the red output and the green output.
+- **Repo**: Next.js 14 (App Router) + TypeScript polling app; work from the repository root, already on the correct branch. (The orchestrator substitutes the absolute path for the current environment when dispatching.)
+- **Context**: read `docs/AUDIT.md` and this file before editing anything.
+- **File ownership**: touch ONLY the files listed in your task. If the fix seems to require another file, stop and report instead of editing it.
+- **No git**: never run `git commit`/`push`/`checkout`. The orchestrator reviews your diff and commits.
+- **Red-green protocol** (any task with a `Red:` line): write the failing test first, run it, confirm it fails *for the expected reason*, then implement the minimal fix, confirm green.
+- **Verification before reporting done**: `npx tsc --noEmit`, `npm run lint`, `npm test` (once the harness exists), `npm run build`. Build-time warnings about missing Upstash url/token are pre-existing and expected.
+- **Report format**: (1) list of changed files, (2) red output + green output for each red-green item, (3) verification results, (4) anything you noticed but did not touch because it was outside your ownership.
 
 ---
 
-## Wave 1 — Foundation (3 agents, parallel)
+## Wave 1 — Foundation
 
-### Agent A (Sonnet) — Test harness + CI
+- [x] **1.1 Env template (M6)** — done, commit `e69e4e4`
+  **Files**: `.env.example`
+  **Special info**: add `POLL_CREATOR_EMAIL`, `EMAIL_FROM` with comments matching existing style.
+- [x] **1.2 README accuracy (M5)** — done, commit `e69e4e4`
+  **Files**: `README.md`
+  **Special info**: verify every claim against `src/` before writing; fix `{id, poll}` response shape, `number` timestamps, `PollResponse` name; add duplicate-voting note, env vars, Redis layout note (planned layout in future tense — TTL/split don't exist until Wave 2).
+- [x] **1.3 Dependency triage (H5)** — done: 14 vulns (7 high) → 5; all remaining require a Next 15/16 major upgrade (see Follow-ups)
+  **Files**: `package.json`, `package-lock.json` (runtime dependency versions only — no scripts, no new packages)
+  **Special info**: `npm audit` before/after; `npm audit fix` without `--force`; bump `next`/`eslint-config-next` to latest 14.2.x; NO breaking majors (report Next 15-only fixes as follow-ups); verify tsc + lint + build.
+- [x] **1.4 Test harness** — done: Vitest 4, mockRedis with TTL inspection, 3-test smoke incl. route-handler pattern
+  **Files**: `package.json` + `package-lock.json` (devDependencies + scripts only), `vitest.config.ts` (new), `src/test/mockRedis.ts` (new), `src/test/smoke.test.ts` (new)
+  **Special info**: add `vitest`, `@testing-library/react`, `jsdom`; scripts `test`, `test:watch`, `typecheck`; mock must support `get/set/rpush/lrange/expire` and be importable by later waves; smoke test = one trivial assertion + one route-handler call to `GET /api/poll` with the mock proving route handlers are testable.
+- [x] **1.5 CI workflow** — done: lint → typecheck → test → build on push/PR, Node 20
+  **Files**: `.github/workflows/ci.yml` (new)
+  **Special info**: install → lint → typecheck → test → build on push + PR; Node 20; can run in parallel with 1.4 but merges after it (CI needs the `test` script to exist to pass).
 
-**Files owned**: `vitest.config.ts`, `package.json` + `package-lock.json` (devDependencies/scripts), `src/test/**`, `.github/workflows/ci.yml`
-- Add Vitest (+ `@testing-library/react` + `jsdom` for component tests later).
-- Create a reusable in-memory mock of `@upstash/redis` (`src/test/mockRedis.ts`) supporting `get/set/rpush/lrange/expire`.
-- Add scripts: `test`, `test:watch`, `typecheck`.
-- GitHub Actions workflow: install → lint → typecheck → test → build.
-- Smoke test proving the harness runs (one trivial passing test + one route-handler test invoking `GET /api/poll` with the mock).
+**Wave gate**: MET — CI run green on branch + PR #4 (2026-07-05).
 
-### Agent B (Haiku) — Env, docs, hygiene
+## Wave 2 — Fixes *(COMPLETE)*
 
-**Files owned**: `.env.example`, `README.md`
-- Add `POLL_CREATOR_EMAIL`, `EMAIL_FROM` to `.env.example` (fixes M6).
-- Fix README drift: response shapes, timestamp types, type names, duplicate-voting note (M5). Document the new env vars and the Redis key layout that Wave 2 introduces (coordinate wording with orchestrator).
+Backend items 2.1–2.6 share `src/app/api/*` and run sequentially inside one backend agent
+(or as separate agents in the listed order). Frontend items 2.7–2.10 are parallel to the backend track.
 
-### Agent C (Sonnet) — Dependency vulnerability triage (H5)
+- [x] **2.1 Input validation (C3 + H3)** — done
+  **Files**: `src/lib/validation.ts` (new), `src/lib/validation.test.ts` (new), `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`
+  **Special info**: poll: suggestions = 1–3 non-empty strings ≤200 chars, title ≤100; vote: votes must match the poll's suggestions exactly, vote value ∈ mode's allowed set (`yolo` only in `dubious`), voterName ≤50, comment ≤200, counterProposal ≤500; malformed JSON → 400 not 500.
+  **Red**: POST a vote with a non-string `vote` value → currently 500 via `toUpperCase()`; POST 50 suggestions → currently accepted.
+- [x] **2.2 Concurrency-safe responses (C1)** — done
+  **Files**: `src/app/api/vote/route.ts`, `src/app/api/poll/route.ts`, their test files
+  **Special info**: `RPUSH poll:{id}:responses`, `GET /api/poll` merges the list into the returned poll object; poll object no longer stores responses.
+  **Red**: two interleaved vote submissions against the mock → one response lost under current read-modify-write.
+- [x] **2.3 Email HTML escaping (C2)** — done
+  **Files**: `src/lib/escapeHtml.ts` (new), `src/lib/escapeHtml.test.ts` (new), `src/app/api/vote/route.ts`
+  **Special info**: escape voterName, poll.title, vote text, comments, counterProposal; mock Resend and assert on the html payload.
+  **Red**: voterName `<img src=x onerror=alert(1)>` appears unescaped in the email html.
+- [x] **2.4 Env-driven emails + URL fallback (C4, M1, H1)** — done
+  **Files**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, their test files
+  **Special info**: `creatorEmail` from `POLL_CREATOR_EMAIL` (skip email + server log when unset; remove hardcoded address); `from:` from `EMAIL_FROM` with current value as fallback; `resultsUrl` = `NEXT_PUBLIC_BASE_URL` else `request.nextUrl.origin`.
+  **Red**: with `NEXT_PUBLIC_BASE_URL` unset and no origin header, email contains `undefined/results/…`.
+- [x] **2.5 TTL + rate limiting (H2, C5)** — done (hand-rolled sliding-window limiter; see decision table)
+  **Files**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, and their test files; no `@upstash/ratelimit` dependency is used
+  **Special info**: atomic create conflict-checks all three namespaces and stores the poll with a 30-day idle TTL; the response and submission keys are created on the first successful vote. Every successful vote atomically refreshes all three existing keys within the 90-day absolute cap. Limiting is always exercised: 10 polls/hour per IP, plus 20 votes/hour per IP and 100 votes/hour per poll.
+  **Red**: keys created with no TTL (assert via mock `expire` tracking); 25 rapid votes all succeed.
+- [x] **2.6 Test-only Redis switch + backend voteDisplay import (enables Wave 3; M2 backend half)** — done
+  **Files**: `src/lib/redis.ts`, `src/app/api/vote/route.ts`
+  **Special info**: the final in-memory adapter is `src/lib/inMemoryRedis.ts` and is allowed only in unit tests or explicit loopback E2E with no deployment marker; production fails closed without durable Redis.
+- [x] **2.7 Shared vote-display lib (M2)** — done, commit `5b46957`
+  **Files**: `src/lib/voteDisplay.ts` (new), `src/lib/voteDisplay.test.ts` (new), `src/app/vote/[id]/page.tsx`, `src/app/results/[id]/page.tsx`
+  **Special info**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` exactly as-is; unit-test the pure functions (red first: tests import the not-yet-existing module).
+- [x] **2.8 Voter-name cap (M3)** — done, commit `5b46957`
+  **Files**: `src/app/vote/[id]/page.tsx`
+  **Special info**: `maxLength={50}` — MUST equal the server cap in 2.1 (contract: 50).
+- [x] **2.9 Visibility-aware refresh (M4)** — done, commit `5b46957`
+  **Files**: `src/app/results/[id]/page.tsx`
+  **Special info**: pause the 30s interval when `document.visibilityState === 'hidden'`; refetch immediately on visible.
+- [x] **2.10 Inline errors + clipboard cleanup (Low findings)** — done, commit `5b46957`
+  **Files**: `src/app/page.tsx`, `src/app/vote/[id]/page.tsx`
+  **Special info**: replace `alert()` with inline error banners; drop deprecated `execCommand` fallback in favor of `navigator.clipboard` + visible error on failure.
 
-**Files owned**: `package.json` + `package-lock.json` (runtime dependency versions only)
+**Wave gate**: MET — 44 tests, tsc, lint, build all green (2026-07-05).
+**Cross-wave contract**: voterName cap = 50; allowed votes = `yes`/`no`/`maybe` (+`yolo` in dubious); keys = `poll:{id}` + `poll:{id}:responses`.
 
-> Manifest contention: Agents A and C both edit `package.json`/`package-lock.json`. The orchestrator serializes the merge — C lands first, then A rebases and re-runs `npm install` so the lockfile is regenerated once, consistently.
-- Run `npm audit`, review the Dependabot list (14 high / 19 moderate / 4 low).
-- Bump within-semver first (`npm audit fix`, Next 14.2.x latest patch); take any remaining high-severity majors case by case.
-- Verify `next build` + the app's three pages still work after bumps; report anything that would need a breaking upgrade (e.g. Next 15) as a follow-up rather than doing it here.
+## Wave 3 — Verification
 
-**Gate**: CI runs green on the branch.
+- [x] **3.1 E2E smoke** — done: 2 Playwright specs (both modes, YOLO + counter proposal), CI e2e job; webServer uses `next build && next start` because dev-mode on-demand compilation resets the in-process mock-Redis singleton mid-run
+  **Files**: `e2e/` (new), `playwright.config.ts` (new), `package.json` + `package-lock.json` (add `@playwright/test`, `e2e` script), `.github/workflows/ci.yml` (e2e job)
+  **Special info**: run the production `next build && next start` web server with the explicit
+  loopback-only E2E in-memory store; one happy-path spec per mode covers create → vote (including
+  YOLO in Dubious mode) → results with counts and a counterproposal. CI installs Chromium with
+  `npx playwright install --with-deps chromium`; the agent environment may reuse its pre-installed
+  `/opt/pw-browsers` binary.
+- [x] **3.2 Orchestrator self-review** — done: `/code-review` (high) + `/security-review` run against the full branch diff.
+  **`/code-review` (8 findings, all fixed)**:
+  1. `GET /api/poll?id=<id>:responses` collided with the `poll:{id}:responses` list key → Redis WRONGTYPE → 500. Fixed with `isValidPollId` guard on both `poll` and `vote` routes.
+  2. Notification email *subject* line wasn't escaped like the body (CR/LF header-injection risk). Fixed with `sanitizeHeaderValue` in `escapeHtml.ts`.
+  3. Rate-limit sliding-window list grew unbounded under sustained traffic. Fixed with `LTRIM` capping in `checkRateLimit`.
+  4. The final implementation trusts only Vercel-owned headers or an explicitly trusted proxy; production fails closed when identity is unavailable and applies both IP and per-poll vote buckets.
+  5. UI unconditionally promises an email notification that silently no-ops (console.log only) if `POLL_CREATOR_EMAIL` is unset. **Waived** — covered operationally by the 4.2 owner checklist below.
+  6. `maxLength={50}` hardcoded instead of importing `VOTER_NAME_MAX`; fixed, plus the two sibling `COMMENT_MAX`/`COUNTER_PROPOSAL_MAX` caps for consistency.
+  7. The final guard permits in-memory Redis only for `NODE_ENV=test`, or explicit loopback E2E when no recognized deployment marker is present; every other production process fails closed.
+  8. The old `RATE_LIMIT_ENABLED` switch was removed; production limiting is always on and enforced at the atomic storage boundary.
+  8 regression tests added (`isValidPollId` collision on both routes, subject sanitization, rate-limit list capping, `getClientIp` null fallback).
+  **`/security-review`**: one candidate (unescaped `resultsUrl` in the email `href`) was raised and filtered out at confidence 2/10 — it requires an untrusted Host header reaching the app, which the documented Vercel deploy target normalizes away; worst case is a swapped link, not attribute-breakout XSS. No findings met the report threshold.
+  Full suite green after fixes: tsc, lint, 56 unit tests, `next build`, both e2e specs.
 
----
+**Wave gate**: MET — lint + typecheck + test + e2e + build all green (2026-07-10).
 
-## Wave 2 — Fixes (2 agents, parallel, disjoint files)
+## Wave 4 — Ship (orchestrator)
 
-### Agent D (Sonnet) — Backend hardening
+- [x] **4.1** Push branch, open PR with a per-finding fixed/waived table mapped to `docs/AUDIT.md` — done: PR #4 body updated (2026-07-10).
+- [ ] **4.2** Owner manual checklist: install the approved Production Redis credentials, set the email/base-URL variables, and send a synthetic test vote. Legacy polls are intentionally unavailable (410) because they lack the independent results credential; they are not shown with invented empty results.
 
-**Files owned**: `src/app/api/poll/route.ts`, `src/app/api/vote/route.ts`, `src/lib/redis.ts`, `src/lib/validation.ts` (new), `src/lib/escapeHtml.ts` (new), their test files, plus `package.json`/`package-lock.json` for the `@upstash/ratelimit` dependency (no contention — Agent E does not touch the manifests, and Wave 1 has already merged)
-Red-green per finding:
-- **C1**: move responses to `RPUSH poll:{id}:responses`; `GET /api/poll` merges list into the poll object. Red test: two concurrent POSTs to `/api/vote`, assert both responses survive.
-- **C2**: `escapeHtml()` applied to every user string interpolated into the email. Red test: voterName `<img src=x onerror=…>` must appear escaped in the sent payload (mock Resend).
-- **C3**: `src/lib/validation.ts` — validate poll creation (suggestions: array of 1–3 non-empty strings ≤200 chars; title ≤100) and vote submission (votes match the poll's suggestions exactly; vote ∈ allowed options for the poll's mode — fixes H3; voterName ≤50; comment ≤200; counterProposal ≤500). Malformed JSON → 400.
-- **C4**: `creatorEmail` from `process.env.POLL_CREATOR_EMAIL`; skip email (with a server log) when unset. Remove the hardcoded address.
-- **C5**: `@upstash/ratelimit` sliding window on both POST routes (e.g. 10 polls/hr, 20 votes/hr per IP), env-gated so dev/test skip it.
-- **H1**: build `resultsUrl` from `NEXT_PUBLIC_BASE_URL` with `request.nextUrl.origin` as fallback (always available on a `NextRequest`, unlike the `origin` header).
-- **H2**: `EX` 30 days on **both** `poll:{id}` and `poll:{id}:responses` keys (expiring only the poll would leak orphaned response lists), refreshed on each vote.
-- **M1**: `from:` address from `EMAIL_FROM` env with the current value as fallback.
-- **Test-only Redis switch**: extend `src/lib/redis.ts` with an env-gated in-memory implementation (e.g. `USE_MOCK_REDIS=1`) reusing Agent A's `src/test/mockRedis.ts`, so the Wave 3 e2e run and credential-less dev/CI never hit real Upstash.
-- **M2 (backend half)**: replace the local `getVoteEmoji` copy in `api/vote/route.ts` with an import from `src/lib/voteDisplay.ts` (created by Agent E — see cross-wave contract for merge order).
+## Follow-ups (out of scope for this pass)
 
-### Agent E (Haiku) — Frontend cleanup
+- Coordinated Next.js 15/16 migration: the 5 remaining `npm audit` findings (Next.js advisory batch, its vendored `postcss`, and `glob` via `eslint-config-next`) are only patched in Next 15/16. Breaking upgrade — needs its own plan.
 
-**Files owned**: `src/app/page.tsx`, `src/app/vote/[id]/page.tsx`, `src/app/results/[id]/page.tsx`, `src/lib/voteDisplay.ts` (new), their test files
-- **M2**: extract `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` to `src/lib/voteDisplay.ts`; unit-test the pure functions (red-green); update all three pages to import them. (The fourth copy, in `api/vote/route.ts`, is swapped to the shared import by Agent D, who owns that file.)
-- **M3**: `maxLength={50}` on the voter-name input (must match Agent D's server cap — orchestrator pins the value at 50 for both).
-- **M4**: pause the 30s results refresh when `document.visibilityState === 'hidden'`, refresh immediately on return.
-- Low items: replace `alert()` with inline error banners on create/vote pages; drop the deprecated `execCommand` fallback path or leave with a comment (agent's judgment, prefer `navigator.clipboard` only + visible error).
+## Owner decisions (defaults in effect unless overridden)
 
-**Cross-wave contract** (orchestrator enforces): voterName cap = 50; vote options per mode = `yes|no|maybe` (normal) / `+yolo` (dubious); Redis keys = `poll:{id}` (poll sans responses) + `poll:{id}:responses` (list); `src/lib/voteDisplay.ts` exports `getVoteEmoji`/`getVoteColor`/`getVoteBgColor` — Agent E's branch merges before Agent D's `api/vote/route.ts` import lands (or D keeps the local copy and the orchestrator dedupes at wave merge).
-
-**Gate**: full suite green, `next build` clean, CI green.
-
----
-
-## Wave 3 — Verification & self-review (orchestrator + 1 agent)
-
-### Agent F (Sonnet) — End-to-end smoke
-
-**Files owned**: `e2e/**` (new), `playwright.config.ts`, plus `package.json`/`package-lock.json` (add `@playwright/test` and an `e2e` script) and the e2e job in `.github/workflows/ci.yml` (no contention — Agent F runs alone in Wave 3)
-- Playwright against `next dev` with `USE_MOCK_REDIS=1` (the switch Agent D added to `src/lib/redis.ts` in Wave 2): create poll → open vote link → vote (both modes, incl. YOLO) → results page shows counts and counter proposal.
-- Reproducible browser setup: CI and contributor machines run `npx playwright install --with-deps chromium`; the agent's own environment has Chromium pre-installed at `/opt/pw-browsers` and must not re-download it.
-- Kept minimal (one happy-path spec per mode) so it stays fast in CI.
-
-### Orchestrator self-review
-
-1. Run `/code-review` (high effort) on the full branch diff; fix or explicitly waive every finding. (`/code-review` and `/security-review` are Claude Code slash commands; a human reviewer without that tooling substitutes a manual pass over the diff against the audit table plus a security-focused read of the email/validation/rate-limit changes.)
-2. Run `/security-review` on the branch (email escaping, validation, rate limiting are security-sensitive).
-3. Final gate: `lint` + `typecheck` + `test` + `e2e` + `build` all green.
-4. Re-read `docs/AUDIT.md` and tick every finding as fixed/waived in the PR description.
-
----
-
-## Wave 4 — Ship
-
-- Squash-tidy commits if needed, push branch, open PR referencing the audit table with per-finding status.
-- Post-merge manual checklist (needs the human — cannot be done by agents): set `POLL_CREATOR_EMAIL`, `EMAIL_FROM`, `NEXT_PUBLIC_BASE_URL` in Vercel; verify a real email delivers via Resend; note that existing polls stored under the old single-JSON layout will show zero responses after the C1 data-model change (acceptable — polls are ephemeral — or run a one-off migration if any live poll matters).
-
-## Decisions needed from the owner (defaults chosen; override any)
-
-| Decision | Default in this plan |
+| Decision | Default |
 |---|---|
 | Poll TTL | 30 days |
-| Rate limits | 10 polls/hr, 20 votes/hr per IP |
-| Rate-limit dependency | `@upstash/ratelimit` (same vendor, no new account) |
+| Rate limits | 10 polls/hr per IP; 20 votes/hr per IP and 100 votes/hr per poll |
+| Rate-limit dependency | The final implementation uses the hand-rolled atomic Lua boundary in `src/lib/redis.ts`; both the production clients and the in-memory test adapter implement that boundary, so `@upstash/ratelimit` is not required. |
 | Test framework | Vitest |
-| Old-format polls | not migrated |
+| Old-format polls | intentionally retired with 410; not migrated |

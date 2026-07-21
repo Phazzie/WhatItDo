@@ -1,113 +1,196 @@
-import { redis } from '@/lib/redis'
+import * as storageModule from '@/lib/redis'
+import { escapeHtml, sanitizeHeaderValue } from '@/lib/escapeHtml'
+import { readJsonBody } from '@/lib/requestBody'
+import { createSubmissionDigest } from '@/lib/submissionDigest'
+import type { NotificationStatus, StoredPoll, StoredPollResponse } from '@/lib/types'
+import { isValidPollId, parseVoteInput } from '@/lib/validation'
+import { withTimeout } from '@/lib/withTimeout'
 import { nanoid } from 'nanoid'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { Poll, PollResponse } from '@/lib/types'
 
-// Lazy initialization to avoid build-time errors
+type RedisReader = { get<T = unknown>(key: string): Promise<T | null> }
+type AppendResult = {
+  status: 'appended' | 'duplicate' | 'idempotency_conflict' | 'not_found' | 'expired' | 'identity_unavailable' | 'capacity_reached' | 'rate_limited'
+  responseId?: string
+  responseCount?: number
+  retryAfterSeconds?: number
+  scope?: 'ip' | 'poll'
+}
+type StorageContract = {
+  getRedis(): RedisReader
+  resolveClientIp(request: NextRequest):
+    | { status: 'resolved'; ip: string }
+    | { status: 'unavailable'; reason: 'missing' | 'untrusted_proxy' }
+  appendVoteAtomically(input: {
+    pollId: string
+    submissionId: string
+    submissionDigest: string
+    responseId: string
+    response: unknown
+    clientIp: string | null
+    now?: number
+  }): Promise<AppendResult>
+}
+const storage = storageModule as unknown as StorageContract
+const NOTIFICATION_TIMEOUT_MS = 5_000
+
 let resend: Resend | null = null
-function getResend() {
-  if (!resend && process.env.RESEND_API_KEY) {
-    resend = new Resend(process.env.RESEND_API_KEY)
-  }
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) return null
+  if (!resend) resend = new Resend(process.env.RESEND_API_KEY)
   return resend
+}
+
+function errorResponse(
+  error: string,
+  status: number,
+  options: { retryAfter?: number; code?: string } = {}
+) {
+  return NextResponse.json(
+    { error, ...(options.code ? { code: options.code } : {}) },
+    {
+      status,
+      ...(options.retryAfter
+        ? { headers: { 'Retry-After': String(options.retryAfter) } }
+        : {}),
+    }
+  )
+}
+
+async function notifyCreator(
+  poll: StoredPoll,
+  response: StoredPollResponse,
+  submissionId: string
+): Promise<Exclude<NotificationStatus, 'duplicate'>> {
+  const to = process.env.POLL_CREATOR_EMAIL?.trim()
+  const from = process.env.EMAIL_FROM?.trim()
+  const client = getResend()
+  if (!to || !from || !client) return 'not_configured'
+
+  try {
+    const voteDetails = response.votes.map((vote) => `
+      <li>
+        <strong>${escapeHtml(vote.text)}</strong>: ${escapeHtml(vote.vote)}
+        ${vote.comment ? `<br><span>Note: ${escapeHtml(vote.comment)}</span>` : ''}
+      </li>
+    `).join('')
+    const counterProposal = response.counterProposal
+      ? `<p><strong>Counterproposal:</strong> ${escapeHtml(response.counterProposal)}</p>`
+      : ''
+    const result = await withTimeout(client.emails.send(
+      {
+        from: sanitizeHeaderValue(from),
+        to,
+        subject: 'A What It Do poll received a response',
+        html: `
+          <div>
+            <h1>New response received</h1>
+            <p><strong>Poll:</strong> ${escapeHtml(poll.title)}</p>
+            <p><strong>Voter:</strong> ${escapeHtml(response.voterName)}</p>
+            <ul>${voteDetails}</ul>
+            ${counterProposal}
+          </div>
+        `,
+      },
+      { idempotencyKey: submissionId }
+    ), NOTIFICATION_TIMEOUT_MS)
+    if (result.error) {
+      console.error('[whatitdo] vote_notification_failed')
+      return 'failed'
+    }
+    return 'sent'
+  } catch {
+    console.error('[whatitdo] vote_notification_failed')
+    return 'failed'
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { pollId, voterName, votes, counterProposal } = body
-
-    if (!pollId || !votes) {
-      return NextResponse.json({ error: 'Poll ID and votes required' }, { status: 400 })
+    const body = await readJsonBody(request)
+    if (!body.ok) return errorResponse(body.error, body.status)
+    const candidate = body.value
+    const pollId = candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+      ? (candidate as Record<string, unknown>).pollId
+      : undefined
+    if (!isValidPollId(pollId)) {
+      return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
     }
 
-    const data = await redis.get(`poll:${pollId}`)
-
-    if (!data) {
-      return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
+    const raw = await storage.getRedis().get<string | StoredPoll>(`poll:${pollId}`)
+    if (!raw) return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
+    const poll = (typeof raw === 'string' ? JSON.parse(raw) : raw) as StoredPoll
+    if (!poll.resultsTokenHash) {
+      return errorResponse('This legacy poll is no longer available', 410, {
+        code: 'LEGACY_POLL_RETIRED',
+      })
+    }
+    if (poll.expiresAt <= Date.now()) {
+      return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
     }
 
-    const poll: Poll = typeof data === 'string' ? JSON.parse(data) : data
-
-    const response: PollResponse = {
-      id: nanoid(8),
-      voterName: voterName || 'Anonymous',
-      votes,
-      counterProposal: counterProposal || undefined,
-      submittedAt: Date.now()
+    const parsed = parseVoteInput(candidate, poll)
+    if (!parsed.ok) return errorResponse(parsed.error, 400)
+    const submissionDigest = createSubmissionDigest({
+      voterName: parsed.data.voterName,
+      votes: parsed.data.votes,
+      ...(parsed.data.counterProposal ? { counterProposal: parsed.data.counterProposal } : {}),
+    })
+    const response: StoredPollResponse = {
+      id: nanoid(12),
+      voterName: parsed.data.voterName,
+      votes: parsed.data.votes,
+      ...(parsed.data.counterProposal ? { counterProposal: parsed.data.counterProposal } : {}),
+      submittedAt: Date.now(),
     }
 
-    poll.responses.push(response)
-    await redis.set(`poll:${pollId}`, JSON.stringify(poll))
+    const identity = storage.resolveClientIp(request)
+    const appended = await storage.appendVoteAtomically({
+      pollId,
+      submissionId: parsed.data.submissionId,
+      submissionDigest,
+      responseId: response.id,
+      clientIp: identity.status === 'resolved'
+        ? identity.ip
+        : process.env.NODE_ENV === 'production' ? null : 'local-development',
+      response,
+      now: Date.now(),
+    })
 
-    // Send email notification
-    const emailClient = getResend()
-    if (emailClient && poll.creatorEmail) {
-      const isDubious = poll.mode === 'dubious'
-      const hasYolo = votes.some((v: { vote: string }) => v.vote === 'yolo')
-
-      const getVoteEmoji = (vote: string) => {
-        if (vote === 'yes') return '✅'
-        if (vote === 'no') return '❌'
-        if (vote === 'maybe') return '🤔'
-        if (vote === 'yolo') return '🎲'
-        return ''
-      }
-
-      const voteSummary = votes.map((v: { text: string; vote: string; comment: string }, i: number) =>
-        `${getVoteEmoji(v.vote)} ${i + 1}. "${v.text}"\n   Vote: ${v.vote.toUpperCase()}${v.comment ? `\n   Comment: "${v.comment}"` : ''}`
-      ).join('\n\n')
-
-      const counterProposalHtml = counterProposal
-        ? `<div style="background: ${isDubious ? '#3d1f1f' : '#2d1f3d'}; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid ${isDubious ? '#f97316' : '#f0abfc'};">
-             <p style="color: ${isDubious ? '#f97316' : '#f0abfc'}; font-weight: bold; margin: 0 0 8px 0;">${isDubious ? '🔥 Counter Dare:' : '💡 Counter Proposal:'}</p>
-             <p style="color: #e2e8f0; margin: 0; font-style: italic;">"${counterProposal}"</p>
-           </div>`
-        : ''
-
-      const resultsUrl = `${process.env.NEXT_PUBLIC_BASE_URL || request.headers.get('origin')}/results/${pollId}`
-
-      const subjectPrefix = isDubious ? '🌶️' : '📊'
-      const yoloNote = hasYolo ? ' 🎲 YOLO DETECTED!' : ''
-
-      try {
-        await emailClient.emails.send({
-          from: 'What It Do <notifications@resend.dev>',
-          to: poll.creatorEmail,
-          subject: `${subjectPrefix} ${response.voterName} voted on: ${poll.title}${counterProposal ? ' (+counter!)' : ''}${yoloNote}`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: ${isDubious ? '#f97316' : '#a855f7'};">${isDubious ? '🌶️ New Dare Response!' : '📊 New Vote Received!'}</h1>
-              <p><strong>${response.voterName}</strong> just ${isDubious ? 'responded to your dare' : 'voted on your poll'} "<strong>${poll.title}</strong>"</p>
-              ${hasYolo ? '<p style="background: linear-gradient(to right, #d946ef, #ec4899); color: white; padding: 8px 16px; border-radius: 8px; display: inline-block; font-weight: bold;">🎲 They went YOLO on at least one!</p>' : ''}
-
-              <div style="background: #1a1a2e; padding: 20px; border-radius: 12px; margin: 20px 0;">
-                <pre style="color: #e2e8f0; white-space: pre-wrap; font-size: 14px;">${voteSummary}</pre>
-              </div>
-
-              ${counterProposalHtml}
-
-              <p>
-                <a href="${resultsUrl}" style="display: inline-block; background: linear-gradient(to right, ${isDubious ? '#f97316, #ef4444' : '#a855f7, #6366f1'}); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                  View All Results
-                </a>
-              </p>
-
-              <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
-                Total responses: ${poll.responses.length} ${isDubious ? '| Dubious Mode 🌶️' : ''}
-              </p>
-            </div>
-          `
-        })
-      } catch (emailError) {
-        console.error('Failed to send email:', emailError)
-      }
+    if (appended.status === 'duplicate') {
+      return NextResponse.json({ success: true, notification: 'duplicate' satisfies NotificationStatus })
+    }
+    if (appended.status === 'idempotency_conflict') {
+      return errorResponse('Submission ID was already used for a different ballot', 409, {
+        code: 'SUBMISSION_CONFLICT',
+      })
+    }
+    if (appended.status === 'not_found' || appended.status === 'expired') {
+      return errorResponse('Poll not found', 404, { code: 'POLL_UNAVAILABLE' })
+    }
+    if (appended.status === 'identity_unavailable') {
+      return errorResponse('Unable to verify request identity', 429, {
+        retryAfter: 60,
+        code: 'IDENTITY_UNAVAILABLE',
+      })
+    }
+    if (appended.status === 'capacity_reached') {
+      return errorResponse('This poll has reached its response limit', 409, { code: 'POLL_FULL' })
+    }
+    if (appended.status === 'rate_limited') {
+      return errorResponse('Too many votes submitted. Please try again later.', 429, {
+        retryAfter: appended.retryAfterSeconds ?? 3600,
+        code: 'RATE_LIMITED',
+      })
     }
 
-    return NextResponse.json({ success: true, responseId: response.id })
-  } catch (error) {
-    console.error('Error submitting vote:', error)
-    return NextResponse.json({ error: 'Failed to submit vote' }, { status: 500 })
+    const notification = await notifyCreator(poll, response, parsed.data.submissionId)
+    return NextResponse.json({ success: true, notification })
+  } catch {
+    // Upstash error messages can include the full EVAL command, whose ARGV
+    // contains a private ballot. Never attach the upstream exception here.
+    console.error('[whatitdo] vote_submit_failed')
+    return errorResponse('Failed to submit vote', 500)
   }
 }

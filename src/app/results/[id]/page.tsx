@@ -1,295 +1,232 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Poll, VoteOption } from '@/lib/types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { availableVotes as getAvailableVotes, countVotes, summarizeVotes, VOTE_LABEL } from '@/lib/results'
+import type { PollResults } from '@/lib/types'
 
 export default function ResultsPage() {
-  const params = useParams()
-  const pollId = params.id as string
-
-  const [poll, setPoll] = useState<Poll | null>(null)
+  const { id } = useParams<{ id: string }>()
+  const [token, setToken] = useState('')
+  const [poll, setPoll] = useState<PollResults | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
-
-  const loadPoll = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/poll?id=${pollId}`)
-      if (!res.ok) throw new Error('Poll not found')
-      const data = await res.json()
-      setPoll(data.poll)
-    } catch {
-      setError('Poll not found')
-    } finally {
-      setLoading(false)
-    }
-  }, [pollId])
+  const [status, setStatus] = useState<number | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const tokenGeneration = useRef(0)
+  const activeRequest = useRef<{ generation: number; controller: AbortController } | null>(null)
 
   useEffect(() => {
-    loadPoll()
-    const interval = setInterval(loadPoll, 30000)
-    return () => clearInterval(interval)
-  }, [loadPoll])
+    const syncTokenFromFragment = () => {
+      tokenGeneration.current += 1
+      activeRequest.current?.controller.abort()
+      activeRequest.current = null
+      const fragment = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : ''
+      setToken(fragment)
+      setPoll(null)
+      setStatus(null)
+      setLastUpdated(null)
+      if (!fragment) {
+        setError('This owner link is missing its private key. Open the complete link you saved when creating the poll.')
+        setLoading(false)
+      } else {
+        setError('')
+        setLoading(true)
+      }
+    }
+    const tokenTimer = window.setTimeout(syncTokenFromFragment, 0)
+    window.addEventListener('hashchange', syncTokenFromFragment)
+    return () => {
+      window.clearTimeout(tokenTimer)
+      window.removeEventListener('hashchange', syncTokenFromFragment)
+    }
+  }, [id])
 
-  const isDubious = poll?.mode === 'dubious'
+  const load = useCallback(async (quiet = false) => {
+    if (!token) return
+    const generation = tokenGeneration.current
+    const controller = new AbortController()
+    activeRequest.current?.controller.abort()
+    activeRequest.current = { generation, controller }
+    if (quiet) setRefreshing(true)
+    else setLoading(true)
+    setError('')
+    setStatus(null)
+    try {
+      const response = await fetch('/api/results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+        body: JSON.stringify({ pollId: id, resultsToken: token }),
+      })
+      const body = (await response.json().catch(() => ({}))) as { poll?: PollResults; error?: string }
+      if (controller.signal.aborted || tokenGeneration.current !== generation || activeRequest.current?.controller !== controller) return
+      if (!response.ok || !body.poll) {
+        setStatus(response.status)
+        const message = response.status === 410
+          ? 'This legacy poll was retired to protect its responses.'
+          : response.status === 404 ? 'That poll or private key could not be found.'
+          : response.status === 429 ? 'Too many refreshes. Give it a minute, then retry.'
+          : body.error || 'Results did not arrive. Try again.'
+        throw new Error(message)
+      }
+      setPoll(body.poll)
+      setLastUpdated(Date.now())
+      setError('')
+    } catch (caught) {
+      if (controller.signal.aborted || tokenGeneration.current !== generation || activeRequest.current?.controller !== controller) return
+      setError(caught instanceof Error ? caught.message : 'Results did not arrive. Try again.')
+    } finally {
+      if (tokenGeneration.current === generation && activeRequest.current?.controller === controller) {
+        activeRequest.current = null
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
+  }, [id, token])
 
-  const getVoteEmoji = (vote: string) => {
-    if (vote === 'yes') return '✅'
-    if (vote === 'no') return '❌'
-    if (vote === 'maybe') return '🤔'
-    if (vote === 'yolo') return '🎲'
-    return ''
+  useEffect(() => {
+    if (!token) return
+    const initialLoad = window.setTimeout(() => void load(), 0)
+    let interval: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (!interval && document.visibilityState === 'visible') interval = setInterval(() => load(true), 30000)
+    }
+    const visibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (interval) clearInterval(interval)
+        interval = null
+      } else {
+        load(true)
+        start()
+      }
+    }
+    start()
+    document.addEventListener('visibilitychange', visibility)
+    return () => {
+      window.clearTimeout(initialLoad)
+      if (interval) clearInterval(interval)
+      document.removeEventListener('visibilitychange', visibility)
+      activeRequest.current?.controller.abort()
+    }
+  }, [load, token])
+
+  const responseCount = poll?.responses.length ?? 0
+  const dubious = poll?.mode === 'dubious'
+  const availableVotes = getAvailableVotes(dubious)
+
+  if (loading && !poll) {
+    return <main className="site-shell center-stage"><div className="loading-card" role="status"><span className="spinner" aria-hidden="true" />Unlocking private results…</div></main>
   }
 
-  const getVoteColor = (vote: string) => {
-    if (vote === 'yes') return 'text-green-400'
-    if (vote === 'no') return 'text-red-400'
-    if (vote === 'maybe') return 'text-yellow-400'
-    if (vote === 'yolo') return 'text-violet-400'
-    return ''
-  }
-
-  const getVoteBgColor = (vote: string) => {
-    if (vote === 'yes') return 'bg-green-500'
-    if (vote === 'no') return 'bg-red-500'
-    if (vote === 'maybe') return 'bg-yellow-500'
-    if (vote === 'yolo') return 'bg-gradient-to-r from-violet-500 to-rose-500'
-    return 'bg-gray-500'
-  }
-
-  const getVoteCounts = (suggestionIndex: number) => {
-    const counts: Record<VoteOption, number> = { yes: 0, no: 0, maybe: 0, yolo: 0 }
-    poll?.responses.forEach(r => {
-      const vote = r.votes[suggestionIndex]?.vote as VoteOption
-      if (vote && counts[vote] !== undefined) counts[vote]++
-    })
-    return counts
-  }
-
-  const getWinningVote = (counts: Record<VoteOption, number>) => {
-    const entries = Object.entries(counts) as [VoteOption, number][]
-    const sorted = entries.sort((a, b) => b[1] - a[1])
-    if (sorted[0][1] === 0) return null
-    return sorted[0][0]
-  }
-
-  if (loading) {
+  if (!poll) {
     return (
-      <main className="min-h-screen py-12 px-4 flex items-center justify-center">
-        <div className="text-purple-300 text-xl animate-pulse">Loading results...</div>
-      </main>
-    )
-  }
-
-  if (error || !poll) {
-    return (
-      <main className="min-h-screen py-12 px-4 flex items-center justify-center scanlines">
-        <div className="text-center card-gradient p-8 rounded-2xl neon-border">
-          <h1 className="text-3xl font-bold text-white mb-4">Poll not found</h1>
-          <a href="/" className="text-fuchsia-400 hover:text-fuchsia-300 font-medium">Create a new poll</a>
-        </div>
+      <main className="site-shell center-stage">
+        <section className="paper-card state-card tape-top">
+          <p className="card-label hot">PRIVATE ARCHIVE</p>
+          <h1>{status === 410 ? 'This archive is retired.' : status === 404 ? 'Key not accepted.' : 'The archive stayed shut.'}</h1>
+          <p className="notice notice-error" role="alert">{error}</p>
+          {token && <button className="primary-button cyan" type="button" onClick={() => load()}>Try the key again</button>}
+          <Link className="text-button" href="/">← Make a new poll</Link>
+        </section>
       </main>
     )
   }
 
   return (
-    <main className={`min-h-screen py-12 px-4 scanlines ${isDubious ? 'dubious-mode' : ''}`}>
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-10">
-          <div className="rainbow-bar w-32 mx-auto mb-6" />
-          <h1 className={`text-4xl md:text-5xl font-black text-transparent bg-clip-text mb-4 ${
-            isDubious
-              ? 'bg-gradient-to-r from-rose-400 via-purple-400 to-violet-400'
-              : 'bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400'
-          }`}>
-            {poll.title}
-          </h1>
-          <div className="flex items-center justify-center gap-4">
-            <p className="text-xl text-purple-200/80">
-              {poll.responses.length} {poll.responses.length === 1 ? 'response' : 'responses'}
+    <main className="site-shell results-shell">
+      <header className="compact-header">
+        <Link href="/" className="mini-brand">WHAT IT <i>DO?</i></Link>
+        <span className="private-badge">PRIVATE RESULTS</span>
+      </header>
+
+      <section className="results-masthead">
+        <div>
+          <p className="eyebrow">The group has spoken-ish</p>
+          <h1>{poll.title}</h1>
+        </div>
+        <div className="response-counter" aria-label={`${responseCount} ${responseCount === 1 ? 'response' : 'responses'}`}>
+          <b>{String(responseCount).padStart(2, '0')}</b>
+          <span>{responseCount === 1 ? 'response' : 'responses'}</span>
+        </div>
+      </section>
+
+      {error && <div className="notice notice-error results-error" role="alert"><span>{error}</span><button type="button" onClick={() => load(true)}>Retry</button></div>}
+
+      <section className="paper-card tally-board tape-top" aria-labelledby="tally-heading">
+        <div className="section-heading">
+          <div>
+            <p className="card-label">LIVE VIBE METER</p>
+            <h2 id="tally-heading">The honest tally</h2>
+            <p className="last-updated" aria-live="polite">
+              {lastUpdated ? `Last updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Waiting for the latest tally…'}
             </p>
-            {isDubious && (
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-rose-500 to-violet-500 text-white">
-                DUBIOUS MODE
-              </span>
-            )}
           </div>
+          <button className="refresh-button" type="button" disabled={refreshing} onClick={() => load(true)}>{refreshing ? 'Refreshing…' : 'Refresh now ↻'}</button>
         </div>
-
-        {/* Vote Summary - Card Style */}
-        <div className="card-gradient rounded-2xl p-6 neon-border mb-8">
-          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <span className="text-2xl">📊</span> Vote Summary
-          </h2>
-          <div className="space-y-6">
-            {poll.suggestions.map((suggestion, index) => {
-              const counts = getVoteCounts(index)
-              const total = counts.yes + counts.no + counts.maybe + counts.yolo
-              const winner = getWinningVote(counts)
-
-              return (
-                <div key={index} className="bg-black/30 rounded-xl p-4 border border-purple-500/20">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-white font-medium flex-1">
-                      <span className={`mr-2 ${isDubious ? 'text-rose-400' : 'text-violet-400'}`}>
-                        #{index + 1}
-                      </span>
-                      &ldquo;{suggestion}&rdquo;
-                    </p>
-                    {winner && (
-                      <span className={`text-2xl ml-2 ${winner === 'yolo' ? 'animate-bounce' : ''}`}>
-                        {getVoteEmoji(winner)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Vote bars */}
-                  {total > 0 ? (
-                    <div className="space-y-2">
-                      {(['yes', 'maybe', 'no', ...(isDubious ? ['yolo'] : [])] as VoteOption[]).map(voteType => {
-                        const count = counts[voteType]
-                        const percentage = total > 0 ? (count / total) * 100 : 0
-                        if (count === 0) return null
-
-                        return (
-                          <div key={voteType} className="flex items-center gap-2">
-                            <span className="w-12 text-xs font-bold uppercase" style={{ color: voteType === 'yes' ? '#4ade80' : voteType === 'no' ? '#f87171' : voteType === 'maybe' ? '#facc15' : '#a78bfa' }}>
-                              {voteType}
-                            </span>
-                            <div className="flex-1 h-6 bg-black/40 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full ${getVoteBgColor(voteType)} transition-all duration-500 flex items-center justify-end pr-2`}
-                                style={{ width: `${Math.max(percentage, 15)}%` }}
-                              >
-                                <span className="text-xs font-bold text-white drop-shadow">{count}</span>
-                              </div>
-                            </div>
-                            <span className="text-purple-400/60 text-xs w-10 text-right">{percentage.toFixed(0)}%</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-purple-400/50 text-sm italic">No votes yet</p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Counter Proposals Section */}
-        {poll.responses.some(r => r.counterProposal) && (
-          <div className="card-gradient rounded-2xl p-6 neon-border mb-8 border-2 border-violet-500/30">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <span className="text-2xl">💡</span>
-              {isDubious ? 'Alternative Suggestions' : 'Counter Proposals'}
-            </h2>
-            <div className="space-y-4">
-              {poll.responses.filter(r => r.counterProposal).map((response) => (
-                <div key={response.id} className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 rounded-xl p-4 border border-violet-500/30">
-                  <p className="text-violet-400 text-sm font-medium mb-2">
-                    {response.voterName} suggests:
-                  </p>
-                  <p className="text-white italic text-lg">
-                    &ldquo;{response.counterProposal}&rdquo;
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Individual Responses */}
-        {poll.responses.length > 0 ? (
-          <div className="space-y-6">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-2xl">👥</span> All Responses
-            </h2>
-            {poll.responses.map((response, respIndex) => (
-              <div
-                key={response.id}
-                className={`card-gradient rounded-2xl p-6 neon-border overflow-hidden relative ${
-                  response.votes.some(v => v.vote === 'yolo') ? 'ring-2 ring-violet-500/50' : ''
-                }`}
-              >
-                {/* Decorative corner */}
-                <div className={`absolute top-0 right-0 w-16 h-16 ${
-                  isDubious
-                    ? 'bg-gradient-to-bl from-rose-500/20 to-transparent'
-                    : 'bg-gradient-to-bl from-violet-500/20 to-transparent'
-                }`} />
-
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className={`text-lg font-bold ${isDubious ? 'text-rose-400' : 'text-violet-400'}`}>
-                    <span className="text-2xl mr-2">
-                      {respIndex === 0 ? '🥇' : respIndex === 1 ? '🥈' : respIndex === 2 ? '🥉' : '👤'}
-                    </span>
-                    {response.voterName}
-                  </h3>
-                  <span className="text-purple-400/60 text-sm">
-                    {new Date(response.submittedAt).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <div className="grid gap-3">
-                  {response.votes.map((vote, i) => (
-                    <div
-                      key={i}
-                      className={`rounded-xl p-3 transition-all ${
-                        vote.vote === 'yolo'
-                          ? 'bg-gradient-to-r from-violet-500/20 to-rose-500/20 border border-violet-500/30'
-                          : 'bg-black/20'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-white/80 text-sm flex-1">&ldquo;{vote.text}&rdquo;</p>
-                        <span className={`font-bold text-lg ml-3 ${getVoteColor(vote.vote)} ${vote.vote === 'yolo' ? 'animate-pulse' : ''}`}>
-                          {getVoteEmoji(vote.vote)} {vote.vote.toUpperCase()}
-                        </span>
+        <div className="tally-grid">
+          {poll.suggestions.map((suggestion, index) => {
+            const counts = countVotes(poll.responses, index)
+            const summary = summarizeVotes(counts, dubious)
+            return (
+              <article className="tally-card" key={suggestion}>
+                <div className="tally-title"><span>{String(index + 1).padStart(2, '0')}</span><h3>{suggestion}</h3></div>
+                <p className="verdict">{summary.verdict}</p>
+                <div className="bars">
+                  {availableVotes.map((vote) => {
+                    const percentage = summary.percentages[vote]
+                    return (
+                      <div className={`bar-row ${vote}`} key={vote}>
+                        <span>{VOTE_LABEL[vote]}</span>
+                        <div className="bar-track" aria-hidden="true"><i style={{ width: `${percentage}%` }} /></div>
+                        <output>{counts[vote]} · {Math.round(percentage)}%</output>
                       </div>
-                      {vote.comment && (
-                        <p className="text-purple-300/70 text-sm mt-2 italic border-l-2 border-purple-500/30 pl-3">
-                          &ldquo;{vote.comment}&rdquo;
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
-
-                {response.counterProposal && (
-                  <div className="mt-4 pt-4 border-t border-purple-500/30">
-                    <p className="text-violet-400 text-sm font-bold mb-2">
-                      {isDubious ? '💡 Alternative Suggestion:' : '💡 Counter Proposal:'}
-                    </p>
-                    <p className="text-white italic bg-violet-500/10 rounded-lg p-3 border border-violet-500/30">
-                      &ldquo;{response.counterProposal}&rdquo;
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="card-gradient rounded-2xl p-8 neon-border text-center">
-            <p className="text-6xl mb-4">🦗</p>
-            <p className="text-purple-300 text-lg">No responses yet!</p>
-            <p className="text-purple-400/60 text-sm mt-2">Share your poll link to get votes</p>
-          </div>
-        )}
-
-        <div className="mt-8 text-center">
-          <p className="text-purple-400/60 text-sm mb-4 flex items-center justify-center gap-2">
-            <span className="animate-pulse">🔄</span> Auto-refreshes every 30 seconds
-          </p>
-          <a
-            href="/"
-            className={`font-medium ${isDubious ? 'text-rose-400 hover:text-rose-300' : 'text-violet-400 hover:text-violet-300'}`}
-          >
-            Create a new poll
-          </a>
+              </article>
+            )
+          })}
         </div>
-      </div>
+        <p className="fine-print">Percentages are calculated per possibility. Equal totals are shown as ties—not fake winners.</p>
+      </section>
+
+      {poll.responses.some((response) => response.counterProposal) && (
+        <section className="wildcards" aria-labelledby="wildcards-heading">
+          <div className="section-heading"><div><p className="eyebrow">Plot twists</p><h2 id="wildcards-heading">Rogue alternatives</h2></div></div>
+          <ul>
+            {poll.responses.filter((response) => response.counterProposal).map((response, index) => (
+              <li className="paper-card" key={`${response.submittedAt}-${index}`}><span aria-hidden="true">↝</span><blockquote>{response.counterProposal}</blockquote><cite>— {response.voterName}</cite></li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="responses-section" aria-labelledby="responses-heading">
+        <div className="section-heading">
+          <div><p className="eyebrow">No podium, just receipts</p><h2 id="responses-heading">Individual ballots</h2></div>
+        </div>
+        {poll.responses.length ? (
+          <ol className="response-list">
+            {poll.responses.map((response, responseIndex) => (
+              <li className="paper-card response-card" key={`${response.submittedAt}-${responseIndex}`}>
+                <header><div><span>RESPONSE {String(responseIndex + 1).padStart(2, '0')}</span><h3>{response.voterName}</h3></div><time dateTime={new Date(response.submittedAt).toISOString()}>{new Date(response.submittedAt).toLocaleString()}</time></header>
+                <ul>
+                  {response.votes.map((vote, voteIndex) => (
+                    <li key={`${vote.text}-${voteIndex}`}><span className={`vote-stamp ${vote.vote}`}>{VOTE_LABEL[vote.vote]}</span><div><p>{vote.text}</p>{vote.comment && <blockquote>“{vote.comment}”</blockquote>}</div></li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="paper-card empty-state"><span aria-hidden="true">…</span><h3>The room is dramatically silent.</h3><p>Share the public voting link to collect the first response.</p></div>
+        )}
+      </section>
+      <footer className="site-footer"><span>AUTO-REFRESH · 30 SEC</span><Link href="/">Create another poll ↗</Link></footer>
     </main>
   )
 }

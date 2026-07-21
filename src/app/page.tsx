@@ -1,287 +1,270 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { PollMode } from '@/lib/types'
+import Link from 'next/link'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import type { PollMode, PublicPoll } from '@/lib/types'
 
-const PLACEHOLDERS = {
-  normal: [
-    "e.g., Try that new restaurant downtown",
-    "e.g., Go hiking this weekend",
-    "e.g., Host a game night"
-  ],
-  dubious: [
-    "e.g., Send a mysterious message to someone intriguing...",
-    "e.g., Take an impromptu midnight drive somewhere scenic",
-    "e.g., Book that spontaneous weekend getaway"
-  ]
+const MAX_RECENT = 10
+// The browser cannot observe server-side idle-TTL refreshes, so expire this
+// convenience list at the initial 30-day boundary rather than showing stale keys.
+const RECENT_LINK_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
+const RECENT_KEY = 'whatitdo:private-results:v1'
+
+const PLACEHOLDERS: Record<PollMode, string[]> = {
+  normal: ['Try the tiny dumpling spot', 'Go stargazing Friday', 'Host a game night'],
+  dubious: ['Send the mysterious text', 'Take a midnight road trip', 'Book the wildly unnecessary getaway'],
+}
+
+interface RecentPoll {
+  title: string
+  voteUrl: string
+  resultsUrl: string
+  createdAt: number
+  expiresAt: number
+}
+
+function readRecentPolls(): RecentPoll[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') as RecentPoll[]
+    return parsed
+      .filter((item) => item && typeof item.resultsUrl === 'string' && item.expiresAt > Date.now())
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, MAX_RECENT)
+  } catch {
+    return []
+  }
 }
 
 export default function Home() {
-  const [suggestions, setSuggestions] = useState(['', '', ''])
-  const [title, setTitle] = useState('')
-  const [pollLink, setPollLink] = useState('')
-  const [resultsLink, setResultsLink] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [creating, setCreating] = useState(false)
   const [mode, setMode] = useState<PollMode>('dubious')
-  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [title, setTitle] = useState('')
+  const [suggestions, setSuggestions] = useState(['', '', ''])
+  const [created, setCreated] = useState<RecentPoll | null>(null)
+  const [recent, setRecent] = useState<RecentPoll[]>([])
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState<'vote' | 'results' | ''>('')
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current)
+    const hydrationTimer = window.setTimeout(() => {
+      const cleaned = readRecentPolls()
+      setRecent(cleaned)
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(cleaned))
+      } catch {
+        // Private browsing and hardened browsers may reject storage writes.
+        // Recent links are only a convenience; the app remains usable without them.
       }
+    }, 0)
+    return () => {
+      window.clearTimeout(hydrationTimer)
+      if (copyTimer.current) clearTimeout(copyTimer.current)
     }
   }, [])
 
-  const updateSuggestion = (index: number, value: string) => {
-    setSuggestions(prev => prev.map((s, i) => i === index ? value : s))
+  function updateSuggestion(index: number, value: string) {
+    setSuggestions((current) => current.map((suggestion, i) => (i === index ? value : suggestion)))
+    setError('')
   }
 
-  const createPoll = async () => {
-    const filledSuggestions = suggestions.filter(s => s.trim())
-    if (filledSuggestions.length === 0) {
-      alert('Add at least one suggestion!')
+  async function createPoll(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const filled = suggestions.map((item) => item.trim()).filter(Boolean)
+    if (!filled.length) {
+      setError('Give the group at least one possibility to deliberate.')
       return
     }
 
     setCreating(true)
+    setError('')
     try {
-      const defaultTitle = mode === 'dubious' ? 'Intriguing Possibilities...' : 'What It Do?'
-      const res = await fetch('/api/poll', {
+      const response = await fetch('/api/poll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim() || defaultTitle,
-          suggestions: filledSuggestions.map(s => s.trim()),
-          mode
-        })
+          title: title.trim() || (mode === 'dubious' ? 'A Highly Questionable Proposal' : 'What It Do?'),
+          suggestions: filled,
+          mode,
+        }),
       })
+      const body = (await response.json().catch(() => ({}))) as {
+        id?: string
+        resultsToken?: string
+        poll?: PublicPoll
+        error?: string
+      }
+      if (!response.ok || !body.id || !body.resultsToken || !body.poll) {
+        const fallback = response.status === 429
+          ? 'The idea machine needs a breather. Try again in a minute.'
+          : 'The poll would not materialize. Try again.'
+        throw new Error(body.error || fallback)
+      }
 
-      if (!res.ok) throw new Error('Failed to create poll')
-
-      const data = await res.json()
-      setPollLink(`${window.location.origin}/vote/${data.id}`)
-      setResultsLink(`${window.location.origin}/results/${data.id}`)
-    } catch (error) {
-      console.error(error)
-      alert('Failed to create poll. Please try again.')
+      const now = Date.now()
+      const item: RecentPoll = {
+        title: body.poll.title,
+        voteUrl: `${window.location.origin}/vote/${body.id}`,
+        resultsUrl: `${window.location.origin}/results/${body.id}#${body.resultsToken}`,
+        createdAt: now,
+        expiresAt: now + RECENT_LINK_LIFETIME_MS,
+      }
+      const next = [item, ...readRecentPolls().filter((entry) => entry.resultsUrl !== item.resultsUrl)]
+        .slice(0, MAX_RECENT)
+      // The API response is authoritative. Show both links before attempting the
+      // optional browser-history write so a storage exception cannot hide them.
+      setCreated(item)
+      setRecent(next)
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+      } catch {
+        setError('Your links are visible, but we could not save it in this browser. Copy the private link now.')
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The poll would not materialize. Try again.')
     } finally {
       setCreating(false)
     }
   }
 
-  const copyLink = async () => {
+  async function copyLink(kind: 'vote' | 'results', value: string) {
     try {
-      await navigator.clipboard.writeText(pollLink)
-      setCopied(true)
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
-      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(value)
+      setCopied(kind)
+      if (copyTimer.current) clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopied(''), 1800)
     } catch {
-      const textArea = document.createElement('textarea')
-      textArea.value = pollLink
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setCopied(true)
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
-      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
+      setError('Clipboard access fizzled. Select the link and copy it manually.')
     }
   }
 
-  const shareViaText = () => {
-    const message = `Vote on my poll: ${title || 'What It Do?'}\n${pollLink}`
-    window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank')
+  function clearRecent() {
+    try {
+      localStorage.removeItem(RECENT_KEY)
+    } catch {
+      // Keep the rendered state clear even when storage is unavailable.
+    }
+    setRecent([])
   }
 
-  const shareViaEmail = () => {
-    const subject = title || 'Vote on my poll!'
-    const body = `Hey! I need your input on some suggestions.\n\nClick here to vote: ${pollLink}\n\nThanks!`
-    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
-  }
-
-  const resetPoll = () => {
-    setPollLink('')
-    setResultsLink('')
-    setSuggestions(['', '', ''])
+  function reset() {
+    setCreated(null)
     setTitle('')
-    setMode('dubious')
-  }
-
-  if (pollLink) {
-    return (
-      <main className="min-h-screen py-12 px-4 scanlines">
-        <div className="max-w-xl mx-auto">
-          <div className="text-center mb-10">
-            <div className="rainbow-bar w-32 mx-auto mb-6" />
-            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-violet-400 to-purple-400 mb-4 floating neon-text">
-              Poll Created!
-            </h1>
-            <p className="text-xl text-purple-200/80">
-              Share this link with your friend
-            </p>
-          </div>
-
-          <div className="card-gradient rounded-2xl p-8 neon-border pulse-glow mb-6">
-            <p className="text-purple-300 text-sm mb-2 font-medium">Send this to your friend:</p>
-            <div className="bg-black/40 rounded-xl p-4 mb-6 break-all border border-purple-500/30">
-              <p className="text-cyan-300 text-sm font-mono">{pollLink}</p>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={copyLink}
-                className="btn-neon w-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all"
-              >
-                {copied ? '✓ Copied!' : 'Copy Link'}
-              </button>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={shareViaText}
-                  className="btn-neon bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <span>📱</span> Text
-                </button>
-                <button
-                  onClick={shareViaEmail}
-                  className="btn-neon bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <span>📧</span> Email
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-gradient rounded-2xl p-6 neon-border">
-            <p className="text-purple-300 text-sm mb-2 font-medium">View results anytime:</p>
-            <a
-              href={resultsLink}
-              className="block w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all text-center border border-white/20"
-            >
-              View Results Page
-            </a>
-            <p className="text-purple-400/60 text-xs mt-3 text-center">
-              You&apos;ll also get an email when someone votes!
-            </p>
-          </div>
-
-          <button
-            onClick={resetPoll}
-            className="w-full text-purple-300 hover:text-white py-4 transition-all"
-          >
-            Create Another Poll
-          </button>
-        </div>
-      </main>
-    )
+    setSuggestions(['', '', ''])
+    setError('')
+    setCopied('')
   }
 
   return (
-    <main className={`min-h-screen py-12 px-4 scanlines ${mode === 'dubious' ? 'dubious-mode' : ''}`}>
-      <div className="max-w-xl mx-auto">
-        <div className="text-center mb-10">
-          <div className="rainbow-bar w-32 mx-auto mb-6" />
-          <h1 className={`text-5xl md:text-6xl font-black text-transparent bg-clip-text mb-4 floating ${
-            mode === 'dubious'
-              ? 'bg-gradient-to-r from-rose-400 via-purple-400 to-violet-400'
-              : 'bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400'
-          }`}>
-            {mode === 'dubious' ? 'Intriguing Possibilities...' : 'What It Do?'}
-          </h1>
-          <p className="text-xl text-purple-200/80">
-            {mode === 'dubious'
-              ? 'Craft enticing propositions for someone special'
-              : 'Create suggestions for your friend to vote on'}
-          </p>
-        </div>
+    <main className="site-shell">
+      <div className="ambient-doodles" aria-hidden="true"><span>✦</span><span>↝</span><span>☻</span></div>
+      <header className="brand-header">
+        <Link href="/" className="brand-mark" aria-label="What It Do home">
+          <span className="brand-kicker">group decisions, but weird</span>
+          <span className="brand-wordmark">WHAT IT <i>DO?</i></span>
+        </Link>
+        <span className="edition-sticker" aria-hidden="true">MIDNIGHT<br />EDITION</span>
+      </header>
 
-        {/* Mode Toggle */}
-        <div className="card-gradient rounded-2xl p-4 neon-border mb-6">
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => setMode('normal')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                mode === 'normal'
-                  ? 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/30'
-                  : 'bg-white/5 text-purple-300 hover:bg-white/10 border border-purple-500/20'
-              }`}
-            >
-              <span className="text-lg">✨</span>
-              <span className="block text-sm mt-1">Classic Mode</span>
-            </button>
-            <button
-              onClick={() => setMode('dubious')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-                mode === 'dubious'
-                  ? 'bg-gradient-to-r from-rose-500 via-purple-500 to-violet-500 text-white shadow-lg shadow-rose-500/30'
-                  : 'bg-white/5 text-purple-300 hover:bg-white/10 border border-purple-500/20'
-              }`}
-            >
-              <span className="text-lg">🌙</span>
-              <span className="block text-sm mt-1">Dubious Mode</span>
-            </button>
+      {created ? (
+        <section className="hero-grid success-grid" aria-labelledby="created-title">
+          <div className="hero-copy">
+            <p className="eyebrow">The council is summoned</p>
+            <h1 id="created-title">Poll <span>alive.</span><br />Chaos pending.</h1>
+            <p className="lede">Send the public ballot to your people. Keep the owner link private—it is the only key to the unfiltered results.</p>
+            <button className="text-button" type="button" onClick={reset}>← Conjure another poll</button>
           </div>
-          <p className="text-center text-purple-400/60 text-xs mt-3">
-            {mode === 'dubious'
-              ? 'YOLO voting enabled · Mystery names for intrigue'
-              : 'Standard voting with Yes, No, or Maybe'}
-          </p>
-        </div>
-
-        <div className="card-gradient rounded-2xl p-8 neon-border">
-          <div className="mb-6">
-            <label htmlFor="poll-title" className="block text-purple-300 text-sm mb-2 font-medium">Poll Title (optional)</label>
-            <input
-              type="text"
-              id="poll-title"
-              placeholder={mode === 'dubious' ? "e.g., Tempting Suggestions..." : "e.g., Weekend Plans for Dave"}
-              value={title}
-              maxLength={100}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
-            />
-          </div>
-
-          <div className="space-y-4 mb-8">
-            {suggestions.map((suggestion, index) => (
-              <div key={index}>
-                <label htmlFor={`suggestion-${index}`} className="block text-purple-300 text-sm mb-2 font-medium">
-                  {mode === 'dubious' ? `Option ${index + 1}` : `Suggestion #${index + 1}`} {index === 0 && <span className="text-rose-400">*</span>}
-                </label>
-                <input
-                  type="text"
-                  id={`suggestion-${index}`}
-                  placeholder={PLACEHOLDERS[mode][index]}
-                  value={suggestion}
-                  maxLength={200}
-                  onChange={(e) => updateSuggestion(index, e.target.value)}
-                  className="w-full bg-black/40 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300/40 focus:outline-none focus:border-fuchsia-500 transition-all"
-                />
+          <div className="paper-stack">
+            {error && <p className="notice notice-error" role="alert">{error}</p>}
+            <article className="paper-card tape-top">
+              <p className="card-label">SHARE THIS ONE</p>
+              <h2>Public voting link</h2>
+              <p className="muted">Safe to send around. It does not reveal names, comments, or results.</p>
+              <output className="link-output">{created.voteUrl}</output>
+              <div className="button-row">
+                <button className="primary-button cyan" type="button" onClick={() => copyLink('vote', created.voteUrl)}>
+                  {copied === 'vote' ? 'Copied! ✦' : 'Copy vote link'}
+                </button>
+                <a className="secondary-button" href={`sms:?body=${encodeURIComponent(`Cast your vote: ${created.title}\n${created.voteUrl}`)}`}>Text it</a>
               </div>
-            ))}
+            </article>
+            <article className="paper-card owner-card">
+              <p className="card-label hot">EYES ONLY</p>
+              <h2>Private owner link</h2>
+              <p className="muted">Save this now. Anyone with this exact link can read every response.</p>
+              <output className="link-output private-link">{created.resultsUrl}</output>
+              <div className="button-row">
+                <button className="primary-button pink" type="button" onClick={() => copyLink('results', created.resultsUrl)}>
+                  {copied === 'results' ? 'Secret secured! ✦' : 'Copy private link'}
+                </button>
+                <Link className="secondary-button" href={created.resultsUrl} prefetch={false}>Open results</Link>
+              </div>
+            </article>
+          </div>
+        </section>
+      ) : (
+        <section className="hero-grid" aria-labelledby="home-title">
+          <div className="hero-copy">
+            <p className="eyebrow">Schemes · dreams · questionable decisions</p>
+            <h1 id="home-title">Stop circling.<br /><span>Pick a thing.</span></h1>
+            <p className="lede">A tiny voting booth for big plans, bad ideas, and friends who refuse to answer the group chat.</p>
+            <div className="scribble-note" aria-hidden="true">no logins<br />no lurking<br />just vote ↗</div>
           </div>
 
-          <button
-            onClick={createPoll}
-            disabled={creating}
-            className={`btn-neon w-full text-white font-bold py-4 px-6 rounded-xl text-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-              mode === 'dubious'
-                ? 'bg-gradient-to-r from-rose-600 via-purple-600 to-violet-600 hover:from-rose-500 hover:via-purple-500 hover:to-violet-500'
-                : 'bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500'
-            }`}
-          >
-            {creating ? 'Creating...' : mode === 'dubious' ? 'Send the Invitation' : 'Create Poll & Get Link'}
-          </button>
-        </div>
+          <form className="paper-card creation-card tape-top" onSubmit={createPoll}>
+            <fieldset className="mode-switch">
+              <legend>Choose your energy</legend>
+              <button type="button" className={mode === 'normal' ? 'active' : ''} aria-pressed={mode === 'normal'} onClick={() => setMode('normal')}>
+                <span aria-hidden="true">☀</span> Classic
+              </button>
+              <button type="button" className={mode === 'dubious' ? 'active dubious' : ''} aria-pressed={mode === 'dubious'} onClick={() => setMode('dubious')}>
+                <span aria-hidden="true">☾</span> Dubious
+              </button>
+            </fieldset>
+            <p className="mode-caption">{mode === 'dubious' ? 'Unlocks the reckless-but-sincere YOLO vote.' : 'A respectable yes / maybe / no situation.'}</p>
 
-        <p className="text-center text-purple-400/60 text-sm mt-8">
-          {mode === 'dubious'
-            ? 'They can choose: Yes, No, Maybe, or YOLO'
-            : 'Your friend will vote Yes, No, or Maybe on each suggestion'}
-        </p>
-      </div>
+            <label className="field-label" htmlFor="poll-title">Name the dilemma <span>optional</span></label>
+            <input id="poll-title" value={title} maxLength={100} onChange={(event) => setTitle(event.target.value)} placeholder="Friday night: what are we doing?" />
+
+            <fieldset className="options-fieldset">
+              <legend>Possible moves <small>1–3 required</small></legend>
+              {suggestions.map((suggestion, index) => (
+                <label className="option-input" key={index} htmlFor={`suggestion-${index}`}>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <input id={`suggestion-${index}`} value={suggestion} maxLength={200} onChange={(event) => updateSuggestion(index, event.target.value)} placeholder={PLACEHOLDERS[mode][index]} />
+                </label>
+              ))}
+            </fieldset>
+
+            {error && <p className="notice notice-error" role="alert" aria-live="assertive">{error}</p>}
+            <button className="primary-button jumbo" disabled={creating} type="submit">
+              {creating ? 'Opening the portal…' : 'Make the poll'} <span aria-hidden="true">↗</span>
+            </button>
+            <p className="fine-print">Polls vanish after 30 idle days (90 days max). We keep no account or profile.</p>
+          </form>
+        </section>
+      )}
+
+      {!created && recent.length > 0 && (
+        <section className="recent-section" aria-labelledby="recent-heading">
+          <div>
+            <p className="eyebrow">Your browser remembers</p>
+            <h2 id="recent-heading">Recent private links</h2>
+          </div>
+          <ul className="recent-list">
+            {recent.map((item) => (
+              <li key={item.resultsUrl}>
+                <Link href={item.resultsUrl} prefetch={false}>
+                  <span>{item.title}</span>
+                  <small>{new Date(item.createdAt).toLocaleDateString()} · open results ↗</small>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <button className="text-button danger" type="button" onClick={clearRecent}>Clear private-link history</button>
+        </section>
+      )}
+      <footer className="site-footer"><span>WHATITDO.EXE</span><span>Built for decisive-ish people.</span></footer>
     </main>
   )
 }
