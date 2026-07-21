@@ -102,6 +102,5 @@ jobs:
       - name: Run e2e tests
         run: npm run e2e
         env:
-          USE_IN_MEMORY_REDIS: '1'
           E2E_TEST: '1'
           E2E_BASE_URL: http://127.0.0.1:3100

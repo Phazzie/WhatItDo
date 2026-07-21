@@ -194,7 +194,64 @@ test('created links remain available when browser storage rejects writes', async
 
   await expect(page.getByText(links.voteUrl, { exact: true })).toBeVisible()
   await expect(page.getByText(links.resultsUrl, { exact: true })).toBeVisible()
-  await expect(appAlert(page)).toContainText('could not save it in this browser')
+  await expect(appAlert(page)).toContainText('could not save the public voting link in this browser')
+})
+
+test('browser history stores only public poll metadata and purges legacy owner tokens', async ({ page }) => {
+  const legacyToken = 'L'.repeat(24)
+  const poisonedToken = 'P'.repeat(24)
+  await page.goto('/')
+  await page.evaluate(({ legacy, poisoned }) => {
+    localStorage.setItem('whatitdo:private-results:v1', JSON.stringify([{
+      title: 'Legacy secret',
+      voteUrl: `${window.location.origin}/vote/AAAAAAAAAA`,
+      resultsUrl: `${window.location.origin}/results/AAAAAAAAAA#${legacy}`,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    }]))
+    localStorage.setItem('whatitdo:recent-polls:v2', JSON.stringify([{
+      title: 'Poisoned recent poll',
+      voteUrl: `${window.location.origin}/vote/BBBBBBBBBB`,
+      resultsUrl: `${window.location.origin}/results/BBBBBBBBBB#${poisoned}`,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    }]))
+  }, { legacy: legacyToken, poisoned: poisonedToken })
+
+  const links = await createPoll(page, {
+    mode: 'normal',
+    title: 'Public history only',
+    suggestions: ['Keep the owner key ephemeral'],
+  })
+  const ownerToken = new URL(links.resultsUrl).hash.slice(1)
+  const stored = await page.evaluate(() => ({
+    legacy: localStorage.getItem('whatitdo:private-results:v1'),
+    recent: localStorage.getItem('whatitdo:recent-polls:v2'),
+  }))
+
+  expect(stored.legacy).toBeNull()
+  expect(stored.recent).not.toContain(legacyToken)
+  expect(stored.recent).not.toContain(poisonedToken)
+  expect(stored.recent).not.toContain(ownerToken)
+  expect(stored.recent).not.toContain('resultsUrl')
+  expect(stored.recent).not.toContain('/results/')
+  expect(stored.recent).not.toContain('#')
+  expect(JSON.parse(stored.recent || '[]')).toEqual([expect.objectContaining({
+    title: 'Public history only',
+    voteUrl: links.voteUrl,
+  }), expect.objectContaining({
+    title: 'Poisoned recent poll',
+    voteUrl: `${new URL(links.voteUrl).origin}/vote/BBBBBBBBBB`,
+  })])
+  for (const item of JSON.parse(stored.recent || '[]')) {
+    expect(Object.keys(item).sort()).toEqual(['createdAt', 'expiresAt', 'title', 'voteUrl'])
+  }
+
+  await page.reload()
+  await expect(page.getByText(links.resultsUrl, { exact: true })).toHaveCount(0)
+  await expect(page.locator('a[href*="/results/"]')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Recent polls' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Public history only.*open ballot/i })).toHaveAttribute('href', links.voteUrl)
 })
 
 test('a stale results request cannot reveal data after the private fragment changes', async ({ page }) => {

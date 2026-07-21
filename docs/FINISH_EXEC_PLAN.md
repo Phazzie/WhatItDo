@@ -181,7 +181,9 @@ idempotency key, omit results links, and return truthful notification state.
 Keep existing results visible during transient refresh failures, add manual retry/last-updated state,
 and reserve "not found" for a real 404 or invalid token. Use pure result helpers for counts and ties.
 Provide separate copy controls for vote and private results links. Persist at most ten conservatively
-30-day-valid creator records in local storage, show a private recent-polls recovery area, and provide clear-history.
+30-day-valid tokenless public voting shortcuts in local storage, show a public recent-polls area, and
+provide clear-history. Never persist the results URL or raw owner token; purge the legacy v1 private-link
+record on the browser's next visit.
 Remove medals and misleading bar minimums. Add designed global error and not-found pages.
 
 ### Milestone 5: Bold visual redesign

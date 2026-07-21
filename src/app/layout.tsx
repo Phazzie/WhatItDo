@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import LegacyStorageCleanup from './legacy-storage-cleanup'
 
 export const metadata: Metadata = {
   title: 'What It Do? — Group decisions, but weird',
@@ -22,7 +23,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LegacyStorageCleanup />
+        {children}
+      </body>
     </html>
   )
 }

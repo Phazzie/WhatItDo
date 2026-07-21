@@ -54,7 +54,6 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
-      USE_IN_MEMORY_REDIS: '1',
       E2E_TEST: '1',
       E2E_BASE_URL: `http://127.0.0.1:${PORT}`,
       TRUST_PROXY: '1',
