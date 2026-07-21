@@ -11,7 +11,8 @@ link for results. No account is required.
 - Creates one public voting link and one independent private results link.
 - Accepts names, per-option notes, and an optional counterproposal.
 - Shows exact counts, proportional percentages, ties, and individual ballots without fake rankings.
-- Keeps up to ten recent private links in the creator's browser, with a clear-history control.
+- Keeps up to ten recent public voting shortcuts in the creator's browser, with a clear-history
+  control. The private owner link appears only on the creation-success screen and is never persisted.
 - Optionally sends an escaped, link-free ballot notification through Resend on a best-effort basis.
 
 The interface is an original midnight-zine collage: tactile paper, loud ink, playful copy, visible
@@ -94,7 +95,7 @@ submission IDs. The provider wait is capped at five seconds. If the Resend key, 
 or verified sender is absent, voting still succeeds and the UI says email is not configured;
 provider failures likewise never undo a recorded vote or claim that mail was sent.
 
-Do not set `E2E_TEST`, `E2E_BASE_URL`, or `USE_IN_MEMORY_REDIS` in a deployed environment. In-memory
+Do not set `E2E_TEST` or `E2E_BASE_URL` in a deployed environment. In-memory
 storage is available only when `NODE_ENV=test`, or when the dedicated E2E marker uses a loopback URL
 and no recognized deployment marker exists.
 
@@ -204,7 +205,7 @@ build.
 src/app/api/poll/route.ts       create and public read
 src/app/api/vote/route.ts       validate, atomically append, optionally notify
 src/app/api/results/route.ts    authorized private results read
-src/app/page.tsx                create/share and recent private links
+src/app/page.tsx                create/share and tokenless recent public polls
 src/app/vote/[id]/page.tsx      public ballot
 src/app/results/[id]/page.tsx   fragment-token owner results
 src/lib/redis.ts                storage selection, Lua, limits, trusted IP

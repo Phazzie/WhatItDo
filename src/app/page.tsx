@@ -8,7 +8,8 @@ const MAX_RECENT = 10
 // The browser cannot observe server-side idle-TTL refreshes, so expire this
 // convenience list at the initial 30-day boundary rather than showing stale keys.
 const RECENT_LINK_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
-const RECENT_KEY = 'whatitdo:private-results:v1'
+const RECENT_KEY = 'whatitdo:recent-polls:v2'
+const LEGACY_PRIVATE_RESULTS_KEY = 'whatitdo:private-results:v1'
 
 const PLACEHOLDERS: Record<PollMode, string[]> = {
   normal: ['Try the tiny dumpling spot', 'Go stargazing Friday', 'Host a game night'],
@@ -18,16 +19,44 @@ const PLACEHOLDERS: Record<PollMode, string[]> = {
 interface RecentPoll {
   title: string
   voteUrl: string
-  resultsUrl: string
   createdAt: number
   expiresAt: number
 }
 
+interface CreatedPoll extends RecentPoll {
+  resultsUrl: string
+}
+
+function parseRecentPoll(value: unknown): RecentPoll | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  if (typeof item.title !== 'string' || typeof item.voteUrl !== 'string'
+    || typeof item.createdAt !== 'number' || !Number.isFinite(item.createdAt)
+    || typeof item.expiresAt !== 'number' || !Number.isFinite(item.expiresAt)
+    || item.expiresAt <= Date.now()) return null
+
+  try {
+    const voteUrl = new URL(item.voteUrl)
+    if (voteUrl.origin !== window.location.origin || voteUrl.username || voteUrl.password
+      || voteUrl.search || voteUrl.hash || !/^\/vote\/[A-Za-z0-9_-]{10}$/.test(voteUrl.pathname)) return null
+    return {
+      title: item.title,
+      voteUrl: `${voteUrl.origin}${voteUrl.pathname}`,
+      createdAt: item.createdAt,
+      expiresAt: item.expiresAt,
+    }
+  } catch {
+    return null
+  }
+}
+
 function readRecentPolls(): RecentPoll[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') as RecentPoll[]
+    const parsed: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+    if (!Array.isArray(parsed)) return []
     return parsed
-      .filter((item) => item && typeof item.resultsUrl === 'string' && item.expiresAt > Date.now())
+      .map(parseRecentPoll)
+      .filter((item): item is RecentPoll => item !== null)
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, MAX_RECENT)
   } catch {
@@ -39,7 +68,7 @@ export default function Home() {
   const [mode, setMode] = useState<PollMode>('dubious')
   const [title, setTitle] = useState('')
   const [suggestions, setSuggestions] = useState(['', '', ''])
-  const [created, setCreated] = useState<RecentPoll | null>(null)
+  const [created, setCreated] = useState<CreatedPoll | null>(null)
   const [recent, setRecent] = useState<RecentPoll[]>([])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -102,23 +131,29 @@ export default function Home() {
       }
 
       const now = Date.now()
-      const item: RecentPoll = {
+      const createdPoll: CreatedPoll = {
         title: body.poll.title,
         voteUrl: `${window.location.origin}/vote/${body.id}`,
         resultsUrl: `${window.location.origin}/results/${body.id}#${body.resultsToken}`,
         createdAt: now,
         expiresAt: now + RECENT_LINK_LIFETIME_MS,
       }
-      const next = [item, ...readRecentPolls().filter((entry) => entry.resultsUrl !== item.resultsUrl)]
+      const recentPoll: RecentPoll = {
+        title: createdPoll.title,
+        voteUrl: createdPoll.voteUrl,
+        createdAt: createdPoll.createdAt,
+        expiresAt: createdPoll.expiresAt,
+      }
+      const next = [recentPoll, ...readRecentPolls().filter((entry) => entry.voteUrl !== recentPoll.voteUrl)]
         .slice(0, MAX_RECENT)
       // The API response is authoritative. Show both links before attempting the
-      // optional browser-history write so a storage exception cannot hide them.
-      setCreated(item)
+      // optional public-history write so a storage exception cannot hide them.
+      setCreated(createdPoll)
       setRecent(next)
       try {
         localStorage.setItem(RECENT_KEY, JSON.stringify(next))
       } catch {
-        setError('Your links are visible, but we could not save it in this browser. Copy the private link now.')
+        setError('Your links are visible, but we could not save the public voting link in this browser. Copy the private link now.')
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The poll would not materialize. Try again.')
@@ -141,6 +176,7 @@ export default function Home() {
   function clearRecent() {
     try {
       localStorage.removeItem(RECENT_KEY)
+      localStorage.removeItem(LEGACY_PRIVATE_RESULTS_KEY)
     } catch {
       // Keep the rendered state clear even when storage is unavailable.
     }
@@ -249,19 +285,19 @@ export default function Home() {
         <section className="recent-section" aria-labelledby="recent-heading">
           <div>
             <p className="eyebrow">Your browser remembers</p>
-            <h2 id="recent-heading">Recent private links</h2>
+            <h2 id="recent-heading">Recent polls</h2>
           </div>
           <ul className="recent-list">
             {recent.map((item) => (
-              <li key={item.resultsUrl}>
-                <Link href={item.resultsUrl} prefetch={false}>
+              <li key={item.voteUrl}>
+                <Link href={item.voteUrl} prefetch={false}>
                   <span>{item.title}</span>
-                  <small>{new Date(item.createdAt).toLocaleDateString()} · open results ↗</small>
+                  <small>{new Date(item.createdAt).toLocaleDateString()} · open ballot ↗</small>
                 </Link>
               </li>
             ))}
           </ul>
-          <button className="text-button danger" type="button" onClick={clearRecent}>Clear private-link history</button>
+          <button className="text-button danger" type="button" onClick={clearRecent}>Clear recent poll history</button>
         </section>
       )}
       <footer className="site-footer"><span>WHATITDO.EXE</span><span>Built for decisive-ish people.</span></footer>
