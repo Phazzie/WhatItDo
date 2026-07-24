@@ -1,9 +1,9 @@
 # WhatItDo Agent Guide
 
 This repository is a small public polling application built with the Next.js App Router. The active
-PR #4 repair and release plan is `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`; read it and
-`docs/FINISH_AUDIT.md` before making a product or architecture change. The older
-`docs/FINISH_EXEC_PLAN.md` remains historical context for the implementation already on the branch.
+completion and main-cutover plan is `docs/SPARK_COMPLETION_EXEC_PLAN.md`; read it before making a
+product, architecture, or release-process change. The PR #4 plans and audit documents are historical
+evidence for the completed repair, not active implementation instructions.
 
 ## Product invariants
 
@@ -46,9 +46,9 @@ PR #4 repair and release plan is `docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`; read it 
 ## Working agreement
 
 - Preserve unrelated user changes. Check `git status --short --branch` before and after each slice.
-- Keep implementation and PR #4 review cleanup on
-  `claude/repo-audit-completion-plan-uau7sr`. Root may use `pr4-audit-prerequisites` only for the
-  stack, inner-merge evidence, and release operations explicitly named by the active ExecPlan.
+- After the main cutover, do normal work on a focused feature branch and open a pull request targeting
+  `main`. Follow the active completion plan for the cutover itself; do not revive old PR #4 branches
+  or use them as an implementation target.
 - Keep commits focused and reviewable. Do not rewrite published history.
 - Use subagents for bounded audits, test design, and review. One agent owns a file at a time; the root
   agent integrates changes and runs repository-wide gates.
@@ -103,7 +103,7 @@ contain text, logos, copyrighted characters, or essential information.
 
 ## Definition of done
 
-Done means the active ExecPlan is complete; the audit has a disposition for every finding; local and
-GitHub checks are green; every PR #4 review thread is replied to and resolved; the branch is pushed;
-and the deployment is verified. A platform-owned Vercel credential failure may be recorded as an
-external blocker only after application build evidence is green and a retry/repair attempt is logged.
+Done means the active ExecPlan is complete; the scoped audit has a disposition for every finding;
+local and GitHub checks are green; the branch is merged into `main`; and the deployment is verified.
+A platform-owned Vercel credential failure may be recorded as an external blocker only after
+application build evidence is green and a retry/repair attempt is logged.

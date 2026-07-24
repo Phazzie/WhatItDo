@@ -113,8 +113,8 @@ npm run check             # lint, typecheck, unit tests, and build
 npm audit --audit-level=high
 ```
 
-Coverage gates for API routes and critical library code are 85% for lines, functions, and statements,
-and 80% for branches. CI also runs the atomic Lua contract against Redis 7 and exercises desktop,
+Coverage gates apply per file in the API-route and critical-library scope: 85% for lines, functions,
+and statements, and 80% for branches. CI also runs the atomic Lua contract against Redis 7 and exercises desktop,
 mobile, privacy, Classic, Dubious, duplicate-retry, and accessibility browser flows.
 
 ## API contract
