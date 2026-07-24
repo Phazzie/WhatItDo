@@ -50,6 +50,9 @@ used as substitutes under the same narrow ownership and exact-proof contract.
   uses a synchronous marker scoped to `/api/results`. A second run showed that full-document
   navigation does not guarantee React cleanup execution, so the final proof stalls a private manual
   refresh and follows the app's client-side home link; the other 22 browser cases remained green.
+- The final thread audit corrected a false Redis empty-list fixture and strengthened JPEG SOF
+  component validation. A timer-cancellation suggestion was already covered by the existing real
+  `clearTimeout` success-path test and required no duplicate code.
 
 ## Decision Log
 

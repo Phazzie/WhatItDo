@@ -16,7 +16,7 @@ function post(resultsToken = token) {
   })
 }
 
-async function seed() {
+async function seed(includeResponse = true) {
   const now = Date.now()
   const poll: StoredPoll = {
     id: pollId, title: 'Secret tally', suggestions: ['A'], mode: 'normal', createdAt: now,
@@ -26,7 +26,9 @@ async function seed() {
     id: 'response-secret-id', voterName: 'Alice', votes: [{ text: 'A', vote: 'yes', comment: 'ok' }], submittedAt: now,
   }
   await inMemoryRedis.set(`poll:${pollId}`, JSON.stringify(poll))
-  await inMemoryRedis.rpush(`poll:${pollId}:responses`, JSON.stringify(response))
+  if (includeResponse) {
+    await inMemoryRedis.rpush(`poll:${pollId}:responses`, JSON.stringify(response))
+  }
 }
 
 describe('POST /api/results', () => {
@@ -91,7 +93,8 @@ describe('POST /api/results', () => {
 
   it('returns an empty response list for a poll without ballots', async () => {
     const { POST } = await import('./route')
-    await inMemoryRedis.set(`poll:${pollId}:responses`, 'not-a-list')
+    inMemoryRedis.reset()
+    await seed(false)
 
     const response = await POST(post())
 

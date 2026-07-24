@@ -26,6 +26,10 @@ export function jpegDimensions(data: Buffer) {
     }
     if (SOF_MARKERS.has(marker)) {
       if (segmentLength < 8) throw new Error('Malformed JPEG: incomplete SOF segment')
+      const componentCount = data[offset + 7]
+      if (componentCount === 0 || segmentLength < 8 + componentCount * 3) {
+        throw new Error('Malformed JPEG: incomplete SOF segment')
+      }
       return {
         height: data.readUInt16BE(offset + 3),
         width: data.readUInt16BE(offset + 5),
