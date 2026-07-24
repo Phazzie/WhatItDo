@@ -45,6 +45,10 @@ export default function ResultsPage() {
     }
   }, [id])
 
+  useEffect(() => () => {
+    activeRequest.current?.controller.abort()
+  }, [])
+
   const load = useCallback(async (quiet = false) => {
     if (!token) return
     const generation = tokenGeneration.current
