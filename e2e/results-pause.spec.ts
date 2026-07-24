@@ -52,13 +52,24 @@ test('leaving results aborts an in-flight private results request', async ({ pag
     releaseRequest = resolve
   })
 
-  await page.exposeFunction('recordResultsAbort', () => {
-    abortCalls += 1
+  page.on('console', (message) => {
+    if (message.text() === '__WHATITDO_RESULTS_ABORT__') abortCalls += 1
   })
   await page.addInitScript(() => {
     const originalAbort = AbortController.prototype.abort
+    const originalFetch = window.fetch.bind(window)
+    let resultsRequestActive = false
+
+    window.fetch = (input, init) => {
+      const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url
+      if (url.includes('/api/results')) resultsRequestActive = true
+      return originalFetch(input, init)
+    }
     AbortController.prototype.abort = function (...args) {
-      void (window as typeof window & { recordResultsAbort: () => Promise<void> }).recordResultsAbort()
+      if (resultsRequestActive) {
+        console.log('__WHATITDO_RESULTS_ABORT__')
+        resultsRequestActive = false
+      }
       return originalAbort.apply(this, args)
     }
   })

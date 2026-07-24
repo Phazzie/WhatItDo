@@ -45,6 +45,9 @@ used as substitutes under the same narrow ownership and exact-proof contract.
   high-severity audit on newly published Next.js and sharp advisories. Next.js and its lint config
   were advanced from 16.2.10 to 16.2.11, with sharp 0.35.3 overridden until Next.js widens its
   optional dependency range; the regenerated lockfile reports zero vulnerabilities.
+- The first teardown-abort browser probe used an asynchronous exposed page binding; navigation
+  destroyed the binding before it recorded the cleanup and produced a false failure. The probe now
+  uses a synchronous marker scoped to `/api/results`, while the other 22 browser cases were green.
 
 ## Decision Log
 
