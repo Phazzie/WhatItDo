@@ -43,6 +43,27 @@ describe('POST /api/results', () => {
     expect(await response.json()).toEqual({ error: 'Poll not found' })
   })
 
+  it('returns 404 when the poll record is missing', async () => {
+    const { POST } = await import('./route')
+    await inMemoryRedis.set(`poll:${pollId}`, null)
+
+    const response = await POST(post())
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Poll not found' })
+  })
+
+  it('returns 404 when the poll record has expired', async () => {
+    const { POST } = await import('./route')
+    const raw = await inMemoryRedis.get<string>(`poll:${pollId}`)
+    await inMemoryRedis.set(`poll:${pollId}`, JSON.stringify({ ...JSON.parse(raw as string), expiresAt: Date.now() - 1 }))
+
+    const response = await POST(post())
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Poll not found' })
+  })
+
   it('retires a tokenless legacy poll without disclosing its response list', async () => {
     const { POST } = await import('./route')
     const raw = await inMemoryRedis.get<string>(`poll:${pollId}`)
@@ -66,6 +87,42 @@ describe('POST /api/results', () => {
     expect(JSON.stringify(json)).not.toContain(pollId)
     expect(JSON.stringify(json)).not.toContain('response-secret-id')
     expect(JSON.stringify(json)).not.toContain(token)
+  })
+
+  it('returns an empty response list for a poll without ballots', async () => {
+    const { POST } = await import('./route')
+    await inMemoryRedis.set(`poll:${pollId}:responses`, 'not-a-list')
+
+    const response = await POST(post())
+
+    expect(response.status).toBe(200)
+    expect((await response.json()).poll.responses).toEqual([])
+  })
+
+  it('includes a counterproposal when a stored response has one', async () => {
+    const { POST } = await import('./route')
+    await inMemoryRedis.rpush(`poll:${pollId}:responses`, JSON.stringify({
+      id: 'another-secret-id', voterName: 'Bob', votes: [{ text: 'A', vote: 'maybe', comment: '' }],
+      counterProposal: 'Flip a coin', submittedAt: Date.now(),
+    } satisfies StoredPollResponse))
+
+    const response = await POST(post())
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json.poll.responses[1]).toMatchObject({ voterName: 'Bob', counterProposal: 'Flip a coin' })
+    expect(json.poll.responses[1]).not.toHaveProperty('id')
+  })
+
+  it('returns the private 500 response when a stored ballot is malformed', async () => {
+    const { POST } = await import('./route')
+    await inMemoryRedis.rpush(`poll:${pollId}:responses`, '{not-json')
+
+    const response = await POST(post())
+
+    expect(response.status).toBe(500)
+    expect(response.headers.get('cache-control')).toContain('no-store')
+    expect(await response.json()).toEqual({ error: 'Failed to fetch results' })
   })
 
   it('does not replay an authorized response into a later unauthorized request', async () => {
