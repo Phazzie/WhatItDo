@@ -23,16 +23,21 @@ used as substitutes under the same narrow ownership and exact-proof contract.
 - [x] (2026-07-24) Completed the CI and Playwright configuration lane.
 - [x] (2026-07-24) Added focused coverage, per-file enforcement, static-asset regression, and
   documentation repairs.
-- [ ] Integrate all lanes and pass focused and repository-wide gates. Local Node 23 coverage became
-  stuck in uninterruptible filesystem I/O; supported-Node GitHub jobs remain authoritative.
-- [ ] Push a review PR and pass independent review plus exact-SHA GitHub checks.
-- [ ] Establish and merge into `main`; switch GitHub default and Vercel Production tracking.
-- [ ] Verify the final Production deployment and close this plan.
+- [x] (2026-07-24) Integrated every lane and passed focused tests plus repository-wide supported-Node
+  gates. Local Node 23 coverage became stuck in filesystem I/O; GitHub's supported runtimes were
+  authoritative.
+- [x] (2026-07-24) Merged PR #7 after all exact-SHA checks passed and all eight review threads were
+  resolved with evidence.
+- [x] (2026-07-24) Established `main` as the GitHub default and Vercel Production Branch, then merged
+  the repair train into `main`.
+- [x] (2026-07-24) Promoted the exact merge artifact, verified Production, ran the token-safe smoke,
+  and closed this plan.
 
 ## Surprises & Discoveries
 
-- The repository has no local or remote `main`; its default remains
-  `claude/voting-suggestions-app-01QZyxebMi27ePup8cniRCws`.
+- At the start, the repository had no local or remote `main`; both GitHub and Vercel tracked
+  `claude/voting-suggestions-app-01QZyxebMi27ePup8cniRCws`. The old branch remains preserved after
+  the cutover.
 - The old `docs/SPARK_REPAIR_EXEC_PLAN.md` exists only as an untracked file in the historical PR #4
   checkout and its progress boxes are stale.
 - The active free Redis resource is RAM-only and does not promise persistence. Durable storage is a
@@ -67,14 +72,27 @@ used as substitutes under the same narrow ownership and exact-proof contract.
 
 ## Outcomes & Retrospective
 
-Open. Record the final merge commit, check results, Production deployment, smoke evidence, remaining
-Sol-owned work, and any waived item here.
+PR #7 merged normally into `main` as `4542c63`. Its exact candidate passed lint, typecheck, build,
+zero-vulnerability audit, 168 unit tests with 14 Redis integration tests separated into a real Redis
+job, 23 browser tests, and compatibility jobs on Node 20.19.0, 22.13.0, and 24.0.0. Coverage finished
+at 93.66% statements, 88.44% branches, 98.18% functions, and 96.23% lines.
+
+All eight GitHub review threads were answered and resolved. GitHub's default and Vercel's Production
+Branch are `main`. Production deployment `dpl_7H5SLemAemmqaipTFoEvyJ2mknRm` reached Vercel's
+`READY` state for merge commit `4542c63` and owns the production aliases. The live smoke returned
+the exact missing-poll 404, then
+passed create, public read, Dubious vote, exact duplicate retry, and private results with one response;
+the owner token and submission ID were absent from returned data. The deployment had zero error or
+fatal runtime logs after the smoke.
+
+No acceptance item was waived. Durable Redis remains a Sol-owned follow-up because the active free
+resource is RAM-only.
 
 ## Context and Orientation
 
-The deployed source is the remote default branch at `675c3b0`. The integration and worker checkouts
-are temporary sibling Git worktrees; their machine-specific locations are intentionally not part of
-the repository contract.
+The deployed source and remote default are now `main`; the feature merge is `4542c63`. The integration
+and worker checkouts were temporary sibling Git worktrees; their machine-specific locations are not
+part of the repository contract.
 
 `src/app/results/[id]/page.tsx` owns owner-only results refresh. `src/app/page.tsx` owns poll creation
 and its success state. `e2e/poll-flows.spec.ts` is the shared end-to-end suite. `playwright.config.ts`
@@ -149,9 +167,10 @@ Integrated worker commits cover results polling (`578122e`, `5f9793a`), home suc
 (`6b54b96`), deterministic CI (`0dbfe82`), poll/results/validation/timeout coverage (`96006d9`,
 `b72d48c`, `67066f0`, `10dee30`), the backdrop regression (`5943bb9`), per-file enforcement
 (`839d714`), and docs (`ac4fd25`). Focused route suites reported 12/12 poll, 11/11 results, and 31/31
-validation tests passing in their clean worker checkouts. Record the final coverage summary, PR URL,
-GitHub check URLs, merge ID, Vercel deployment ID, and aggregate smoke result before closing. Never
-record owner tokens, Redis values, notification addresses, raw IPs, or synthetic ballot contents.
+validation tests passing in their clean worker checkouts. The final review-focused suite passed 20/20.
+PR #7, Actions run `30086031319`, merge `4542c63`, and Production deployment
+`dpl_7H5SLemAemmqaipTFoEvyJ2mknRm` are the durable release evidence. No owner tokens, Redis values,
+notification addresses, raw IPs, or synthetic ballot contents are recorded.
 
 ## Interfaces and Dependencies
 
