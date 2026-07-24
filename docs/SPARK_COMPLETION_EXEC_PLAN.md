@@ -47,7 +47,9 @@ used as substitutes under the same narrow ownership and exact-proof contract.
   optional dependency range; the regenerated lockfile reports zero vulnerabilities.
 - The first teardown-abort browser probe used an asynchronous exposed page binding; navigation
   destroyed the binding before it recorded the cleanup and produced a false failure. The probe now
-  uses a synchronous marker scoped to `/api/results`, while the other 22 browser cases were green.
+  uses a synchronous marker scoped to `/api/results`. A second run showed that full-document
+  navigation does not guarantee React cleanup execution, so the final proof stalls a private manual
+  refresh and follows the app's client-side home link; the other 22 browser cases remained green.
 
 ## Decision Log
 

@@ -48,6 +48,7 @@ test('pausing auto-refresh stops timed and visibility refreshes but keeps manual
 
 test('leaving results aborts an in-flight private results request', async ({ page }) => {
   let abortCalls = 0
+  let resultRequests = 0
   let releaseRequest!: () => void
   const requestReleased = new Promise<void>((resolve) => {
     releaseRequest = resolve
@@ -75,13 +76,22 @@ test('leaving results aborts an in-flight private results request', async ({ pag
     }
   })
   await page.route('**/api/results', async (route) => {
+    resultRequests += 1
+    if (resultRequests === 1) {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ poll }) })
+      return
+    }
     await requestReleased
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ poll }) }).catch(() => {})
   })
 
   await page.goto(`/results/${'A'.repeat(10)}#${'B'.repeat(24)}`)
-  await page.waitForRequest('**/api/results')
-  await page.goto('/privacy')
+  await expect(page.getByRole('heading', { name: poll.title })).toBeVisible()
+  const refreshRequest = page.waitForRequest('**/api/results')
+  await page.getByRole('button', { name: /Refresh now/i }).click()
+  await refreshRequest
+  await page.getByRole('link', { name: /WHAT IT DO/i }).click()
+  await expect(page).toHaveURL('/')
   releaseRequest()
 
   await expect.poll(() => abortCalls).toBe(1)
