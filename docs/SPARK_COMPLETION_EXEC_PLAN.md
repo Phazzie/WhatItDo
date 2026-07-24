@@ -78,8 +78,9 @@ job, 23 browser tests, and compatibility jobs on Node 20.19.0, 22.13.0, and 24.0
 at 93.66% statements, 88.44% branches, 98.18% functions, and 96.23% lines.
 
 All eight GitHub review threads were answered and resolved. GitHub's default and Vercel's Production
-Branch are `main`. Production deployment `dpl_7H5SLemAemmqaipTFoEvyJ2mknRm` is Ready for merge
-`4542c63` and owns the production aliases. The live smoke returned the exact missing-poll 404, then
+Branch are `main`. Production deployment `dpl_7H5SLemAemmqaipTFoEvyJ2mknRm` reached Vercel's
+`READY` state for merge commit `4542c63` and owns the production aliases. The live smoke returned
+the exact missing-poll 404, then
 passed create, public read, Dubious vote, exact duplicate retry, and private results with one response;
 the owner token and submission ID were absent from returned data. The deployment had zero error or
 fatal runtime logs after the smoke.
