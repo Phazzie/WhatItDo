@@ -15,7 +15,7 @@ export default defineConfig({
       reporter: ['text', 'json-summary'],
       include: ['src/app/api/**/*.ts', 'src/lib/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/test/**'],
-      thresholds: { lines: 85, functions: 85, statements: 85, branches: 80 },
+      thresholds: { lines: 85, functions: 85, statements: 85, branches: 80, perFile: true },
     },
   },
   resolve: {

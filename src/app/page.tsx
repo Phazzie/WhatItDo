@@ -74,6 +74,8 @@ export default function Home() {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState<'vote' | 'results' | ''>('')
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const createdTitleRef = useRef<HTMLHeadingElement | null>(null)
+  const shouldFocusCreatedTitle = useRef(false)
 
   useEffect(() => {
     const hydrationTimer = window.setTimeout(() => {
@@ -91,6 +93,12 @@ export default function Home() {
       if (copyTimer.current) clearTimeout(copyTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!created || !shouldFocusCreatedTitle.current) return
+    shouldFocusCreatedTitle.current = false
+    createdTitleRef.current?.focus()
+  }, [created])
 
   function updateSuggestion(index: number, value: string) {
     setSuggestions((current) => current.map((suggestion, i) => (i === index ? value : suggestion)))
@@ -148,6 +156,7 @@ export default function Home() {
         .slice(0, MAX_RECENT)
       // The API response is authoritative. Show both links before attempting the
       // optional public-history write so a storage exception cannot hide them.
+      shouldFocusCreatedTitle.current = true
       setCreated(createdPoll)
       setRecent(next)
       try {
@@ -206,11 +215,12 @@ export default function Home() {
         <section className="hero-grid success-grid" aria-labelledby="created-title">
           <div className="hero-copy">
             <p className="eyebrow">The council is summoned</p>
-            <h1 id="created-title">Poll <span>alive.</span><br />Chaos pending.</h1>
+            <h1 id="created-title" ref={createdTitleRef} tabIndex={-1}>Poll <span>alive.</span><br />Chaos pending.</h1>
             <p className="lede">Send the public ballot to your people. Keep the owner link private—it is the only key to the unfiltered results.</p>
             <button className="text-button" type="button" onClick={reset}>← Conjure another poll</button>
           </div>
           <div className="paper-stack">
+            <p className="notice" role="status" style={{ backgroundColor: 'var(--butter)', color: 'var(--ink)' }}>Your public ballot and private owner links are ready.</p>
             {error && <p className="notice notice-error" role="alert">{error}</p>}
             <article className="paper-card tape-top">
               <p className="card-label">SHARE THIS ONE</p>

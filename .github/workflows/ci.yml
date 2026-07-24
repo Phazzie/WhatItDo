@@ -9,6 +9,7 @@ concurrency:
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -45,12 +46,41 @@ jobs:
       - name: Build
         run: npm run build
 
+  supported-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.19.0, 22.13.0, 24.0.0]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
   redis-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
       redis:
-        image: redis:7-alpine
+        # Resolved from the official Docker Hub OCI index on 2026-07-24.
+        image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
         ports:
           - 6379:6379
         options: >-

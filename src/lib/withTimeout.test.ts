@@ -51,4 +51,33 @@ describe('withTimeout', () => {
 
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  it('ignores a provider result that arrives after the timeout', async () => {
+    vi.useFakeTimers()
+    let resolveProvider: (value: string) => void = () => undefined
+    const provider = new Promise<string>((resolve) => {
+      resolveProvider = resolve
+    })
+    const result = withTimeout(provider, 5_000)
+    const assertion = expect(result).rejects.toThrow('Operation timed out after 5000ms')
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await assertion
+    resolveProvider('late provider result')
+    await Promise.resolve()
+
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not double-settle if an already-scheduled timeout callback runs after cleanup', async () => {
+    vi.useFakeTimers()
+    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout').mockImplementation(() => undefined)
+    const result = withTimeout(Promise.resolve('sent'), 5_000)
+
+    await expect(result).resolves.toBe('sent')
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })

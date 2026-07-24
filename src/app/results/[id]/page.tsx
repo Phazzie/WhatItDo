@@ -15,6 +15,7 @@ export default function ResultsPage() {
   const [error, setError] = useState('')
   const [status, setStatus] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const [autoRefreshPaused, setAutoRefreshPaused] = useState(false)
   const tokenGeneration = useRef(0)
   const activeRequest = useRef<{ generation: number; controller: AbortController } | null>(null)
 
@@ -43,6 +44,10 @@ export default function ResultsPage() {
       window.removeEventListener('hashchange', syncTokenFromFragment)
     }
   }, [id])
+
+  useEffect(() => () => {
+    activeRequest.current?.controller.abort()
+  }, [])
 
   const load = useCallback(async (quiet = false) => {
     if (!token) return
@@ -91,6 +96,11 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!token) return
     const initialLoad = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(initialLoad)
+  }, [load, token])
+
+  useEffect(() => {
+    if (!token || autoRefreshPaused) return
     let interval: ReturnType<typeof setInterval> | null = null
     const start = () => {
       if (!interval && document.visibilityState === 'visible') interval = setInterval(() => load(true), 30000)
@@ -107,12 +117,10 @@ export default function ResultsPage() {
     start()
     document.addEventListener('visibilitychange', visibility)
     return () => {
-      window.clearTimeout(initialLoad)
       if (interval) clearInterval(interval)
       document.removeEventListener('visibilitychange', visibility)
-      activeRequest.current?.controller.abort()
     }
-  }, [load, token])
+  }, [autoRefreshPaused, load, token])
 
   const responseCount = poll?.responses.length ?? 0
   const dubious = poll?.mode === 'dubious'
@@ -161,11 +169,22 @@ export default function ResultsPage() {
           <div>
             <p className="card-label">LIVE VIBE METER</p>
             <h2 id="tally-heading">The honest tally</h2>
-            <p className="last-updated" aria-live="polite">
+            <p className="last-updated">
               {lastUpdated ? `Last updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Waiting for the latest tally…'}
             </p>
           </div>
-          <button className="refresh-button" type="button" disabled={refreshing} onClick={() => load(true)}>{refreshing ? 'Refreshing…' : 'Refresh now ↻'}</button>
+          <div>
+            <button
+              className="refresh-button"
+              type="button"
+              aria-label="Auto-refresh"
+              aria-pressed={!autoRefreshPaused}
+              onClick={() => setAutoRefreshPaused((paused) => !paused)}
+            >
+              {autoRefreshPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+            </button>
+            <button className="refresh-button" type="button" disabled={refreshing} onClick={() => load(true)}>{refreshing ? 'Refreshing…' : 'Refresh now ↻'}</button>
+          </div>
         </div>
         <div className="tally-grid">
           {poll.suggestions.map((suggestion, index) => {
@@ -226,7 +245,7 @@ export default function ResultsPage() {
           <div className="paper-card empty-state"><span aria-hidden="true">…</span><h3>The room is dramatically silent.</h3><p>Share the public voting link to collect the first response.</p></div>
         )}
       </section>
-      <footer className="site-footer"><span>AUTO-REFRESH · 30 SEC</span><Link href="/">Create another poll ↗</Link></footer>
+      <footer className="site-footer"><span>{autoRefreshPaused ? 'AUTO-REFRESH PAUSED' : 'AUTO-REFRESH · 30 SEC'}</span><Link href="/">Create another poll ↗</Link></footer>
     </main>
   )
 }

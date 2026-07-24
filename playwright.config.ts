@@ -11,7 +11,6 @@ const SANDBOX_CHROMIUM = '/opt/pw-browsers/chromium'
 const executablePath = fs.existsSync(SANDBOX_CHROMIUM) ? SANDBOX_CHROMIUM : undefined
 
 const PORT = 3100
-const skipBuild = process.env.E2E_SKIP_BUILD === '1'
 
 export default defineConfig({
   testDir: './e2e',
@@ -45,11 +44,9 @@ export default defineConfig({
     // Use a production build so the in-process E2E store survives navigation
     // across route bundles. The application permits this store only for an
     // explicit loopback E2E run with no deployment marker.
-    command: skipBuild
-      ? `npm run start -- --port ${PORT}`
-      : `npm run build && npm run start -- --port ${PORT}`,
+    command: `npm run build && npm run start -- --port ${PORT}`,
     url: `http://127.0.0.1:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 540_000,
     stdout: 'pipe',
     stderr: 'pipe',

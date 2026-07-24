@@ -12,6 +12,8 @@ import {
   parsePollInput,
   parseResultsInput,
   parseVoteInput,
+  validatePollInput,
+  validateVoteInput,
 } from './validation'
 
 const poll: StoredPoll = {
@@ -147,5 +149,20 @@ describe('parseResultsInput', () => {
     expect(parseResultsInput({ pollId: poll.id, resultsToken: token })).toMatchObject({ ok: true })
     expect(parseResultsInput({ pollId: 'short', resultsToken: token })).toMatchObject({ ok: false })
     expect(parseResultsInput({ pollId: poll.id, resultsToken: 'too-short' })).toMatchObject({ ok: false })
+  })
+})
+
+describe('compatibility validation wrappers', () => {
+  it('reports poll validation success and parser errors in the legacy shape', () => {
+    expect(validatePollInput({ title: 'Dinner?', suggestions: ['Pizza'], mode: 'normal' })).toEqual({ valid: true })
+    expect(validatePollInput({ suggestions: [], mode: 'normal' })).toMatchObject({ valid: false, error: expect.stringContaining('At least one') })
+  })
+
+  it('reports vote validation success and parser errors in the legacy shape', () => {
+    expect(validateVoteInput(validVote, poll)).toEqual({ valid: true })
+    expect(validateVoteInput({ ...validVote, submissionId: 'not-a-uuid' }, poll)).toMatchObject({
+      valid: false,
+      error: expect.stringContaining('submission'),
+    })
   })
 })

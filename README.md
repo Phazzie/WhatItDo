@@ -113,8 +113,8 @@ npm run check             # lint, typecheck, unit tests, and build
 npm audit --audit-level=high
 ```
 
-Coverage gates for API routes and critical library code are 85% for lines, functions, and statements,
-and 80% for branches. CI also runs the atomic Lua contract against Redis 7 and exercises desktop,
+Coverage gates apply per file in the API-route and critical-library scope: 85% for lines, functions,
+and statements, and 80% for branches. CI also runs the atomic Lua contract against Redis 7 and exercises desktop,
 mobile, privacy, Classic, Dubious, duplicate-retry, and accessibility browser flows.
 
 ## API contract
@@ -213,6 +213,6 @@ src/lib/validation.ts           normalized bounded request contracts
 e2e/poll-flows.spec.ts          privacy, product, mobile, and axe flows
 ```
 
-Repository-specific agent guardrails are in `AGENTS.md`; the active completion record is
-`docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`. Transitive dependency license notes are documented in
+Repository-specific agent guardrails are in `AGENTS.md`; the active completion and `main`
+cutover record is `docs/SPARK_COMPLETION_EXEC_PLAN.md`. Transitive dependency license notes are documented in
 `docs/THIRD_PARTY_LICENSES.md`.

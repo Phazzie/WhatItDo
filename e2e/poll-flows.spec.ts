@@ -44,7 +44,9 @@ async function createPoll(
   }
   await page.getByRole('button', { name: /Make the poll/i }).click()
 
-  await expect(page.getByRole('heading', { name: /Poll alive/i })).toBeVisible()
+  const createdHeading = page.getByRole('heading', { name: /Poll alive/i })
+  await expect(createdHeading).toBeVisible()
+  await expect(createdHeading).toBeFocused()
   const voteOutput = page.locator('article').filter({ hasText: 'Public voting link' }).locator('output')
   const resultsOutput = page.locator('article').filter({ hasText: 'Private owner link' }).locator('output')
   await expect(voteOutput).toContainText('/vote/')
@@ -118,6 +120,8 @@ test('Classic: creates separate links, records a ballot, and unlocks owner resul
   const first = 'Try the tiny dumpling spot'
   const second = 'Go stargazing Friday'
   const links = await createPoll(page, { mode: 'normal', title, suggestions: [first, second] })
+  await expect(page.locator('.notice[role="status"]')).toContainText('public ballot and private owner links are ready')
+  await assertNoSeriousAxeViolations(page)
 
   await page.goto(links.voteUrl)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
@@ -132,6 +136,7 @@ test('Classic: creates separate links, records a ballot, and unlocks owner resul
   await expect(page.getByRole('status')).toContainText(
     'Email alerts are not configured, but your response is safe.'
   )
+  await assertNoSeriousAxeViolations(page)
 
   await page.goto(links.resultsUrl)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
@@ -139,6 +144,25 @@ test('Classic: creates separate links, records a ballot, and unlocks owner resul
   await expect(page.getByRole('heading', { name: 'Individual ballots' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Night Owl' })).toBeVisible()
   await expect(page.getByText('Book the corner table')).toBeVisible()
+})
+
+test('reduced motion effectively disables transitions and animations', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true)
+
+  const durations = await page.evaluate(() => {
+    const parseDuration = (value: string) => value.split(',').map((duration) => {
+      const trimmed = duration.trim()
+      return trimmed.endsWith('ms') ? Number.parseFloat(trimmed) : Number.parseFloat(trimmed) * 1_000
+    })
+    return Array.from(document.querySelectorAll('*')).flatMap((element) => {
+      const style = window.getComputedStyle(element)
+      return [...parseDuration(style.transitionDuration), ...parseDuration(style.animationDuration)]
+    })
+  })
+
+  expect(durations.every((duration) => Number.isFinite(duration) && duration <= 0.01)).toBe(true)
 })
 
 test('Dubious: offers YOLO and surfaces a rogue alternative', async ({ page }) => {
