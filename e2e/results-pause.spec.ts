@@ -23,9 +23,10 @@ test('pausing auto-refresh stops timed and visibility refreshes but keeps manual
   expect(resultRequests).toBe(1)
   await expect(page.getByText(/^Last updated /)).not.toHaveAttribute('aria-live')
 
-  const autoRefresh = page.getByRole('button', { name: 'Pause auto-refresh' })
+  const autoRefresh = page.getByRole('button', { name: 'Auto-refresh' })
+  await expect(autoRefresh).toHaveAttribute('aria-pressed', 'true')
   await autoRefresh.click()
-  await expect(page.getByRole('button', { name: 'Resume auto-refresh' })).toBeVisible()
+  await expect(autoRefresh).toHaveAttribute('aria-pressed', 'false')
 
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
@@ -39,8 +40,8 @@ test('pausing auto-refresh stops timed and visibility refreshes but keeps manual
   await page.getByRole('button', { name: /Refresh now/i }).click()
   await expect.poll(() => resultRequests).toBe(2)
 
-  await page.getByRole('button', { name: 'Resume auto-refresh' }).click()
-  await expect(page.getByRole('button', { name: 'Pause auto-refresh' })).toBeVisible()
+  await autoRefresh.click()
+  await expect(autoRefresh).toHaveAttribute('aria-pressed', 'true')
   await page.clock.runFor(30_000)
   await expect.poll(() => resultRequests).toBe(3)
 })

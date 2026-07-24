@@ -67,9 +67,9 @@ Sol-owned work, and any waived item here.
 
 ## Context and Orientation
 
-The deployed source is the remote default branch at `675c3b0`. The integration worktree is
-`/Users/hbpheonix/.codex-worktrees/whatitdo-spark-integration`. Worker worktrees use sibling
-directories ending in `spark-results`, `spark-home`, and `spark-ci`.
+The deployed source is the remote default branch at `675c3b0`. The integration and worker checkouts
+are temporary sibling Git worktrees; their machine-specific locations are intentionally not part of
+the repository contract.
 
 `src/app/results/[id]/page.tsx` owns owner-only results refresh. `src/app/page.tsx` owns poll creation
 and its success state. `e2e/poll-flows.spec.ts` is the shared end-to-end suite. `playwright.config.ts`
