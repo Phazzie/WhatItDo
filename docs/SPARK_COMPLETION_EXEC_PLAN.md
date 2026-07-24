@@ -41,6 +41,10 @@ used as substitutes under the same narrow ownership and exact-proof contract.
   the original checkout's real dependency tree at the frozen integration SHA; CI uses `npm ci`.
 - Two cross-review passes found a missing resume assertion, conflicting toggle semantics, and one
   stale README plan pointer. All were repaired before publication.
+- The first PR build passed lint, typecheck, 167 unit tests, and per-file coverage, then failed the
+  high-severity audit on newly published Next.js and sharp advisories. Next.js and its lint config
+  were advanced from 16.2.10 to 16.2.11, with sharp 0.35.3 overridden until Next.js widens its
+  optional dependency range; the regenerated lockfile reports zero vulnerabilities.
 
 ## Decision Log
 
