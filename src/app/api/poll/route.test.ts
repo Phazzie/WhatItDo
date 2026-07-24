@@ -89,6 +89,31 @@ describe('/api/poll public privacy contract', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
+  it('rejects missing and malformed poll IDs', async () => {
+    const { GET } = await import('./route')
+
+    const missing = await GET(new NextRequest('http://localhost/api/poll'))
+    const malformed = await GET(new NextRequest('http://localhost/api/poll?id=not-a-valid-id'))
+
+    expect(missing.status).toBe(400)
+    expect(await missing.json()).toEqual({ error: 'Poll ID required' })
+    expect(malformed.status).toBe(404)
+    expect(await malformed.json()).toEqual({ error: 'Poll not found' })
+  })
+
+  it('does not return expired polls', async () => {
+    const { GET } = await import('./route')
+    await inMemoryRedis.set('poll:expired001', JSON.stringify({
+      id: 'expired001', title: 'Expired', suggestions: ['A'], mode: 'normal', createdAt: 0,
+      expiresAt: Date.now() - 1, resultsTokenHash: 'a'.repeat(64),
+    }))
+
+    const response = await GET(new NextRequest('http://localhost/api/poll?id=expired001'))
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Poll not found' })
+  })
+
   it('retires tokenless legacy polls with 410 instead of exposing embedded responses', async () => {
     const { GET } = await import('./route')
     await inMemoryRedis.set('poll:legacy0001', JSON.stringify({
@@ -115,5 +140,42 @@ describe('/api/poll public privacy contract', () => {
     }))
     expect(response.status).toBe(415)
     expect(await response.json()).toEqual({ error: 'Content-Type must be application/json' })
+  })
+
+  it('rejects production creates when client identity cannot be verified', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.spyOn(redis, 'resolveClientIp').mockReturnValue({ status: 'unavailable', reason: 'missing' })
+    const { POST } = await import('./route')
+
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+
+    expect(response.status).toBe(429)
+    expect(await response.json()).toEqual({ error: 'Unable to verify request identity' })
+    expect(response.headers.get('retry-after')).toBe('60')
+  })
+
+  it('returns the create-rate limit response and retry header', async () => {
+    vi.spyOn(redis, 'checkPollCreateRateLimit').mockResolvedValue({
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: 42,
+    })
+    const { POST } = await import('./route')
+
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+
+    expect(response.status).toBe(429)
+    expect(await response.json()).toEqual({ error: 'Too many polls created. Please try again later.' })
+    expect(response.headers.get('retry-after')).toBe('42')
+  })
+
+  it('returns a generic error when poll storage fails', async () => {
+    vi.spyOn(redis, 'createPollAtomically').mockRejectedValue(new Error('storage unavailable'))
+    const { POST } = await import('./route')
+
+    const response = await POST(post({ suggestions: ['A'], mode: 'normal' }))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Failed to create poll' })
   })
 })
