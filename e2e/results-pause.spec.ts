@@ -25,7 +25,6 @@ test('pausing auto-refresh stops timed and visibility refreshes but keeps manual
 
   const autoRefresh = page.getByRole('button', { name: 'Pause auto-refresh' })
   await autoRefresh.click()
-  await expect(autoRefresh).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('button', { name: 'Resume auto-refresh' })).toBeVisible()
 
   await page.evaluate(() => {
@@ -39,4 +38,39 @@ test('pausing auto-refresh stops timed and visibility refreshes but keeps manual
 
   await page.getByRole('button', { name: /Refresh now/i }).click()
   await expect.poll(() => resultRequests).toBe(2)
+
+  await page.getByRole('button', { name: 'Resume auto-refresh' }).click()
+  await expect(page.getByRole('button', { name: 'Pause auto-refresh' })).toBeVisible()
+  await page.clock.runFor(30_000)
+  await expect.poll(() => resultRequests).toBe(3)
+})
+
+test('leaving results aborts an in-flight private results request', async ({ page }) => {
+  let abortCalls = 0
+  let releaseRequest!: () => void
+  const requestReleased = new Promise<void>((resolve) => {
+    releaseRequest = resolve
+  })
+
+  await page.exposeFunction('recordResultsAbort', () => {
+    abortCalls += 1
+  })
+  await page.addInitScript(() => {
+    const originalAbort = AbortController.prototype.abort
+    AbortController.prototype.abort = function (...args) {
+      void (window as typeof window & { recordResultsAbort: () => Promise<void> }).recordResultsAbort()
+      return originalAbort.apply(this, args)
+    }
+  })
+  await page.route('**/api/results', async (route) => {
+    await requestReleased
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ poll }) }).catch(() => {})
+  })
+
+  await page.goto(`/results/${'A'.repeat(10)}#${'B'.repeat(24)}`)
+  await page.waitForRequest('**/api/results')
+  await page.goto('/privacy')
+  releaseRequest()
+
+  await expect.poll(() => abortCalls).toBe(1)
 })

@@ -213,6 +213,6 @@ src/lib/validation.ts           normalized bounded request contracts
 e2e/poll-flows.spec.ts          privacy, product, mobile, and axe flows
 ```
 
-Repository-specific agent guardrails are in `AGENTS.md`; the active completion record is
-`docs/PR4_TWO_PR_REPAIR_EXEC_PLAN.md`. Transitive dependency license notes are documented in
+Repository-specific agent guardrails are in `AGENTS.md`; the active completion and `main`
+cutover record is `docs/SPARK_COMPLETION_EXEC_PLAN.md`. Transitive dependency license notes are documented in
 `docs/THIRD_PARTY_LICENSES.md`.

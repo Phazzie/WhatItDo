@@ -18,11 +18,13 @@ used as substitutes under the same narrow ownership and exact-proof contract.
 - [x] (2026-07-24) Verified Production commit `675c3b0` and repaired its Redis environment scope.
 - [x] (2026-07-24) Proved Production create, public read, Dubious vote, exact retry, and private results.
 - [x] (2026-07-24) Created clean integration and worker worktrees from `origin/HEAD`.
-- [ ] Complete the results refresh/accessibility lane.
-- [ ] Complete the home success and shared browser-evidence lane.
-- [ ] Complete the CI and Playwright configuration lane.
-- [ ] Complete coverage, static-asset, and documentation follow-up tickets.
-- [ ] Integrate all lanes and pass focused and repository-wide local gates.
+- [x] (2026-07-24) Completed the results refresh/accessibility lane.
+- [x] (2026-07-24) Completed the home success and shared browser-evidence lane.
+- [x] (2026-07-24) Completed the CI and Playwright configuration lane.
+- [x] (2026-07-24) Added focused coverage, per-file enforcement, static-asset regression, and
+  documentation repairs.
+- [ ] Integrate all lanes and pass focused and repository-wide gates. Local Node 23 coverage became
+  stuck in uninterruptible filesystem I/O; supported-Node GitHub jobs remain authoritative.
 - [ ] Push a review PR and pass independent review plus exact-SHA GitHub checks.
 - [ ] Establish and merge into `main`; switch GitHub default and Vercel Production tracking.
 - [ ] Verify the final Production deployment and close this plan.
@@ -35,6 +37,10 @@ used as substitutes under the same narrow ownership and exact-proof contract.
   checkout and its progress boxes are stale.
 - The active free Redis resource is RAM-only and does not promise persistence. Durable storage is a
   Sol-owned follow-up, not part of the mechanical Spark train.
+- A `node_modules` symlink outside a worktree is rejected by Turbopack. Local browser validation uses
+  the original checkout's real dependency tree at the frozen integration SHA; CI uses `npm ci`.
+- Two cross-review passes found a missing resume assertion, conflicting toggle semantics, and one
+  stale README plan pointer. All were repaired before publication.
 
 ## Decision Log
 
@@ -89,10 +95,10 @@ integrates worker commits.
 4. Root resolves the immutable Redis 7 Alpine manifest-list digest from the official registry before
    the CI workflow uses it.
 5. Root runs every command in Validation and Acceptance. Any failure returns to the owning lane.
-6. Root pushes `agent/spark-integration`, opens a PR against the current default, requests independent
-   review, and resolves actionable findings with new focused commits.
-7. After the exact PR SHA is green, create `main` from the verified default history, retarget and
-   merge normally, set GitHub default to `main`, set Vercel Production Branch to `main`, and retain
+6. Root creates `main` at the verified current default without rewriting history, makes it the GitHub
+   default, pushes `agent/spark-integration`, opens a PR into `main`, requests independent review, and
+   resolves actionable findings with new focused commits.
+7. After the exact PR SHA is green, merge normally, set Vercel Production Branch to `main`, and retain
    the old default until Production proof passes.
 
 ## Validation and Acceptance
@@ -127,9 +133,13 @@ this plan.
 
 ## Artifacts and Notes
 
-Record worker commit IDs, focused test totals, coverage summary, PR URL, GitHub check URLs, final merge
-ID, Vercel deployment ID, and aggregate smoke result here. Never record owner tokens, Redis values,
-notification addresses, raw IPs, or synthetic ballot contents.
+Integrated worker commits cover results polling (`578122e`, `5f9793a`), home success evidence
+(`6b54b96`), deterministic CI (`0dbfe82`), poll/results/validation/timeout coverage (`96006d9`,
+`b72d48c`, `67066f0`, `10dee30`), the backdrop regression (`5943bb9`), per-file enforcement
+(`839d714`), and docs (`ac4fd25`). Focused route suites reported 12/12 poll, 11/11 results, and 31/31
+validation tests passing in their clean worker checkouts. Record the final coverage summary, PR URL,
+GitHub check URLs, merge ID, Vercel deployment ID, and aggregate smoke result before closing. Never
+record owner tokens, Redis values, notification addresses, raw IPs, or synthetic ballot contents.
 
 ## Interfaces and Dependencies
 

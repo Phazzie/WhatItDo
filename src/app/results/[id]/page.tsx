@@ -174,7 +174,7 @@ export default function ResultsPage() {
             </p>
           </div>
           <div>
-            <button className="refresh-button" type="button" aria-pressed={autoRefreshPaused} onClick={() => setAutoRefreshPaused((paused) => !paused)}>
+            <button className="refresh-button" type="button" onClick={() => setAutoRefreshPaused((paused) => !paused)}>
               {autoRefreshPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
             </button>
             <button className="refresh-button" type="button" disabled={refreshing} onClick={() => load(true)}>{refreshing ? 'Refreshing…' : 'Refresh now ↻'}</button>
