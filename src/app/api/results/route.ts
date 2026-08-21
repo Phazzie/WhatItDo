@@ -1,6 +1,7 @@
 import * as storageModule from '@/lib/redis'
 import { readJsonBody } from '@/lib/requestBody'
 import { verifyResultsToken } from '@/lib/resultsToken'
+import { describeStorageFailure } from '@/lib/storageFailure'
 import type { PollResponse, PollResults, StoredPoll, StoredPollResponse } from '@/lib/types'
 import { parseResultsInput } from '@/lib/validation'
 import { NextRequest, NextResponse } from 'next/server'
@@ -64,8 +65,8 @@ export async function POST(request: NextRequest) {
       responses,
     }
     return reply({ poll: results })
-  } catch {
-    console.error('[whatitdo] results_fetch_failed')
+  } catch (error) {
+    console.error('[whatitdo] results_fetch_failed', describeStorageFailure(error))
     return reply({ error: 'Failed to fetch results' }, 500)
   }
 }

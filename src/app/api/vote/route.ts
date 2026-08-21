@@ -1,6 +1,7 @@
 import * as storageModule from '@/lib/redis'
 import { escapeHtml, sanitizeHeaderValue } from '@/lib/escapeHtml'
 import { readJsonBody } from '@/lib/requestBody'
+import { describeStorageFailure } from '@/lib/storageFailure'
 import { createSubmissionDigest } from '@/lib/submissionDigest'
 import type { NotificationStatus, StoredPoll, StoredPollResponse } from '@/lib/types'
 import { isValidPollId, parseVoteInput } from '@/lib/validation'
@@ -187,10 +188,11 @@ export async function POST(request: NextRequest) {
 
     const notification = await notifyCreator(poll, response, parsed.data.submissionId)
     return NextResponse.json({ success: true, notification })
-  } catch {
+  } catch (error) {
     // Upstash error messages can include the full EVAL command, whose ARGV
-    // contains a private ballot. Never attach the upstream exception here.
-    console.error('[whatitdo] vote_submit_failed')
+    // contains a private ballot. Never attach the upstream exception here;
+    // describeStorageFailure emits only allow-listed, non-secret fields.
+    console.error('[whatitdo] vote_submit_failed', describeStorageFailure(error))
     return errorResponse('Failed to submit vote', 500)
   }
 }

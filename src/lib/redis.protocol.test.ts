@@ -178,7 +178,7 @@ describe('durable REDIS_URL protocol adapter', () => {
     const errorRegistration = client.on.mock.calls.find(([event]) => event === 'error')
     expect(errorRegistration?.[1]).toEqual(expect.any(Function))
     expect(() => errorRegistration?.[1](new Error('socket failed'))).not.toThrow()
-    expect(consoleError).toHaveBeenCalledWith('[whatitdo] redis_client_error')
+    expect(consoleError).toHaveBeenCalledWith('[whatitdo] redis_client_error', 'name=Error')
     expect(consoleError).not.toHaveBeenCalledWith(expect.any(Error))
   })
 
@@ -203,7 +203,7 @@ describe('durable REDIS_URL protocol adapter', () => {
 
     await expect(redis.get('key')).resolves.toBe('second')
     expect(nodeRedis.createClient).toHaveBeenCalledTimes(2)
-    expect(consoleError).toHaveBeenCalledWith('[whatitdo] redis_client_error')
+    expect(consoleError).toHaveBeenCalledWith('[whatitdo] redis_client_error', 'name=Error')
   })
 
   it('preserves an initial connection error from a closed client and retries later', async () => {
