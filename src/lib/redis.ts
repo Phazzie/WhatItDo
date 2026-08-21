@@ -2,6 +2,7 @@ import { Redis } from '@upstash/redis'
 import { isIP } from 'node:net'
 import { createClient } from 'redis'
 import { InMemoryRedis, inMemoryRedis } from './inMemoryRedis'
+import { StorageConfigurationError, describeStorageFailure } from './storageFailure'
 import type { StoredPoll } from './types'
 
 export const POLL_IDLE_TTL_SECONDS = 60 * 60 * 24 * 30
@@ -128,10 +129,14 @@ function redisUrlFromEnvironment(): string | null {
   try {
     protocol = new URL(value).protocol
   } catch {
-    throw new Error('Redis is not configured. REDIS_URL must be a valid redis:// or rediss:// URL.')
+    throw new StorageConfigurationError(
+      'Redis is not configured. REDIS_URL must be a valid redis:// or rediss:// URL.'
+    )
   }
   if (protocol !== 'redis:' && protocol !== 'rediss:') {
-    throw new Error('Redis is not configured. REDIS_URL must use redis:// or rediss://.')
+    throw new StorageConfigurationError(
+      'Redis is not configured. REDIS_URL must use redis:// or rediss://.'
+    )
   }
   return value
 }
@@ -141,8 +146,8 @@ function connectProtocolRedis(url: string): Promise<ProtocolRedisClient> {
 
   const client = createProtocolRedisClient(url)
   protocolRedisClient = client
-  client.on('error', () => {
-    console.error('[whatitdo] redis_client_error')
+  client.on('error', (error: unknown) => {
+    console.error('[whatitdo] redis_client_error', describeStorageFailure(error))
     queueMicrotask(() => {
       if (!client.isOpen) clearProtocolRedisClient(client)
     })
@@ -234,7 +239,7 @@ function createUpstashRedis(): RedisLike {
     !token ? 'UPSTASH_REDIS_REST_TOKEN' : null,
   ].filter(Boolean)
   if (missing.length > 0) {
-    throw new Error(
+    throw new StorageConfigurationError(
       `Redis is not configured. Missing ${missing.join(' and ')}. ` +
         'Configure Upstash Redis; in-memory storage is permitted only in tests or an explicit loopback E2E run.'
     )

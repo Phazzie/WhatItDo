@@ -1,6 +1,7 @@
 import * as storageModule from '@/lib/redis'
 import { createResultsToken, hashResultsToken } from '@/lib/resultsToken'
 import { readJsonBody } from '@/lib/requestBody'
+import { describeStorageFailure } from '@/lib/storageFailure'
 import type { PublicPoll, StoredPoll } from '@/lib/types'
 import { isValidPollId, parsePollInput } from '@/lib/validation'
 import { nanoid } from 'nanoid'
@@ -78,8 +79,8 @@ export async function POST(request: NextRequest) {
     }
 
     return jsonError('Failed to create poll', 500)
-  } catch {
-    console.error('[whatitdo] poll_create_failed')
+  } catch (error) {
+    console.error('[whatitdo] poll_create_failed', describeStorageFailure(error))
     return jsonError('Failed to create poll', 500)
   }
 }
@@ -100,8 +101,8 @@ export async function GET(request: NextRequest) {
       { poll: publicPoll(poll) },
       { headers: { 'Cache-Control': 'no-store' } }
     )
-  } catch {
-    console.error('[whatitdo] poll_fetch_failed')
+  } catch (error) {
+    console.error('[whatitdo] poll_fetch_failed', describeStorageFailure(error))
     return jsonError('Failed to fetch poll', 500)
   }
 }

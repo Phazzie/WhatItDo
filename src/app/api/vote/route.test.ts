@@ -274,7 +274,9 @@ describe('POST /api/vote', () => {
     const response = await POST(request())
 
     expect(response.status).toBe(500)
-    expect(JSON.stringify(errorSpy.mock.calls)).toBe('[["[whatitdo] vote_submit_failed"]]')
+    expect(JSON.stringify(errorSpy.mock.calls)).toBe(
+      '[["[whatitdo] vote_submit_failed","name=Error"]]'
+    )
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SENTINEL_PRIVATE_BALLOT')
   })
 
