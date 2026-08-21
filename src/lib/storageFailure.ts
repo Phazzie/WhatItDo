@@ -25,12 +25,19 @@ const DESCRIBED_FIELDS = ['name', 'code', 'errno', 'syscall'] as const
 /** Node system codes look like `ENOTFOUND`; anything else is treated as payload. */
 const SAFE_VALUE_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/
 
+/**
+ * node-redis wraps a socket error one or two levels deep, and an aggregate error
+ * can add one more. Five leaves headroom without letting a hostile or cyclic chain
+ * dictate how long this walk runs.
+ */
 const MAX_CAUSE_DEPTH = 5
 
 function safeValue(value: unknown): string | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
-  if (typeof value !== 'string') return null
-  return SAFE_VALUE_PATTERN.test(value) ? value : null
+  // A finite number is stringified first and then held to the same pattern as a
+  // string: `String(1e21)` is `1e+21`, which is not code-shaped and must not pass.
+  const candidate = typeof value === 'number' && Number.isFinite(value) ? String(value) : value
+  if (typeof candidate !== 'string') return null
+  return SAFE_VALUE_PATTERN.test(candidate) ? candidate : null
 }
 
 /**

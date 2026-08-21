@@ -49,6 +49,22 @@ describe('describeStorageFailure', () => {
     expect(described).not.toContain('SENTINEL_PRIVATE_BALLOT')
   })
 
+  it('keeps an integer errno but drops a number that is not code-shaped', () => {
+    const integerErrno = Object.assign(new Error('boom'), { code: 'ECONNRESET', errno: -3008 })
+    expect(describeStorageFailure(integerErrno)).toBe('name=Error code=ECONNRESET errno=-3008')
+
+    // String(1e21) is '1e+21'; `+` is outside the allow-listed charset.
+    const exponentialErrno = Object.assign(new Error('boom'), { code: 'ECONNRESET', errno: 1e21 })
+    const described = describeStorageFailure(exponentialErrno)
+    expect(described).toBe('name=Error code=ECONNRESET')
+    expect(described).not.toContain('+')
+  })
+
+  it('drops a non-finite numeric field', () => {
+    const error = Object.assign(new Error('boom'), { errno: Number.NaN })
+    expect(describeStorageFailure(error)).toBe('name=Error')
+  })
+
   it('terminates on a self-referencing cause chain', () => {
     const error = new Error('loop') as Error & { cause?: unknown }
     error.cause = error
