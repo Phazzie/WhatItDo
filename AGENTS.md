@@ -88,7 +88,17 @@ Run these from the repository root after the dependency-upgrade slice lands:
     npm run test:integration
     npm run e2e
     npm run build
-    npm audit --audit-level=high
+    npm audit --omit=dev --audit-level=high
+    npm audit --audit-level=high          # informational; see below
+
+The production audit is the release gate and must stay at zero high and zero critical: it covers
+every dependency that reaches the deployed artifact, and a package moving from `devDependencies`
+to `dependencies` re-enters it automatically. The full-tree audit still runs on every build, but
+does not block, because the remaining high advisories live in build and lint tooling whose only
+offered fixes are a `tailwindcss` v4 major migration and an `eslint-config-next` downgrade to
+14.2.35 that cannot pair with next 16. Blocking releases on those would stall every change without
+reducing user-facing risk. Treat a new entry in the informational audit as work to schedule, not as
+noise, and move it back under the blocking gate as soon as a forward fix exists.
 
 `test:integration` may skip locally when `REDIS_URL` is absent, but CI must run it against Redis 7.
 Browser coverage must include Classic and Dubious happy paths, an unauthorized-results check, the
