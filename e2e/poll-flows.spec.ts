@@ -34,21 +34,21 @@ async function createPoll(
   await page.goto('/')
 
   if (mode === 'normal') {
-    await page.getByRole('button', { name: /Classic/i }).click()
+    await page.getByRole('button', { name: /Regular order/i }).click()
   }
 
-  await page.getByLabel(/Name the dilemma/i).fill(title)
-  const options = page.getByRole('group', { name: /Possible moves/i }).getByRole('textbox')
+  await page.getByLabel(/Short title of the bill/i).fill(title)
+  const options = page.getByRole('group', { name: /Be it enacted/i }).getByRole('textbox')
   for (const [index, suggestion] of suggestions.entries()) {
     await options.nth(index).fill(suggestion)
   }
-  await page.getByRole('button', { name: /Make the poll/i }).click()
+  await page.getByRole('button', { name: /Introduce the bill/i }).click()
 
-  const createdHeading = page.getByRole('heading', { name: /Poll alive/i })
+  const createdHeading = page.getByRole('heading', { name: /The bill is on the floor/i })
   await expect(createdHeading).toBeVisible()
   await expect(createdHeading).toBeFocused()
-  const voteOutput = page.locator('article').filter({ hasText: 'Public voting link' }).locator('output')
-  const resultsOutput = page.locator('article').filter({ hasText: 'Private owner link' }).locator('output')
+  const voteOutput = page.locator('article').filter({ hasText: 'Floor pass' }).locator('output')
+  const resultsOutput = page.locator('article').filter({ hasText: 'The Clerk’s tally' }).locator('output')
   await expect(voteOutput).toContainText('/vote/')
   await expect(resultsOutput).toContainText('/results/')
 
@@ -70,7 +70,7 @@ async function createPoll(
   }
 }
 
-async function choose(page: Page, suggestion: string, vote: 'Yes' | 'Maybe' | 'Nope' | 'YOLO') {
+async function choose(page: Page, suggestion: string, vote: 'Yea' | 'Present' | 'Nay' | 'Hell Yea') {
   await page.getByRole('group', { name: suggestion, exact: true }).getByRole('button', { name: vote, exact: true }).click()
 }
 
@@ -120,28 +120,28 @@ test('Classic: creates separate links, records a ballot, and unlocks owner resul
   const first = 'Try the tiny dumpling spot'
   const second = 'Go stargazing Friday'
   const links = await createPoll(page, { mode: 'normal', title, suggestions: [first, second] })
-  await expect(page.locator('.notice[role="status"]')).toContainText('public ballot and private owner links are ready')
+  await expect(page.locator('.notice[role="status"]')).toContainText('floor pass and the Clerk’s private tally link are ready')
   await assertNoSeriousAxeViolations(page)
 
   await page.goto(links.voteUrl)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
-  await choose(page, first, 'Yes')
-  await choose(page, second, 'Nope')
-  await page.getByLabel(/Your alias/i).fill('Night Owl')
-  await page.getByLabel(`Margin note for ${first} (optional)`).fill('Book the corner table')
-  await expect(page.getByLabel(`Margin note for ${second} (optional)`)).toBeVisible()
-  await page.getByRole('button', { name: /Seal my ballot/i }).click()
+  await choose(page, first, 'Yea')
+  await choose(page, second, 'Nay')
+  await page.getByLabel(/for the record/i).fill('Night Owl')
+  await page.getByLabel(`Remarks on ${first} (optional)`).fill('Book the corner table')
+  await expect(page.getByLabel(`Remarks on ${second} (optional)`)).toBeVisible()
+  await page.getByRole('button', { name: /Cast my vote/i }).click()
 
-  await expect(page.getByRole('heading', { name: /Your vote is in/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Your vote is recorded/i })).toBeVisible()
   await expect(page.getByRole('status')).toContainText(
-    'Email alerts are not configured, but your response is safe.'
+    'Email alerts are not set up in this chamber, but your response is safe.'
   )
   await assertNoSeriousAxeViolations(page)
 
   await page.goto(links.resultsUrl)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
   await expect(page.getByLabel('1 response')).toContainText('01')
-  await expect(page.getByRole('heading', { name: 'Individual ballots' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The Record' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Night Owl' })).toBeVisible()
   await expect(page.getByText('Book the corner table')).toBeVisible()
 })
@@ -165,22 +165,22 @@ test('reduced motion effectively disables transitions and animations', async ({ 
   expect(durations.every((duration) => Number.isFinite(duration) && duration <= 0.01)).toBe(true)
 })
 
-test('Dubious: offers YOLO and surfaces a rogue alternative', async ({ page }) => {
+test('Dubious: offers HELL YEA and records an amendment', async ({ page }) => {
   const title = 'Questionable field trip'
   const suggestion = 'Take a midnight road trip'
   const alternative = 'Charter a tiny boat at dawn'
   const links = await createPoll(page, { mode: 'dubious', title, suggestions: [suggestion] })
 
   await page.goto(links.voteUrl)
-  await expect(page.getByText('DUBIOUS BALLOT')).toBeVisible()
-  await choose(page, suggestion, 'YOLO')
-  await page.getByLabel(/Plot twist/i).fill(alternative)
-  await page.getByRole('button', { name: /Seal my ballot/i }).click()
-  await expect(page.getByRole('heading', { name: /Your vote is in/i })).toBeVisible()
+  await expect(page.getByText('Rules suspended')).toBeVisible()
+  await choose(page, suggestion, 'Hell Yea')
+  await page.getByLabel(/Offer an amendment/i).fill(alternative)
+  await page.getByRole('button', { name: /Cast my vote/i }).click()
+  await expect(page.getByRole('heading', { name: /Your vote is recorded/i })).toBeVisible()
 
   await page.goto(links.resultsUrl)
-  await expect(page.getByText('YOLO leads')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Rogue alternatives' })).toBeVisible()
+  await expect(page.getByText('The HELL YEAS have it')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Amendments' })).toBeVisible()
   await expect(page.getByText(alternative)).toBeVisible()
 })
 
@@ -190,16 +190,16 @@ test('private results reveal no poll data without the exact URL fragment', async
   const results = new URL(links.resultsUrl)
 
   await page.goto(results.origin + results.pathname)
-  await expect(page.getByRole('heading', { name: 'The archive stayed shut.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The tally stayed sealed.' })).toBeVisible()
   await expect(page.locator('.state-card').getByRole('alert')).toContainText('missing its private key')
   await expect(page.getByText(title)).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Individual ballots' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'The Record' })).toHaveCount(0)
   await assertNoSeriousAxeViolations(page)
 
   await page.goto(`${results.origin}${results.pathname}#${'A'.repeat(24)}`)
-  await expect(page.getByRole('heading', { name: 'Key not accepted.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The Clerk does not recognize this key.' })).toBeVisible()
   await expect(page.getByText(title)).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Individual ballots' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'The Record' })).toHaveCount(0)
   await assertNoSeriousAxeViolations(page)
 })
 
@@ -218,7 +218,7 @@ test('created links remain available when browser storage rejects writes', async
 
   await expect(page.getByText(links.voteUrl, { exact: true })).toBeVisible()
   await expect(page.getByText(links.resultsUrl, { exact: true })).toBeVisible()
-  await expect(appAlert(page)).toContainText('could not save the public voting link in this browser')
+  await expect(appAlert(page)).toContainText('would not let us remember the floor pass')
 })
 
 test('browser history stores only public poll metadata and purges legacy owner tokens', async ({ page }) => {
@@ -274,8 +274,8 @@ test('browser history stores only public poll metadata and purges legacy owner t
   await page.reload()
   await expect(page.getByText(links.resultsUrl, { exact: true })).toHaveCount(0)
   await expect(page.locator('a[href*="/results/"]')).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Recent polls' })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Public history only.*open ballot/i })).toHaveAttribute('href', links.voteUrl)
+  await expect(page.getByRole('heading', { name: 'Your bills on the calendar' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Public history only.*open the floor/i })).toHaveAttribute('href', links.voteUrl)
 })
 
 test('a stale results request cannot reveal data after the private fragment changes', async ({ page }) => {
@@ -301,10 +301,10 @@ test('a stale results request cannot reveal data after the private fragment chan
   await firstRequest
   await page.evaluate(() => { window.location.hash = `#${'A'.repeat(24)}` })
 
-  await expect(page.getByRole('heading', { name: 'Key not accepted.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The Clerk does not recognize this key.' })).toBeVisible()
   await page.waitForTimeout(450)
   await expect(page.getByText(title)).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Individual ballots' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'The Record' })).toHaveCount(0)
 })
 
 test('ballot offers a retry after a transient load failure', async ({ page }) => {
@@ -322,9 +322,9 @@ test('ballot offers a retry after a transient load failure', async ({ page }) =>
   })
 
   await page.goto(links.voteUrl)
-  await expect(page.getByRole('heading', { name: 'The ballot booth is offline.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'We lost the feed from the chamber.' })).toBeVisible()
   await assertNoSeriousAxeViolations(page)
-  await page.getByRole('button', { name: 'Try the ballot again' }).click()
+  await page.getByRole('button', { name: 'Reconnect to the chamber' }).click()
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
 })
 
@@ -352,15 +352,15 @@ test('results show freshness and recover from a transient refresh failure', asyn
 
 test('keyboard form submission exposes create and vote validation errors', async ({ page }) => {
   await page.goto('/')
-  await page.getByLabel(/Name the dilemma/i).focus()
+  await page.getByLabel(/Short title of the bill/i).focus()
   await page.keyboard.press('Enter')
-  await expect(appAlert(page)).toContainText('at least one possibility')
+  await expect(appAlert(page)).toContainText('at least one section')
 
   const links = await createPoll(page, { mode: 'normal', title: 'Keyboard validation', suggestions: ['Pick me'] })
   await page.goto(links.voteUrl)
-  await page.getByRole('button', { name: /Choose 1 more/i }).focus()
+  await page.getByRole('button', { name: /Answer 1 more/i }).focus()
   await page.keyboard.press('Enter')
-  await expect(appAlert(page)).toContainText('Choose one response for every possibility')
+  await expect(appAlert(page)).toContainText('Every section needs a yea, nay, or present')
 })
 
 test('poll creation surfaces the API error message', async ({ page }) => {
@@ -373,9 +373,9 @@ test('poll creation surfaces the API error message', async ({ page }) => {
   })
 
   await page.goto('/')
-  await page.getByLabel(/Name the dilemma/i).fill('Rejected poll')
-  await page.getByRole('group', { name: /Possible moves/i }).getByRole('textbox').first().fill('Try again')
-  await page.getByRole('button', { name: /Make the poll/i }).click()
+  await page.getByLabel(/Short title of the bill/i).fill('Rejected poll')
+  await page.getByRole('group', { name: /Be it enacted/i }).getByRole('textbox').first().fill('Try again')
+  await page.getByRole('button', { name: /Introduce the bill/i }).click()
 
   await expect(appAlert(page)).toContainText('The server rejected this test poll.')
 })
@@ -396,15 +396,15 @@ test('vote submission surfaces the API error message', async ({ page }) => {
   })
 
   await page.goto(links.voteUrl)
-  await choose(page, suggestion, 'Yes')
-  await page.getByRole('button', { name: /Seal my ballot/i }).click()
+  await choose(page, suggestion, 'Yea')
+  await page.getByRole('button', { name: /Cast my vote/i }).click()
 
   await expect(appAlert(page)).toContainText('The server rejected this test ballot.')
 })
 
 for (const terminal of [
-  { code: 'POLL_FULL', status: 409, heading: 'This poll is full.' },
-  { code: 'POLL_UNAVAILABLE', status: 404, heading: 'This poll is no longer available.' },
+  { code: 'POLL_FULL', status: 409, heading: 'The chamber is full.' },
+  { code: 'POLL_UNAVAILABLE', status: 404, heading: 'This bill died in committee.' },
 ] as const) {
   test(`ballot closes when vote submission returns ${terminal.code}`, async ({ page }) => {
     const suggestion = `Terminal ${terminal.code}`
@@ -422,11 +422,11 @@ for (const terminal of [
     })
 
     await page.goto(links.voteUrl)
-    await choose(page, suggestion, 'Yes')
-    await page.getByRole('button', { name: /Seal my ballot/i }).click()
+    await choose(page, suggestion, 'Yea')
+    await page.getByRole('button', { name: /Cast my vote/i }).click()
 
     await expect(page.getByRole('heading', { name: terminal.heading })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Seal my ballot/i })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Cast my vote/i })).toHaveCount(0)
   })
 }
 
@@ -445,11 +445,11 @@ test('forced-colors focus stays visible on links, buttons, inputs, and textareas
 
   const controls = [
     page.getByRole('link', { name: /What It Do/i }),
-    page.getByLabel(/Your alias/i),
+    page.getByLabel(/for the record/i),
     page.getByRole('group', { name: suggestion, exact: true })
-      .getByRole('button', { name: 'Yes', exact: true }),
-    page.getByLabel(/Margin note/i),
-    page.getByLabel(/Plot twist/i),
+      .getByRole('button', { name: 'Yea', exact: true }),
+    page.getByLabel(/Remarks/i),
+    page.getByLabel(/Offer an amendment/i),
   ]
   for (const control of controls) await tabToVisibleFocusRing(page, control)
 })
@@ -469,8 +469,8 @@ for (const [notification, copy] of [
       })
     })
     await page.goto(links.voteUrl)
-    await choose(page, suggestion, 'Yes')
-    await page.getByRole('button', { name: /Seal my ballot/i }).click()
+    await choose(page, suggestion, 'Yea')
+    await page.getByRole('button', { name: /Cast my vote/i }).click()
     await expect(page.getByRole('status')).toContainText(copy)
   })
 }
@@ -497,17 +497,17 @@ test('an ambiguous vote retry reuses the exact payload and receipt', async ({ pa
   })
 
   await page.goto(links.voteUrl)
-  await choose(page, suggestion, 'Yes')
-  await page.getByLabel(/Your alias/i).fill('Original Voter')
-  await page.getByRole('button', { name: /Seal my ballot/i }).click()
+  await choose(page, suggestion, 'Yea')
+  await page.getByLabel(/for the record/i).fill('Original Voter')
+  await page.getByRole('button', { name: /Cast my vote/i }).click()
   await expect(appAlert(page)).toBeVisible()
 
-  await choose(page, suggestion, 'Nope')
-  await page.getByLabel(/Your alias/i).fill('Edited Voter')
-  await page.getByRole('button', { name: /Seal my ballot/i }).click()
+  await choose(page, suggestion, 'Nay')
+  await page.getByLabel(/for the record/i).fill('Edited Voter')
+  await page.getByRole('button', { name: /Cast my vote/i }).click()
 
-  await expect(page.getByRole('heading', { name: /Your vote is in/i })).toBeVisible()
-  await expect(page.locator('.receipt')).toContainText(`YES — ${suggestion}`)
+  await expect(page.getByRole('heading', { name: /Your vote is recorded/i })).toBeVisible()
+  await expect(page.locator('.receipt')).toContainText(`YEA — ${suggestion}`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]).toEqual(attempts[0])
 })
@@ -541,7 +541,7 @@ test('retrying one stable submission records exactly one response', async ({ pag
 test('home, ballot, and owner results are accessible and fit a 375px viewport', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Stop circling/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /now in session/i })).toBeVisible()
   await assertNoHorizontalOverflow(page)
   await assertNoSeriousAxeViolations(page)
 
@@ -553,12 +553,12 @@ test('home, ballot, and owner results are accessible and fit a 375px viewport', 
   await assertNoHorizontalOverflow(page)
   await assertNoSeriousAxeViolations(page)
 
-  await choose(page, suggestion, 'Yes')
-  await page.getByLabel(/Your alias/i).fill('N'.repeat(50))
-  await page.getByLabel(/Margin note/i).fill('C'.repeat(200))
-  await page.getByLabel(/Plot twist/i).fill('P'.repeat(500))
-  await page.getByRole('button', { name: /Seal my ballot/i }).click()
-  await expect(page.getByRole('heading', { name: /Your vote is in/i })).toBeVisible()
+  await choose(page, suggestion, 'Yea')
+  await page.getByLabel(/for the record/i).fill('N'.repeat(50))
+  await page.getByLabel(/Remarks/i).fill('C'.repeat(200))
+  await page.getByLabel(/Offer an amendment/i).fill('P'.repeat(500))
+  await page.getByRole('button', { name: /Cast my vote/i }).click()
+  await expect(page.getByRole('heading', { name: /Your vote is recorded/i })).toBeVisible()
   await assertNoHorizontalOverflow(page)
 
   await page.goto(links.resultsUrl)

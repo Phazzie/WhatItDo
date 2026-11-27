@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import type { NotificationStatus, PublicPoll, VoteOption } from '@/lib/types'
 import { COMMENT_MAX, COUNTER_PROPOSAL_MAX, VOTER_NAME_MAX } from '@/lib/validation'
+import { VOTE_LABEL } from '@/lib/results'
+import { billNumber, ChamberHeader, Chyron } from '../../chamber'
 
 interface SuggestionVote {
   text: string
@@ -20,21 +22,26 @@ interface SubmissionPayload {
   counterProposal?: string
 }
 
-const VOTES: { value: VoteOption; label: string; symbol: string }[] = [
-  { value: 'yes', label: 'Yes', symbol: '✓' },
-  { value: 'maybe', label: 'Maybe', symbol: '~' },
-  { value: 'no', label: 'Nope', symbol: '×' },
-  { value: 'yolo', label: 'YOLO', symbol: '⚡' },
+const VOTES: { value: VoteOption; label: string }[] = [
+  { value: 'yes', label: 'Yea' },
+  { value: 'maybe', label: 'Present' },
+  { value: 'no', label: 'Nay' },
+  { value: 'yolo', label: 'Hell Yea' },
 ]
 
-const MYSTERY_NAMES = ['A Midnight Caller', 'The Plot Twist', 'An Enigmatic Pal', 'Someone With Taste']
+const MYSTERY_NAMES = [
+  'The Gentleperson from the Group Chat',
+  'The Honorable Lurker',
+  'A Member Who Left It on Read',
+  'The Representative from Read Receipts',
+]
 
 function statusCopy(status: NotificationStatus) {
   switch (status) {
-    case 'sent': return 'Vote sealed. The email alert was accepted for delivery.'
-    case 'not_configured': return 'Vote sealed. Email alerts are not configured, but your response is safe.'
-    case 'failed': return 'Vote sealed. The email alert fizzled, but your response is safe.'
-    case 'duplicate': return 'This exact vote was already sealed. Nothing was duplicated.'
+    case 'sent': return 'So recorded. The email alert was accepted for delivery to the sponsor.'
+    case 'not_configured': return 'So recorded. Email alerts are not set up in this chamber, but your response is safe.'
+    case 'failed': return 'So recorded. The email alert fizzled, but your response is safe.'
+    case 'duplicate': return 'The Clerk already has this exact vote. Nothing was counted twice.'
   }
 }
 
@@ -98,12 +105,12 @@ export default function VotePage() {
     let payload = pendingSubmission.current
     if (!payload) {
       if (!suggestions.length || suggestions.some((item) => !item.vote)) {
-        setSubmitError('Choose one response for every possibility.')
+        setSubmitError('Every section needs a yea, nay, or present. The Clerk insists.')
         return
       }
       const resolvedName = voterName.trim() || (poll?.mode === 'dubious'
         ? MYSTERY_NAMES[Math.floor(Math.random() * MYSTERY_NAMES.length)]
-        : 'Anonymous')
+        : 'An Unnamed Member')
       payload = {
         pollId: id,
         submissionId: crypto.randomUUID(),
@@ -147,35 +154,39 @@ export default function VotePage() {
         // accepted, so the voter may correct it and create a fresh receipt.
         if (response.status < 500) pendingSubmission.current = null
         const fallback = response.status === 429
-          ? 'Too many votes arrived at once. Wait a moment, then retry—your choices are still here.'
-          : response.status === 410 ? 'This older poll has been retired.' : 'Your vote did not land. Try again.'
+          ? 'The Chair does not recognize you right now. Too many votes at once. Wait a moment, then retry. Your choices are still here.'
+          : response.status === 410 ? 'This older bill was expunged from the record.' : 'The Clerk did not catch that. Cast your vote again.'
         throw new Error(body.error || fallback)
       }
       setReceipt(payload)
       setNotification(body.notification || 'failed')
     } catch (caught) {
-      setSubmitError(caught instanceof Error ? caught.message : 'Your vote did not land. Try again.')
+      setSubmitError(caught instanceof Error ? caught.message : 'The Clerk did not catch that. Cast your vote again.')
     } finally {
       setSubmitting(false)
     }
   }
 
   if (loading) {
-    return <main className="site-shell center-stage"><div className="loading-card" role="status"><span className="spinner" aria-hidden="true" />Opening the ballot…</div></main>
+    return <main className="site-shell center-stage"><div className="loading-card" role="status"><span className="spinner" aria-hidden="true" />The Clerk will call the roll&hellip;</div></main>
   }
 
   if (loadState || !poll) {
-    const retired = loadState === 'retired'
-    const full = loadState === 'full'
-    const unavailable = loadState === 'unavailable'
+    const copy = {
+      retired: ['EXPUNGED', 'This bill was expunged from the record.', 'Older bills were retired to protect the members\u2019 votes. Ask the sponsor to introduce a fresh one.'],
+      full: ['CHAMBER FULL', 'The chamber is full.', 'This bill reached 250 votes, the most one chamber can seat. The roll is closed.'],
+      unavailable: ['ADJOURNED', 'This bill died in committee.', 'It expired or was withdrawn before your vote could be recorded.'],
+      error: ['FEED LOST', 'We lost the feed from the chamber.', 'The ballot could not load. Give it a moment and reconnect.'],
+      'not-found': ['NOT ON THE CALENDAR', 'No such bill on the calendar.', 'The floor pass may be mistyped, expired, or from a parallel session.'],
+    }[loadState || 'not-found']
     return (
       <main className="site-shell center-stage">
-        <section className="paper-card state-card tape-top">
-          <p className="card-label hot">{retired ? 'ARCHIVED' : full || unavailable ? 'CLOSED' : loadState === 'error' ? 'SIGNAL LOST' : 'NOT FOUND'}</p>
-          <h1>{retired ? 'This old poll has left the building.' : full ? 'This poll is full.' : unavailable ? 'This poll is no longer available.' : loadState === 'error' ? 'The ballot booth is offline.' : 'Nothing doing here.'}</h1>
-          <p>{retired ? 'Legacy polls were retired to protect private responses. Ask the creator to make a fresh one.' : full ? 'It reached the 250-response limit, so the ballot booth is closed.' : unavailable ? 'It expired or was removed before this ballot could land.' : loadState === 'error' ? 'Try reloading in a moment.' : 'The link may be mistyped, expired, or already gone.'}</p>
-          {loadState === 'error' && <button className="primary-button cyan" type="button" onClick={retryLoad}>Try the ballot again</button>}
-          <Link className="primary-button pink" href="/">Make a fresh poll</Link>
+        <section className="paper-card state-card">
+          <p className="card-label hot">{copy[0]}</p>
+          <h1>{copy[1]}</h1>
+          <p>{copy[2]}</p>
+          {loadState === 'error' && <button className="primary-button" type="button" onClick={retryLoad}>Reconnect to the chamber</button>}
+          <Link className="primary-button red" href="/">Introduce your own bill</Link>
         </section>
       </main>
     )
@@ -184,47 +195,48 @@ export default function VotePage() {
   if (notification) {
     return (
       <main className="site-shell center-stage">
-        <section className="paper-card state-card success-card tape-top">
-          <div className="giant-stamp" aria-hidden="true">COUNTED</div>
-          <p className="eyebrow">Democracy, approximately</p>
-          <h1>Your vote is in.</h1>
+        <section className="paper-card state-card success-card">
+          <div className="giant-stamp" aria-hidden="true">RECORDED</div>
+          <p className="eyebrow">{billNumber(id)} · Without objection</p>
+          <h1>Your vote is recorded.</h1>
           <p className="status-message" role="status">{statusCopy(notification)}</p>
           <div className="receipt">
+            <p className="receipt-head">Roll call slip</p>
             <p>{poll.title}</p>
-            {(receipt?.votes ?? []).map((item, index) => <span key={item.text}><b>{String(index + 1).padStart(2, '0')}</b> {item.vote.toUpperCase()} — {item.text}</span>)}
+            {(receipt?.votes ?? []).map((item, index) => <span key={item.text}><b>SEC. {index + 1}</b> {VOTE_LABEL[item.vote]} — {item.text}</span>)}
           </div>
-          <Link className="primary-button cyan" href="/">Start your own dilemma ↗</Link>
+          <p className="fine-print">Only the bill&rsquo;s sponsor can see the board. You&rsquo;ll have to ask them how it went.</p>
+          <Link className="primary-button" href="/">Introduce your own bill &rarr;</Link>
         </section>
       </main>
     )
   }
 
   const dubious = poll.mode === 'dubious'
-  const complete = suggestions.length > 0 && suggestions.every((item) => item.vote)
+  const remaining = suggestions.filter((item) => !item.vote).length
+  const complete = suggestions.length > 0 && remaining === 0
 
   return (
     <main className="site-shell ballot-shell">
-      <header className="compact-header">
-        <Link href="/" className="mini-brand">WHAT IT <i>DO?</i></Link>
-        <span>{dubious ? 'DUBIOUS BALLOT' : 'CLASSIC BALLOT'}</span>
-      </header>
+      <Chyron live="LIVE" headline={`ROLL CALL VOTE · ${billNumber(id)} · ${poll.title}`} />
+      <ChamberHeader right={<span className="session-tag">{dubious ? <>Roll call<br />Rules suspended</> : <>Roll call<br />Regular order</>}</span>} />
       <section className="ballot-intro">
-        <p className="eyebrow">An important-ish decision awaits</p>
+        <p className="eyebrow">{billNumber(id)} · The Clerk will call the roll</p>
         <h1>{poll.title}</h1>
-        <p>{dubious ? 'Answer honestly. Or dramatically. Ideally both.' : 'Mark every possibility, then seal your ballot.'}</p>
+        <p>{dubious ? 'The rules are suspended. HELL YEA is in order. Every section still needs an answer.' : 'Every section needs an answer. That is the whole point.'}</p>
       </section>
 
       <form className="ballot-form" onSubmit={submit}>
-        <section className="paper-card identity-card tape-top">
-          <label className="field-label" htmlFor="voter-name">Your alias <span>optional</span></label>
-          <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Leave blank for a mysterious alias' : 'Anonymous is allowed'} />
-          <p className="fine-print">Your name and notes are visible to anyone holding the private results link.</p>
+        <section className="paper-card identity-card">
+          <label className="field-label" htmlFor="voter-name">Your name, for the record <span>optional</span></label>
+          <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Leave blank to be entered as a mystery member' : 'Leave blank to be An Unnamed Member'} />
+          <p className="fine-print">Your name and remarks go into the record. Only the bill&rsquo;s sponsor can read it.</p>
         </section>
 
         <ol className="ballot-list">
           {suggestions.map((item, index) => (
             <li className="paper-card ballot-card" key={item.text}>
-              <div className="ballot-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
+              <div className="ballot-number" aria-hidden="true">SEC. {index + 1}</div>
               <fieldset>
                 <legend>{item.text}</legend>
                 <div className={`vote-grid ${dubious ? 'four' : ''}`}>
@@ -236,31 +248,31 @@ export default function VotePage() {
                       className={`vote-choice ${choice.value} ${item.vote === choice.value ? 'selected' : ''}`}
                       onClick={() => choose(index, choice.value)}
                     >
-                      <span aria-hidden="true">{choice.symbol}</span>{choice.label}
+                      <span className="lamp" aria-hidden="true" />{choice.label}
                     </button>
                   ))}
                 </div>
               </fieldset>
               <label className="note-input" htmlFor={`comment-${index}`}>
-                <span>Margin note <small>optional</small></span>
-                <input aria-label={`Margin note for ${item.text} (optional)`} id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="Context, conditions, strong feelings…" />
+                <span>Remarks for the record <small>optional</small></span>
+                <input aria-label={`Remarks on ${item.text} (optional)`} id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="I yield my time to say: only if we leave by nine." />
               </label>
             </li>
           ))}
         </ol>
 
         <section className="paper-card counter-card">
-          <label className="field-label" htmlFor="counter-proposal">Plot twist <span>optional</span></label>
-          <p>None of these? Pitch one rogue alternative.</p>
-          <textarea id="counter-proposal" value={counterProposal} maxLength={COUNTER_PROPOSAL_MAX} onChange={(event) => setCounterProposal(event.target.value)} rows={3} placeholder="Hear me out…" />
+          <label className="field-label" htmlFor="counter-proposal">Offer an amendment <span>optional</span></label>
+          <p>Hate every section? Propose your own plan from the floor.</p>
+          <textarea id="counter-proposal" value={counterProposal} maxLength={COUNTER_PROPOSAL_MAX} onChange={(event) => setCounterProposal(event.target.value)} rows={3} placeholder="Strike all sections and insert the following:" />
         </section>
 
         {submitError && <p className="notice notice-error" role="alert" aria-live="assertive">{submitError}</p>}
         <button className="primary-button jumbo seal-button" type="submit" disabled={submitting}>
-          {submitting ? 'Sealing…' : complete ? 'Seal my ballot ↗' : `Choose ${suggestions.filter((item) => !item.vote).length} more`}
+          {submitting ? 'The Clerk is recording…' : complete ? 'Cast my vote →' : `Answer ${remaining} more ${remaining === 1 ? 'section' : 'sections'}`}
         </button>
       </form>
-      <footer className="site-footer"><span>PRIVATE BY DESIGN</span><span>The private results link reveals details.</span></footer>
+      <footer className="site-footer"><span>CHAT-SPAN · Gavel to gavel</span><span>Only the sponsor sees the tally.</span></footer>
     </main>
   )
 }
