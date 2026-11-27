@@ -264,7 +264,7 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
 .member-wall { margin-top: 26px; }
 .member-wall table { width: 100%; border-collapse: collapse; font: 400 21px var(--led); }
 .member-wall th, .member-wall td { padding: 7px 8px; border-bottom: 1px solid #1f1f1f; text-align: center; }
-.member-wall thead th { color: #9aa0a6; font-weight: 400; text-transform: uppercase; border-bottom-color: #3a3a3a; }
+.member-wall thead th { white-space: nowrap; color: #9aa0a6; font-weight: 400; text-transform: uppercase; border-bottom-color: #3a3a3a; }
 .member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 8em; text-align: left; color: #fff; font-weight: 400; text-transform: uppercase; overflow-wrap: break-word; }
 .wall-lamp { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .wall-lamp::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
@@ -331,16 +331,17 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
   .tally-title { grid-template-columns: 1fr; gap: 0; }
   .verdict, .bars { margin-left: 0; }
   .bar-row { grid-template-columns: 74px 1fr 66px; gap: 8px; font-size: 18px; }
-  .member-wall { overflow-x: auto; }
   .member-wall table { font-size: 18px; }
-  .wall-lamp { gap: 5px; }
+  .member-wall th, .member-wall td { padding: 7px 4px; }
+  .member-wall th[scope="row"] { overflow-wrap: anywhere; }
+  .wall-lamp { flex-direction: column; gap: 3px; white-space: normal; line-height: 1; }
   .button-row > * { flex: 1 1 100%; }
   .site-footer { flex-direction: column; align-items: start; gap: 8px; }
   .giant-stamp { top: 10px; right: -16px; font-size: 22px; border-width: 4px; }
   .success-card .eyebrow { padding-right: 0; margin-top: 50px; }
   .chamber-wordmark { font-size: 24px; }
   .private-badge { font-size: 9px; padding: 5px 7px; }
-  .member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 6.5em; }
+  .member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 5em; }
   .mode-switch button { font-size: 13px; letter-spacing: .06em; padding: 0 6px; }
 }
 

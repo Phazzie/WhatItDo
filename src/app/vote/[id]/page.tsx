@@ -81,7 +81,7 @@ export default function VotePage() {
         if (active) setLoading(false)
       }
     }
-    load()
+    void load()
     return () => { active = false }
   }, [id, loadAttempt])
 

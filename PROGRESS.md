@@ -14,7 +14,7 @@ suspended), and only the sponsor holds the Clerk's key to the electronic vote bo
 **Preview link (private, needs your Vercel login):**
 https://what-it-do-git-claude-project-thread-iqv2ap-phazzies-projects.vercel.app/
 
-**Pull request (not merged, main untouched):** https://github.com/Phazzie/WhatItDo/pull/13
+**Pull request:** https://github.com/Phazzie/WhatItDo/pull/13
 
 **Honest score:** 8/10. The vote board and the Record are the best things on the site. The home page
 is strong but quieter than the results; it could use one more bold move.
@@ -23,7 +23,6 @@ is strong but quieter than the results; it could use one more bold move.
 - Preview can't create polls until its database is replaced (see Blockers).
 - The bill number (H.R. 4424) is decoration from the poll id, not a real count.
 - Email alerts still say `yes / maybe / no / yolo`, not the chamber words.
-- On phones, the member wall scrolls sideways on three-section bills with long names.
 - A missing ballot logs a browser "404" line in the console. That is the real HTTP status, not a crash.
 
 **Choices I made on my own that you should check**
@@ -69,7 +68,7 @@ Local production build (`npm run build && npm start`, test store), laptop 1366px
 - States: missing key, wrong key, unknown bill, bad URL (404), feed lost + reconnect, chamber full,
   died in committee, server failure (the last four via mocked responses in the browser tests).
   No console errors during the click-through.
-- Automated: lint, typecheck, 169 unit tests, 23 Playwright flows with axe accessibility scans,
+- Automated: lint, typecheck, 169 unit tests, 24 Playwright flows with axe accessibility scans,
   reduced motion, forced colors, and the 375px no-overflow check. All pass.
 Preview (desktop Claude browser): home page loads the new version; creating a poll fails only because
 of the dead preview database.

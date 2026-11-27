@@ -7,6 +7,14 @@ import { availableVotes as getAvailableVotes, countVotes, summarizeVotes, VOTE_L
 import type { PollResults } from '@/lib/types'
 import { billNumber, ChamberHeader, Chyron } from '../../chamber'
 
+function boardErrorMessage(status: number, serverError?: string): string {
+  if (status === 410) return 'This older bill was expunged to protect its members\u2019 votes.'
+  if (status === 404) return 'That bill or that key is not on file with the Clerk.'
+  if (status === 429) return 'The Chair does not recognize you right now. Too many refreshes. Give it a minute.'
+  if (status >= 500) return 'The Clerk\u2019s office is not answering. The board will try again.'
+  return serverError || 'The board did not come through. Try again.'
+}
+
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>()
   const [token, setToken] = useState('')
@@ -72,12 +80,7 @@ export default function ResultsPage() {
       if (controller.signal.aborted || tokenGeneration.current !== generation || activeRequest.current?.controller !== controller) return
       if (!response.ok || !body.poll) {
         setStatus(response.status)
-        const message = response.status === 410
-          ? 'This older bill was expunged to protect its members\u2019 votes.'
-          : response.status === 404 ? 'That bill or that key is not on file with the Clerk.'
-          : response.status === 429 ? 'The Chair does not recognize you right now. Too many refreshes. Give it a minute.'
-          : response.status >= 500 ? 'The Clerk\u2019s office is not answering. The board will try again.'
-          : body.error || 'The board did not come through. Try again.'
+        const message = boardErrorMessage(response.status, body.error)
         throw new Error(message)
       }
       setPoll(body.poll)
@@ -215,7 +218,7 @@ export default function ResultsPage() {
         </div>
 
         {poll.responses.length > 0 && (
-          <div className="member-wall" tabIndex={0} role="region" aria-label="Members, as recorded">
+          <section className="member-wall" aria-label="Members, as recorded">
             <p className="board-label">Members, as recorded</p>
             <table>
               <caption className="sr-only">How each member voted on each section</caption>
@@ -236,7 +239,7 @@ export default function ResultsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         )}
         <p className="fine-print">Percentages are per section. Equal totals are shown as ties. The board never invents a winner.</p>
       </section>
@@ -274,7 +277,7 @@ export default function ResultsPage() {
                     <li key={`${vote.text}-${voteIndex}`}>
                       <span className={`vote-stamp ${vote.vote}`}>{VOTE_LABEL[vote.vote]}</span>
                       <div>
-                        <p>on Sec. {voteIndex + 1}, {vote.text}.</p>
+                        <p>on Sec. {voteIndex + 1}, {vote.text}{/[.!?]$/.test(vote.text) ? '' : '.'}</p>
                         {vote.comment && <blockquote><i>And asked that the following be entered into the Record:</i> &ldquo;{vote.comment}&rdquo;</blockquote>}
                       </div>
                     </li>

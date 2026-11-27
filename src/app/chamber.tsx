@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 export function billNumber(pollId: string): string {
   let hash = 2166136261
   for (const character of pollId) {
-    hash ^= character.charCodeAt(0)
+    hash ^= (character.codePointAt(0) ?? 0)
     hash = Math.imul(hash, 16777619)
   }
   return `H.R. ${((hash >>> 0) % 8900) + 100}`
@@ -28,7 +28,7 @@ export function useCalendarDate(): string {
   return date
 }
 
-export function Seal({ size = 64 }: { size?: number }) {
+export function Seal({ size = 64 }: Readonly<{ size?: number }>) {
   return (
     <svg className="seal" width={size} height={size} viewBox="0 0 120 120" aria-hidden="true" focusable="false">
       <defs>
@@ -58,7 +58,7 @@ const CRAWL = [
   'BILLS DIE IN COMMITTEE AFTER 30 QUIET DAYS',
 ]
 
-export function Chyron({ live, headline }: { live: string; headline: string }) {
+export function Chyron({ live, headline }: Readonly<{ live: string; headline: string }>) {
   return (
     <div className="chyron">
       <div className="chyron-top">
@@ -68,14 +68,14 @@ export function Chyron({ live, headline }: { live: string; headline: string }) {
       </div>
       <div className="chyron-crawl" aria-hidden="true">
         <div className="chyron-track">
-          {[...CRAWL, ...CRAWL].map((line, index) => <span key={index}>{line}</span>)}
+          {[...CRAWL, ...CRAWL].map((line, index) => <span key={`${index < CRAWL.length ? 'a' : 'b'}-${line}`}>{line}</span>)}
         </div>
       </div>
     </div>
   )
 }
 
-export function ChamberHeader({ right }: { right?: React.ReactNode }) {
+export function ChamberHeader({ right }: Readonly<{ right?: React.ReactNode }>) {
   return (
     <header className="chamber-header">
       <Link href="/" className="chamber-brand" aria-label="What It Do home">
