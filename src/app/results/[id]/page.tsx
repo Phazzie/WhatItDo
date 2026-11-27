@@ -214,7 +214,7 @@ export default function ResultsPage() {
         </div>
 
         {poll.responses.length > 0 && (
-          <div className="member-wall">
+          <div className="member-wall" tabIndex={0} role="region" aria-label="Members, as recorded">
             <p className="board-label">Members, as recorded</p>
             <table>
               <caption className="sr-only">How each member voted on each section</caption>

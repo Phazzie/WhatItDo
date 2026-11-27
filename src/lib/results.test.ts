@@ -42,4 +42,11 @@ describe('result summaries', () => {
     expect(summary.choices).toEqual(['yes', 'maybe', 'no'])
     expect(summary.percentages.yes).toBe(50)
   })
+
+  it('names a single plurality leader in parliamentary terms without inventing majorities on ties', () => {
+    expect(summarizeVotes({ yes: 2, maybe: 1, no: 0, yolo: 0 }, false).verdict).toBe('The yeas have it')
+    expect(summarizeVotes({ yes: 0, maybe: 0, no: 3, yolo: 0 }, false).verdict).toBe('The nays have it')
+    expect(summarizeVotes({ yes: 1, maybe: 0, no: 0, yolo: 2 }, true).verdict).toBe('The HELL YEAS have it')
+    expect(summarizeVotes({ yes: 0, maybe: 0, no: 0, yolo: 0 }, true).verdict).toBe('Awaiting the roll')
+  })
 })

@@ -229,7 +229,7 @@ export default function VotePage() {
       <form className="ballot-form" onSubmit={submit}>
         <section className="paper-card identity-card">
           <label className="field-label" htmlFor="voter-name">Your name, for the record <span>optional</span></label>
-          <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Leave blank to be entered as a mystery member' : 'Leave blank to be An Unnamed Member'} />
+          <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Blank = a mystery member' : 'Blank = An Unnamed Member'} />
           <p className="fine-print">Your name and remarks go into the record. Only the bill&rsquo;s sponsor can read it.</p>
         </section>
 
@@ -255,7 +255,7 @@ export default function VotePage() {
               </fieldset>
               <label className="note-input" htmlFor={`comment-${index}`}>
                 <span>Remarks for the record <small>optional</small></span>
-                <input aria-label={`Remarks on ${item.text} (optional)`} id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="I yield my time to say: only if we leave by nine." />
+                <input aria-label={`Remarks on ${item.text} (optional)`} id={`comment-${index}`} value={item.comment} maxLength={COMMENT_MAX} onChange={(event) => comment(index, event.target.value)} placeholder="Only if we leave by nine." />
               </label>
             </li>
           ))}
@@ -268,7 +268,7 @@ export default function VotePage() {
         </section>
 
         {submitError && <p className="notice notice-error" role="alert" aria-live="assertive">{submitError}</p>}
-        <button className="primary-button jumbo seal-button" type="submit" disabled={submitting}>
+        <button className={`primary-button jumbo seal-button ${complete ? 'ready' : ''}`} type="submit" disabled={submitting}>
           {submitting ? 'The Clerk is recording…' : complete ? 'Cast my vote →' : `Answer ${remaining} more ${remaining === 1 ? 'section' : 'sections'}`}
         </button>
       </form>

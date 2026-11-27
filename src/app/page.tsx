@@ -251,9 +251,9 @@ export default function Home() {
             <h1 id="home-title">The group chat is <span>now in session.</span></h1>
             <p className="lede">Somebody always says &ldquo;idk, whatever y&rsquo;all want.&rdquo; Not anymore. Introduce the plan as a bill, and every member has to go on the record: yea, nay, or present.</p>
             <ol className="procedure">
-              <li><b>Introduce</b> the bill. Up to three sections.</li>
-              <li><b>Text the floor pass</b> to the chat. No accounts.</li>
-              <li><b>Watch the board</b> light up. Only you hold the key.</li>
+              <li><span><b>Introduce</b> the bill. Up to three sections.</span></li>
+              <li><span><b>Text the floor pass</b> to the chat. No accounts.</span></li>
+              <li><span><b>Watch the board</b> light up. Only you hold the key.</span></li>
             </ol>
           </div>
 

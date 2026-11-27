@@ -48,7 +48,6 @@ body {
     radial-gradient(ellipse at 50% -10%, rgba(217,176,79,.18), transparent 55%),
     repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 2px, transparent 2px 46px),
     linear-gradient(180deg, var(--navy-2), var(--navy) 45%, #070f21);
-  background-attachment: fixed;
 }
 
 button, input, textarea { font: inherit; }
@@ -65,7 +64,7 @@ a { color: inherit; }
 /* ---------- Chyron ---------- */
 .chyron { margin: 0 calc(50% - 50vw) 0; border-bottom: 3px solid var(--gold); font-family: var(--cond); text-transform: uppercase; }
 .chyron-top { display: flex; align-items: stretch; min-height: 40px; background: linear-gradient(180deg, #f8f6ef, #d9d5c8); color: var(--navy); }
-.chyron-live { display: grid; place-items: center; padding: 0 14px; background: var(--red); color: #fff; font-weight: 700; letter-spacing: .12em; font-size: 15px; }
+.chyron-live { display: flex; align-items: center; padding: 0 14px; background: var(--red); color: #fff; font-weight: 700; letter-spacing: .12em; font-size: 15px; }
 .chyron-live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #fff; animation: blink 1.2s steps(2, start) infinite; vertical-align: 1px; }
 .chyron-headline { flex: 1; display: flex; align-items: center; min-width: 0; padding: 0 14px; overflow: hidden; font-weight: 700; font-size: clamp(14px, 1.6vw, 18px); letter-spacing: .02em; white-space: nowrap; text-overflow: ellipsis; }
 .chyron-net { display: grid; place-items: center; padding: 0 14px; background: var(--navy); color: var(--gold); font-weight: 700; letter-spacing: .1em; font-size: 14px; }
@@ -93,12 +92,14 @@ a { color: inherit; }
 .hero-copy { position: relative; padding-top: 18px; }
 .eyebrow, .card-label, .board-label { margin: 0 0 12px; color: var(--gold); font: 500 13px/1.2 var(--cond); letter-spacing: .2em; text-transform: uppercase; }
 .card-label { display: inline-block; background: var(--navy); color: var(--gold-soft); padding: 5px 10px; }
+.paper-card .eyebrow { color: var(--red-deep); }
 .card-label.hot { background: var(--red); color: #fff; }
 .hero-copy h1, .ballot-intro h1, .results-masthead h1, .state-card h1 { margin: 0; color: var(--paper); font: 700 clamp(42px, 6.4vw, 82px)/1 var(--serif); letter-spacing: -.025em; text-wrap: balance; overflow-wrap: anywhere; }
 .hero-copy h1 span { display: block; color: var(--gold); font-style: italic; font-weight: 400; }
 .hero-copy h1:focus { outline: none; }
 .lede { max-width: 560px; margin: 26px 0; color: #dfe3ee; font: 400 clamp(17px, 1.8vw, 21px)/1.55 var(--serif); }
 .procedure { list-style: none; counter-reset: step; margin: 30px 0 0; padding: 0; display: grid; gap: 12px; max-width: 520px; }
+.procedure li > span { min-width: 0; }
 .procedure li { counter-increment: step; display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: center; color: #cfd6e6; font-size: 15px; }
 .procedure li::before { content: counter(step, upper-roman); display: grid; place-items: center; height: 44px; border: 1px solid var(--gold); color: var(--gold); font: 700 16px var(--serif); }
 .procedure b { color: var(--paper); }
@@ -176,10 +177,11 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
 @keyframes spin { to { transform: rotate(360deg); } }
 .state-card { display: grid; justify-items: start; gap: 16px; width: min(660px, 100%); }
 .state-card h1 { color: var(--ink); font-size: clamp(34px, 6vw, 54px); }
-.state-card > p { margin: 0; font: 400 18px/1.5 var(--serif); color: var(--ink-soft); }
+.state-card > p:not(.card-label):not(.eyebrow) { margin: 0; font: 400 18px/1.5 var(--serif); color: var(--ink-soft); }
 .success-card { overflow: hidden; }
-.giant-stamp { position: absolute; right: -8px; top: 28px; border: 5px double var(--red); color: var(--red); padding: 4px 14px; font: 700 clamp(26px, 6vw, 44px)/1 var(--cond); letter-spacing: .12em; opacity: .85; transform: rotate(-9deg); pointer-events: none; }
-.state-card .status-message { font: 600 15px/1.5 var(--sans); color: var(--ink); }
+.success-card .eyebrow { padding-right: 150px; }
+.giant-stamp { position: absolute; right: -8px; top: 22px; border: 5px double var(--red); color: var(--red); padding: 4px 14px; font: 700 clamp(26px, 6vw, 44px)/1 var(--cond); letter-spacing: .12em; opacity: .85; transform: rotate(-9deg); pointer-events: none; }
+.state-card > p.status-message { font: 600 15px/1.5 var(--sans); color: var(--ink); }
 .receipt { width: 100%; display: grid; gap: 6px; padding: 16px 18px; background: var(--board); color: var(--present); font: 400 21px/1.2 var(--led); box-shadow: inset 0 0 0 2px #2a2a2a; }
 .receipt p { margin: 0; color: #fff; overflow-wrap: anywhere; }
 .receipt .receipt-head { color: var(--present); letter-spacing: .1em; text-transform: uppercase; }
@@ -214,6 +216,9 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
 .note-input > span { margin-top: 10px; }
 .counter-card p { margin: 0 0 12px; font: italic 400 16px var(--serif); color: var(--ink-soft); }
 .identity-card .field-label { margin-top: 0; }
+.seal-button { background: transparent; border-color: var(--gold); color: var(--gold-soft); }
+.seal-button.ready { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+.seal-button.ready:hover { background: var(--gold-soft); }
 
 /* ---------- Results ---------- */
 .results-masthead { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding: 40px 0 28px; }
@@ -260,7 +265,7 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
 .member-wall table { width: 100%; border-collapse: collapse; font: 400 21px var(--led); }
 .member-wall th, .member-wall td { padding: 7px 8px; border-bottom: 1px solid #1f1f1f; text-align: center; }
 .member-wall thead th { color: #9aa0a6; font-weight: 400; text-transform: uppercase; border-bottom-color: #3a3a3a; }
-.member-wall th[scope="row"], .member-wall thead th:first-child { text-align: left; color: #fff; font-weight: 400; text-transform: uppercase; overflow-wrap: anywhere; }
+.member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 8em; text-align: left; color: #fff; font-weight: 400; text-transform: uppercase; overflow-wrap: break-word; }
 .wall-lamp { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .wall-lamp::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
 .wall-lamp.yes { --c: var(--yea); color: var(--yea); }
@@ -331,7 +336,12 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
   .wall-lamp { gap: 5px; }
   .button-row > * { flex: 1 1 100%; }
   .site-footer { flex-direction: column; align-items: start; gap: 8px; }
-  .giant-stamp { top: 12px; right: -14px; }
+  .giant-stamp { top: 10px; right: -16px; font-size: 22px; border-width: 4px; }
+  .success-card .eyebrow { padding-right: 0; margin-top: 50px; }
+  .chamber-wordmark { font-size: 24px; }
+  .private-badge { font-size: 9px; padding: 5px 7px; }
+  .member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 6.5em; }
+  .mode-switch button { font-size: 13px; letter-spacing: .06em; padding: 0 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
