@@ -344,7 +344,7 @@ test('results show freshness and recover from a transient refresh failure', asyn
   })
 
   await page.getByRole('button', { name: /Refresh now/i }).click()
-  await expect(appAlert(page)).toContainText('temporary outage')
+  await expect(appAlert(page)).toContainText('office is not answering')
   await page.getByRole('button', { name: 'Retry' }).click()
   await expect(appAlert(page)).toHaveCount(0)
   await expect(page.getByText(/^Last updated /)).toBeVisible()

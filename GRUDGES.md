@@ -16,3 +16,8 @@ Things that failed silently or lied. Check this list before every deploy.
 - **Styles silently overriding labels.** `.state-card > p` restyled the little red labels inside
   error cards (`.card-label`) into big spaced serif text. Tests passed; it only showed up in
   screenshots. Any broad `> p` rule in this file needs a `:not(.card-label)`.
+- **2026-11-27 — The preview database is dead, and the error said so in plain server-speak.**
+  The Preview `REDIS_URL` (labeled "Temporary empty-database PR 4 verification only") no longer
+  connects: `redis_client_error` on `/api/poll` since 2026-08-23. The preview page loads fine and
+  looks finished, but "Introduce the bill" fails with a 500. Every 5xx now shows the chamber's own
+  message instead of "Failed to create poll". Before trusting a preview, create a poll on it.

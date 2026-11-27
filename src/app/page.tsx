@@ -134,6 +134,10 @@ export default function Home() {
         error?: string
       }
       if (!response.ok || !body.id || !body.resultsToken || !body.poll) {
+        // Server failures get the chamber's own words; 4xx reasons are specific and kept.
+        if (response.status >= 500) {
+          throw new Error('The Clerk\u2019s office is not answering, so nothing was introduced. Try again in a minute.')
+        }
         const fallback = response.status === 429
           ? 'The Chair does not recognize you right now. Too many bills too fast. Try again in a minute.'
           : 'The Clerk dropped the bill. Try introducing it again.'

@@ -156,6 +156,9 @@ export default function VotePage() {
         const fallback = response.status === 429
           ? 'The Chair does not recognize you right now. Too many votes at once. Wait a moment, then retry. Your choices are still here.'
           : response.status === 410 ? 'This older bill was expunged from the record.' : 'The Clerk did not catch that. Cast your vote again.'
+        if (response.status >= 500) {
+          throw new Error('The Clerk\u2019s office is not answering. Your choices are still here. Cast your vote again in a moment.')
+        }
         throw new Error(body.error || fallback)
       }
       setReceipt(payload)

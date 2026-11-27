@@ -76,6 +76,7 @@ export default function ResultsPage() {
           ? 'This older bill was expunged to protect its members\u2019 votes.'
           : response.status === 404 ? 'That bill or that key is not on file with the Clerk.'
           : response.status === 429 ? 'The Chair does not recognize you right now. Too many refreshes. Give it a minute.'
+          : response.status >= 500 ? 'The Clerk\u2019s office is not answering. The board will try again.'
           : body.error || 'The board did not come through. Try again.'
         throw new Error(message)
       }
