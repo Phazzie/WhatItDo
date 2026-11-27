@@ -1,22 +1,43 @@
 # What It Do?
 
-What It Do is a small, privacy-minded group polling app for ordinary plans and delightfully
-questionable decisions. Create a poll, share the public ballot, and keep a separate private owner
-link for results. No account is required.
+**The group chat is now in session.** What It Do is a private, no-account polling app for the plans
+your friends won't commit to. It is staged as a televised floor vote in *The House of What It Do*:
+you introduce the plan as a **bill**, each option is a **section**, every friend gets a **floor pass**
+and has to go on the record, and only you hold **the Clerk's key** to the vote board.
 
 ## What it does
 
-- **Classic mode:** `yes`, `maybe`, or `no` for each possibility.
-- **Dubious mode:** adds the sincere-but-reckless `yolo` choice.
-- Creates one public voting link and one independent private results link.
-- Accepts names, per-option notes, and an optional counterproposal.
-- Shows exact counts, proportional percentages, ties, and individual ballots without fake rankings.
-- Keeps up to ten recent public voting shortcuts in the creator's browser, with a clear-history
-  control. The private owner link appears only on the creation-success screen and is never persisted.
+- **Regular order:** members vote `YEA`, `PRESENT`, or `NAY` on each section (stored as `yes`,
+  `maybe`, `no`).
+- **Suspend the rules:** adds `HELL YEA` (stored as `yolo`) for plans that are a bad idea and
+  everyone knows it.
+- Creates one public voting link (the floor pass) and one independent private results link (the
+  Clerk's key).
+- Accepts a name for the record, per-section remarks, and an optional amendment from the floor.
+- The results page is an electronic vote board: per-section tallies with honest ties, a member wall
+  with a lamp for every vote, the amendments, and "The Record" (every ballot, set as a
+  congressional transcript).
+- Keeps up to ten recent floor passes in the creator's browser, with a clear control. The private
+  link appears only on the creation screen and is never stored.
 - Optionally sends an escaped, link-free ballot notification through Resend on a best-effort basis.
 
-The interface is an original midnight-zine collage: tactile paper, loud ink, playful copy, visible
-focus, reduced-motion support, mobile-safe controls, and no essential information in the artwork.
+### The world
+
+Navy chamber, a gold seal ("E PLURIBUS WHATEVER"), bills set in Libre Caslon, a cable-news chyron
+(network: CHAT-SPAN) in Oswald, and the vote board in VT323 LED type. Every loading state, error and
+empty state talks like the chamber: a bad link "died in committee," a rate limit is "the Chair does
+not recognize you," a full poll means "the chamber is full." Fonts are self-hosted through
+`@fontsource`, so there are no third-party requests. Reduced motion stops the crawl and the
+HELL YEA flashing.
+
+### What's still rough
+
+- The bill number (e.g. `H.R. 4424`) is decorative, derived from the poll id. It is not a count.
+- Email notifications still show the stored vote words (`yes`/`maybe`/`no`/`yolo`), not the chamber
+  labels.
+- The preview environment shares a temporary free Redis database; production still needs an
+  owner-approved persistent provider (see below).
+- On phones, the member wall scrolls sideways when a bill has three sections and long names.
 
 ## Privacy and lifecycle
 
