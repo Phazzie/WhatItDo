@@ -265,7 +265,7 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
 .member-wall table { width: 100%; border-collapse: collapse; font: 400 21px var(--led); }
 .member-wall th, .member-wall td { padding: 7px 8px; border-bottom: 1px solid #1f1f1f; text-align: center; }
 .member-wall thead th { white-space: nowrap; color: #9aa0a6; font-weight: 400; text-transform: uppercase; border-bottom-color: #3a3a3a; }
-.member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 8em; text-align: left; color: #fff; font-weight: 400; text-transform: uppercase; overflow-wrap: break-word; }
+.member-wall th[scope="row"], .member-wall thead th:first-child { min-width: 8em; text-align: left; color: #fff; font-weight: 400; text-transform: uppercase; overflow-wrap: anywhere; }
 .wall-lamp { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .wall-lamp::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
 .wall-lamp.yes { --c: var(--yea); color: var(--yea); }
@@ -333,7 +333,6 @@ input:focus, textarea:focus { background: #fff; border-color: var(--red); box-sh
   .bar-row { grid-template-columns: 74px 1fr 66px; gap: 8px; font-size: 18px; }
   .member-wall table { font-size: 18px; }
   .member-wall th, .member-wall td { padding: 7px 4px; }
-  .member-wall th[scope="row"] { overflow-wrap: anywhere; }
   .wall-lamp { flex-direction: column; gap: 3px; white-space: normal; line-height: 1; }
   .button-row > * { flex: 1 1 100%; }
   .site-footer { flex-direction: column; align-items: start; gap: 8px; }

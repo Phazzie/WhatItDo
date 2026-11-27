@@ -567,7 +567,7 @@ test('home, ballot, and owner results are accessible and fit a 375px viewport', 
   await assertNoSeriousAxeViolations(page)
 })
 
-test('a three-section member wall fits a 375px viewport without a scroll box', async ({ page }) => {
+test('a three-section member wall fits phone and tablet widths without a scroll box', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   const suggestions = ['Waffle House at 3 a.m.', 'Karaoke until they cut the power', 'Just go home']
   const links = await createPoll(page, { mode: 'dubious', title: 'Friday night', suggestions })
@@ -575,7 +575,7 @@ test('a three-section member wall fits a 375px viewport without a scroll box', a
   await choose(page, suggestions[0], 'Hell Yea')
   await choose(page, suggestions[1], 'Present')
   await choose(page, suggestions[2], 'Nay')
-  await page.getByLabel(/for the record/i).fill('Representative Longname-Hyphenated')
+  await page.getByLabel(/for the record/i).fill('N'.repeat(50))
   await page.getByRole('button', { name: /Cast my vote/i }).click()
   await expect(page.getByRole('heading', { name: /Your vote is recorded/i })).toBeVisible()
 
@@ -586,5 +586,8 @@ test('a three-section member wall fits a 375px viewport without a scroll box', a
   expect(fits).toBe(true)
   await assertNoHorizontalOverflow(page)
   await assertNoSeriousAxeViolations(page)
-  await page.screenshot({ path: 'test-results/member-wall-375.png', fullPage: true })
+
+  await page.setViewportSize({ width: 768, height: 1024 })
+  expect(await wall.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await assertNoHorizontalOverflow(page)
 })

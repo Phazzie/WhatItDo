@@ -208,7 +208,7 @@ export default function VotePage() {
             <p>{poll.title}</p>
             {(receipt?.votes ?? []).map((item, index) => <span key={item.text}><b>SEC. {index + 1}</b> {VOTE_LABEL[item.vote]} — {item.text}</span>)}
           </div>
-          <p className="fine-print">Only the bill&rsquo;s sponsor can see the board. You&rsquo;ll have to ask them how it went.</p>
+          <p className="fine-print">The board is sealed to whoever holds the Clerk&rsquo;s key, which is the sponsor unless they pass it around. Ask them how it went.</p>
           <Link className="primary-button" href="/">Introduce your own bill &rarr;</Link>
         </section>
       </main>
@@ -233,7 +233,7 @@ export default function VotePage() {
         <section className="paper-card identity-card">
           <label className="field-label" htmlFor="voter-name">Your name, for the record <span>optional</span></label>
           <input id="voter-name" value={voterName} maxLength={VOTER_NAME_MAX} onChange={(event) => setVoterName(event.target.value)} placeholder={dubious ? 'Blank = a mystery member' : 'Blank = An Unnamed Member'} />
-          <p className="fine-print">Your name and remarks go into the record. Only the bill&rsquo;s sponsor can read it.</p>
+          <p className="fine-print">Your name and remarks go into the Record. Anyone holding the Clerk&rsquo;s key (the private results link) can read them.</p>
         </section>
 
         <ol className="ballot-list">
@@ -275,7 +275,7 @@ export default function VotePage() {
           {submitting ? 'The Clerk is recording…' : complete ? 'Cast my vote →' : `Answer ${remaining} more ${remaining === 1 ? 'section' : 'sections'}`}
         </button>
       </form>
-      <footer className="site-footer"><span>CHAT-SPAN · Gavel to gavel</span><span>Only the sponsor sees the tally.</span></footer>
+      <footer className="site-footer"><span>CHAT-SPAN · Gavel to gavel</span><span>Only the Clerk&rsquo;s key opens the tally.</span></footer>
     </main>
   )
 }
