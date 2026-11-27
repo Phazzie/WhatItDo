@@ -16,16 +16,16 @@ export default function GlobalError({
 
   return (
     <main className="site-shell center-stage">
-      <section className="paper-card state-card tape-top">
-        <p className="card-label hot">PLOT TWIST</p>
-        <h1>The plan went sideways.</h1>
+      <section className="paper-card state-card">
+        <p className="card-label hot">Point of order</p>
+        <h1>The chamber lost its footing.</h1>
         <p role="alert">
-          Something unexpected interrupted the ritual. Your browser still has anything you typed.
+          Something unexpected interrupted the proceedings. Your browser still has anything you typed.
         </p>
-        <button className="primary-button cyan" type="button" onClick={reset}>
-          Try that again
+        <button className="primary-button" type="button" onClick={reset}>
+          Return to regular order
         </button>
-        <Link className="text-button" href="/">← Return to headquarters</Link>
+        <Link className="text-button" href="/">← Back to the floor</Link>
       </section>
     </main>
   )

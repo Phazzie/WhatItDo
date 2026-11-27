@@ -2,10 +2,18 @@ import type { PollResponse, VoteOption } from './types'
 
 export const VOTE_ORDER: VoteOption[] = ['yes', 'maybe', 'no', 'yolo']
 export const VOTE_LABEL: Record<VoteOption, string> = {
-  yes: 'YES',
-  maybe: 'MAYBE',
-  no: 'NOPE',
-  yolo: 'YOLO',
+  yes: 'YEA',
+  maybe: 'PRESENT',
+  no: 'NAY',
+  yolo: 'HELL YEA',
+}
+
+// Parliamentary phrasing for a single plurality leader. Ties never use these.
+const LEADER_VERDICT: Record<VoteOption, string> = {
+  yes: 'The yeas have it',
+  maybe: 'Present leads. The chat shrugs',
+  no: 'The nays have it',
+  yolo: 'The HELL YEAS have it',
 }
 
 export type VoteCounts = Record<VoteOption, number>
@@ -32,10 +40,10 @@ export function summarizeVotes(counts: VoteCounts, dubious: boolean) {
   const high = Math.max(...choices.map((vote) => counts[vote]))
   const leaders = high === 0 ? [] : choices.filter((vote) => counts[vote] === high)
   const verdict = leaders.length === 0
-    ? 'Awaiting evidence'
+    ? 'Awaiting the roll'
     : leaders.length > 1
-      ? `Tie: ${leaders.map((vote) => VOTE_LABEL[vote]).join(' + ')}`
-      : `${VOTE_LABEL[leaders[0]]} leads`
+      ? `Tied: ${leaders.map((vote) => VOTE_LABEL[vote]).join(' + ')}`
+      : LEADER_VERDICT[leaders[0]]
 
   return { choices, total, percentages, leaders, verdict }
 }

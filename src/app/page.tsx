@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import type { PollMode, PublicPoll } from '@/lib/types'
+import { ChamberHeader, Chyron, useCalendarDate } from './chamber'
 
 const MAX_RECENT = 10
 // The browser cannot observe server-side idle-TTL refreshes, so expire this
@@ -12,8 +13,8 @@ const RECENT_KEY = 'whatitdo:recent-polls:v2'
 const LEGACY_PRIVATE_RESULTS_KEY = 'whatitdo:private-results:v1'
 
 const PLACEHOLDERS: Record<PollMode, string[]> = {
-  normal: ['Try the tiny dumpling spot', 'Go stargazing Friday', 'Host a game night'],
-  dubious: ['Send the mysterious text', 'Take a midnight road trip', 'Book the wildly unnecessary getaway'],
+  normal: ['get tacos and actually show up', 'host game night at my place', 'go see the movie everybody spoiled'],
+  dubious: ['hit the Waffle House at 3 a.m.', 'drive to the beach right now', 'text the ex "you up?" as a group'],
 }
 
 interface RecentPoll {
@@ -76,6 +77,7 @@ export default function Home() {
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const createdTitleRef = useRef<HTMLHeadingElement | null>(null)
   const shouldFocusCreatedTitle = useRef(false)
+  const calendarDate = useCalendarDate()
 
   useEffect(() => {
     const hydrationTimer = window.setTimeout(() => {
@@ -109,7 +111,7 @@ export default function Home() {
     event.preventDefault()
     const filled = suggestions.map((item) => item.trim()).filter(Boolean)
     if (!filled.length) {
-      setError('Give the group at least one possibility to deliberate.')
+      setError('A bill needs at least one section. Give the chat something to vote on.')
       return
     }
 
@@ -120,7 +122,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim() || (mode === 'dubious' ? 'A Highly Questionable Proposal' : 'What It Do?'),
+          title: title.trim() || (mode === 'dubious' ? 'The Highly Questionable Plans Act' : 'The What It Do Act'),
           suggestions: filled,
           mode,
         }),
@@ -132,9 +134,13 @@ export default function Home() {
         error?: string
       }
       if (!response.ok || !body.id || !body.resultsToken || !body.poll) {
+        // Server failures get the chamber's own words; 4xx reasons are specific and kept.
+        if (response.status >= 500) {
+          throw new Error('The Clerk\u2019s office is not answering, so nothing was introduced. Try again in a minute.')
+        }
         const fallback = response.status === 429
-          ? 'The idea machine needs a breather. Try again in a minute.'
-          : 'The poll would not materialize. Try again.'
+          ? 'The Chair does not recognize you right now. Too many bills too fast. Try again in a minute.'
+          : 'The Clerk dropped the bill. Try introducing it again.'
         throw new Error(body.error || fallback)
       }
 
@@ -162,10 +168,10 @@ export default function Home() {
       try {
         localStorage.setItem(RECENT_KEY, JSON.stringify(next))
       } catch {
-        setError('Your links are visible, but we could not save the public voting link in this browser. Copy the private link now.')
+        setError('Your links are below, but this browser would not let us remember the floor pass. Copy the Clerk\u2019s key now.')
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The poll would not materialize. Try again.')
+      setError(caught instanceof Error ? caught.message : 'The Clerk dropped the bill. Try introducing it again.')
     } finally {
       setCreating(false)
     }
@@ -178,7 +184,7 @@ export default function Home() {
       if (copyTimer.current) clearTimeout(copyTimer.current)
       copyTimer.current = setTimeout(() => setCopied(''), 1800)
     } catch {
-      setError('Clipboard access fizzled. Select the link and copy it manually.')
+      setError('The clipboard refused to cooperate. Select the link and copy it by hand.')
     }
   }
 
@@ -202,48 +208,42 @@ export default function Home() {
 
   return (
     <main className="site-shell">
-      <div className="ambient-doodles" aria-hidden="true"><span>✦</span><span>↝</span><span>☻</span></div>
-      <header className="brand-header">
-        <Link href="/" className="brand-mark" aria-label="What It Do home">
-          <span className="brand-kicker">group decisions, but weird</span>
-          <span className="brand-wordmark">WHAT IT <i>DO?</i></span>
-        </Link>
-        <span className="edition-sticker" aria-hidden="true">MIDNIGHT<br />EDITION</span>
-      </header>
+      <Chyron live="LIVE" headline={created ? `FLOOR DEBATE · ${created.title}` : 'THE HOUSE IS IN SESSION · NO QUORUM REQUIRED'} />
+      <ChamberHeader right={<span className="session-tag">1st Session<br />of the Group Chat</span>} />
 
       {created ? (
         <section className="hero-grid success-grid" aria-labelledby="created-title">
           <div className="hero-copy">
-            <p className="eyebrow">The council is summoned</p>
-            <h1 id="created-title" ref={createdTitleRef} tabIndex={-1}>Poll <span>alive.</span><br />Chaos pending.</h1>
-            <p className="lede">Send the public ballot to your people. Keep the owner link private—it is the only key to the unfiltered results.</p>
-            <button className="text-button" type="button" onClick={reset}>← Conjure another poll</button>
+            <p className="eyebrow">Referred directly to the floor</p>
+            <h1 id="created-title" ref={createdTitleRef} tabIndex={-1}>The bill is <span>on the floor.</span></h1>
+            <p className="lede">Send the floor pass to every member of the chat. Keep the Clerk&rsquo;s key to yourself&mdash;it is the only way to see who voted how.</p>
+            <button className="text-button" type="button" onClick={reset}>&larr; Introduce another bill</button>
           </div>
           <div className="paper-stack">
-            <p className="notice" role="status" style={{ backgroundColor: 'var(--butter)', color: 'var(--ink)' }}>Your public ballot and private owner links are ready.</p>
+            <p className="notice notice-ok" role="status">Your floor pass and the Clerk&rsquo;s private tally link are ready.</p>
             {error && <p className="notice notice-error" role="alert">{error}</p>}
-            <article className="paper-card tape-top">
-              <p className="card-label">SHARE THIS ONE</p>
-              <h2>Public voting link</h2>
-              <p className="muted">Safe to send around. It does not reveal names, comments, or results.</p>
+            <article className="paper-card pass-card">
+              <p className="card-label">Admit all members · Share freely</p>
+              <h2>Floor pass</h2>
+              <p className="muted">The public voting link. It shows the bill and nothing else&mdash;no names, no remarks, no tally.</p>
               <output className="link-output">{created.voteUrl}</output>
               <div className="button-row">
-                <button className="primary-button cyan" type="button" onClick={() => copyLink('vote', created.voteUrl)}>
-                  {copied === 'vote' ? 'Copied! ✦' : 'Copy vote link'}
+                <button className="primary-button" type="button" onClick={() => copyLink('vote', created.voteUrl)}>
+                  {copied === 'vote' ? 'Copied. Whip the votes.' : 'Copy floor pass'}
                 </button>
-                <a className="secondary-button" href={`sms:?body=${encodeURIComponent(`Cast your vote: ${created.title}\n${created.voteUrl}`)}`}>Text it</a>
+                <a className="secondary-button" href={`sms:?body=${encodeURIComponent(`You've been called to vote: ${created.title}\n${created.voteUrl}`)}`}>Text it to the chat</a>
               </div>
             </article>
             <article className="paper-card owner-card">
-              <p className="card-label hot">EYES ONLY</p>
-              <h2>Private owner link</h2>
-              <p className="muted">Save this now. Anyone with this exact link can read every response.</p>
+              <p className="card-label hot">Sponsor&rsquo;s eyes only</p>
+              <h2>The Clerk&rsquo;s tally</h2>
+              <p className="muted">Your private results link. Save it now. Anyone holding this exact link can read every vote and every remark.</p>
               <output className="link-output private-link">{created.resultsUrl}</output>
               <div className="button-row">
-                <button className="primary-button pink" type="button" onClick={() => copyLink('results', created.resultsUrl)}>
-                  {copied === 'results' ? 'Secret secured! ✦' : 'Copy private link'}
+                <button className="primary-button red" type="button" onClick={() => copyLink('results', created.resultsUrl)}>
+                  {copied === 'results' ? 'Key secured.' : 'Copy the Clerk’s key'}
                 </button>
-                <Link className="secondary-button" href={created.resultsUrl} prefetch={false}>Open results</Link>
+                <Link className="secondary-button" href={created.resultsUrl} prefetch={false}>Open the vote board</Link>
               </div>
             </article>
           </div>
@@ -251,32 +251,43 @@ export default function Home() {
       ) : (
         <section className="hero-grid" aria-labelledby="home-title">
           <div className="hero-copy">
-            <p className="eyebrow">Schemes · dreams · questionable decisions</p>
-            <h1 id="home-title">Stop circling.<br /><span>Pick a thing.</span></h1>
-            <p className="lede">A tiny voting booth for big plans, bad ideas, and friends who refuse to answer the group chat.</p>
-            <div className="scribble-note" aria-hidden="true">no logins<br />no lurking<br />just vote ↗</div>
+            <p className="eyebrow">Group decisions, under oath</p>
+            <h1 id="home-title">The group chat is <span>now in session.</span></h1>
+            <p className="lede">Somebody always says &ldquo;idk, whatever y&rsquo;all want.&rdquo; Not anymore. Introduce the plan as a bill, and every member has to go on the record: yea, nay, or present.</p>
+            <ol className="procedure">
+              <li><span><b>Introduce</b> the bill. Up to three sections.</span></li>
+              <li><span><b>Text the floor pass</b> to the chat. No accounts.</span></li>
+              <li><span><b>Watch the board</b> light up. Only you hold the key.</span></li>
+            </ol>
           </div>
 
-          <form className="paper-card creation-card tape-top" onSubmit={createPoll}>
+          <form className="paper-card bill-card" onSubmit={createPoll}>
+            <div className="bill-masthead" aria-hidden="true">
+              <span>H.R. ____</span>
+              <span>{calendarDate || 'In the House of What It Do'}</span>
+            </div>
+            <p className="bill-a">A BILL</p>
+            <p className="bill-purpose">To end the group chat&rsquo;s indecision, and for other purposes.</p>
+
             <fieldset className="mode-switch">
-              <legend>Choose your energy</legend>
+              <legend>Rules of debate</legend>
               <button type="button" className={mode === 'normal' ? 'active' : ''} aria-pressed={mode === 'normal'} onClick={() => setMode('normal')}>
-                <span aria-hidden="true">☀</span> Classic
+                Regular order
               </button>
               <button type="button" className={mode === 'dubious' ? 'active dubious' : ''} aria-pressed={mode === 'dubious'} onClick={() => setMode('dubious')}>
-                <span aria-hidden="true">☾</span> Dubious
+                Suspend the rules
               </button>
             </fieldset>
-            <p className="mode-caption">{mode === 'dubious' ? 'Unlocks the reckless-but-sincere YOLO vote.' : 'A respectable yes / maybe / no situation.'}</p>
+            <p className="mode-caption">{mode === 'dubious' ? 'Members may also vote HELL YEA. For plans that are a bad idea and everyone knows it.' : 'Yea, present, or nay. Respectable. Procedural. Boring on purpose.'}</p>
 
-            <label className="field-label" htmlFor="poll-title">Name the dilemma <span>optional</span></label>
-            <input id="poll-title" value={title} maxLength={100} onChange={(event) => setTitle(event.target.value)} placeholder="Friday night: what are we doing?" />
+            <label className="field-label" htmlFor="poll-title">Short title of the bill <span>optional</span></label>
+            <input id="poll-title" value={title} maxLength={100} onChange={(event) => setTitle(event.target.value)} placeholder={mode === 'dubious' ? 'The Absolutely Not Going To Bed Act' : 'The Friday Night Act'} />
 
             <fieldset className="options-fieldset">
-              <legend>Possible moves <small>1–3 required</small></legend>
+              <legend>Be it enacted by the members of the group chat, that we: <small>1&ndash;3 sections</small></legend>
               {suggestions.map((suggestion, index) => (
                 <label className="option-input" key={index} htmlFor={`suggestion-${index}`}>
-                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <span>Sec. {index + 1}</span>
                   <input id={`suggestion-${index}`} value={suggestion} maxLength={200} onChange={(event) => updateSuggestion(index, event.target.value)} placeholder={PLACEHOLDERS[mode][index]} />
                 </label>
               ))}
@@ -284,9 +295,9 @@ export default function Home() {
 
             {error && <p className="notice notice-error" role="alert" aria-live="assertive">{error}</p>}
             <button className="primary-button jumbo" disabled={creating} type="submit">
-              {creating ? 'Opening the portal…' : 'Make the poll'} <span aria-hidden="true">↗</span>
+              {creating ? 'The Clerk is reading the bill…' : 'Introduce the bill'} <span aria-hidden="true">&rarr;</span>
             </button>
-            <p className="fine-print">Polls vanish after 30 idle days (90 days max). We keep no account or profile.</p>
+            <p className="fine-print">Bills die in committee after 30 quiet days, 90 at most. No accounts, no profiles, no lobbyists.</p>
           </form>
         </section>
       )}
@@ -294,23 +305,23 @@ export default function Home() {
       {!created && recent.length > 0 && (
         <section className="recent-section" aria-labelledby="recent-heading">
           <div>
-            <p className="eyebrow">Your browser remembers</p>
-            <h2 id="recent-heading">Recent polls</h2>
+            <p className="eyebrow">Remembered by this browser only</p>
+            <h2 id="recent-heading">Your bills on the calendar</h2>
           </div>
           <ul className="recent-list">
             {recent.map((item) => (
               <li key={item.voteUrl}>
                 <Link href={item.voteUrl} prefetch={false}>
                   <span>{item.title}</span>
-                  <small>{new Date(item.createdAt).toLocaleDateString()} · open ballot ↗</small>
+                  <small>Introduced {new Date(item.createdAt).toLocaleDateString()} · open the floor &rarr;</small>
                 </Link>
               </li>
             ))}
           </ul>
-          <button className="text-button danger" type="button" onClick={clearRecent}>Clear recent poll history</button>
+          <button className="text-button danger" type="button" onClick={clearRecent}>Strike these from the calendar</button>
         </section>
       )}
-      <footer className="site-footer"><span>WHATITDO.EXE</span><span>Built for decisive-ish people.</span></footer>
+      <footer className="site-footer"><span>CHAT-SPAN · Unedited, uninterrupted, unbothered</span><span>A Skeptical Wombat production</span></footer>
     </main>
   )
 }
